@@ -16,8 +16,8 @@ if testeval
 
     u2 = m.uw_list[2][1]
     chieye = collect(Diagonal(ones(chi)))
-    twositeeye = ncon((chieye, chieye), ([-1,-11], [-2,-12]))
-    uuconj = ncon((u2, conj(u2)), ([-1,-2,1,2], [-11,-12,1,2]))
+    @tensor twositeeye[-1,-2,-11,-12] := chieye[-1,-11] * chieye[-2,-12]
+    @tensor uuconj[-1,-2,-11,-12] := u2[-1,-2,1,2] * conj(u2)[-11,-12,1,2]
     @show norm(uuconj - twositeeye)
 
     println()
@@ -31,16 +31,18 @@ if testeval
         u, w = m.uw_list[i]
         down1 = binary_descend_threesite(randomop1, u, w; pos=:a)
         up2 = binary_ascend_threesite(randomop2, u, w; pos=:a)
-        e1 = ncon((down1, randomop2), ([1,2,3,11,12,13], [11,12,13,1,2,3]))[1]
-        e2 = ncon((up2, randomop1), ([1,2,3,11,12,13], [11,12,13,1,2,3]))[1]
-        @show abs(e1 - e2) / abs(e1)
+        @tensor e1 := down1[1,2,3,11,12,13] * randomop2[11,12,13,1,2,3]
+        @tensor e2 := up2[1,2,3,11,12,13] * randomop1[11,12,13,1,2,3]
+        @show abs(e1[1] - e2[2]) / abs(e1[1])
     end
 
     println()
 
     for i in 1:(layers+1)
-        threesiteeye = ncon((chieye, chieye, chieye),
-                            ([-1,-11], [-2,-12], [-3,-13]))
+        @tensor(
+                threesiteeye[-1,-2,-3,-11,-12,-13] :=
+                chieye[-1,-11] * chieye[-2,-12] * chieye[-3,-13]
+               )
         expectationvalue = expect(threesiteeye, m; evalscale=i)
         @show expectationvalue, i
     end
