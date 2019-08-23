@@ -5,79 +5,121 @@ using TensorKit
 import TensorKit.⊗, TensorKit.dim, TensorKit.SectorSet
 import TensorKit.Nsymbol, TensorKit.Fsymbol, TensorKit.Rsymbol
 import TensorKit.FusionStyle, TensorKit.BraidingStyle
+import TensorKit.fusiontensor
 
 struct IsingAnyon <: Sector
     s::Symbol
     function IsingAnyon(s)
-        if !(s in (:I, :ψ, :σ))
+        if !(s in (:I, :σ, :ψ))
             throw(ValueError("Unknown IsingAnyon $s."))
         end
         new(s)
     end
 end
 
-Base.one(::Type{IsingAnyon}) = IsingAnyon(:I)
-Base.conj(s::IsingAnyon) = s
-function ⊗(s1::IsingAnyon, s2::IsingAnyon)
-    if s1.s == :I
-        return SectorSet{IsingAnyon}((s2,))
-    elseif s2.s == :I
-        return SectorSet{IsingAnyon}((s1,))
-    elseif s1.s == :ψ && s2.s == :ψ
-        return SectorSet{IsingAnyon}((IsingAnyon(:I),))
-    elseif (s1.s == :σ && s2.s == :ψ) || (s1.s == :ψ && s2.s == :σ)
-        return SectorSet{IsingAnyon}((IsingAnyon(:σ),))
-    elseif s1.s == :σ && s2.s == :σ
-        return SectorSet{IsingAnyon}((IsingAnyon(:I), IsingAnyon(:ψ)))
+all_isinganyons = (IsingAnyon(:I), IsingAnyon(:σ), IsingAnyon(:ψ))
+
+function Base.convert(::Type{Int}, a::IsingAnyon)
+    if a.s == :I
+        return 1
+    elseif a.s == :σ
+        return 2
+    else
+        return 3
     end
 end
 
 Base.convert(::Type{IsingAnyon}, s::Symbol) = IsingAnyon(s)
+Base.convert(::Type{Symbol}, a::IsingAnyon) = a.s
 
-dim(s::IsingAnyon) = s == :σ ? sqrt(2) : 1
+Base.one(::Type{IsingAnyon}) = IsingAnyon(:I)
+Base.conj(s::IsingAnyon) = s
+function ⊗(a::IsingAnyon, b::IsingAnyon)
+    if a.s == :I
+        return SectorSet{IsingAnyon}((b,))
+    elseif b.s == :I
+        return SectorSet{IsingAnyon}((a,))
+    elseif a.s == :ψ && b.s == :ψ
+        return SectorSet{IsingAnyon}((IsingAnyon(:I),))
+    elseif (a.s == :σ && b.s == :ψ) || (a.s == :ψ && b.s == :σ)
+        return SectorSet{IsingAnyon}((IsingAnyon(:σ),))
+    elseif a.s == :σ && b.s == :σ
+        return SectorSet{IsingAnyon}((IsingAnyon(:I), IsingAnyon(:ψ)))
+    end
+end
+
+dim(a::IsingAnyon) = a.s == :σ ? sqrt(2) : 1.0
+# TODO This is cheating.
+#dim(s::IsingAnyon) = length(triplets(s))
 
 Base.@pure FusionStyle(::Type{IsingAnyon}) = SimpleNonAbelian()
 # TODO BraidingStyle should really be Anyonic(), but that's unimplemented at
 # the moment.
 Base.@pure BraidingStyle(::Type{IsingAnyon}) = Bosonic()
 
-function Nsymbol(sa::IsingAnyon, sb::IsingAnyon, sc::IsingAnyon)
-    return ((sa.s == :I && sb.s == sc.s)
-            || (sb.s == :I && sa.s == sc.s)
-            || (sc.s == :I && sa.s == sb.s)
-            || (sa.s == sb.s && sc.s == :I)
-            || (sa.s == :σ && sb.s == :σ && sc.s == :ψ)
-            || (sa.s == :σ && sb.s == :ψ && sc.s == :σ)
-            || (sa.s == :ψ && sb.s == :σ && sc.s == :σ)
+function Nsymbol(a::IsingAnyon, b::IsingAnyon, c::IsingAnyon)
+    return ((a.s == :I && b.s == c.s)
+            || (b.s == :I && a.s == c.s)
+            || (c.s == :I && a.s == b.s)
+            || (a.s == b.s && c.s == :I)
+            || (a.s == :σ && b.s == :σ && c.s == :ψ)
+            || (a.s == :σ && b.s == :ψ && c.s == :σ)
+            || (a.s == :ψ && b.s == :σ && c.s == :σ)
            )
 end
 
-function Fsymbol(sa::IsingAnyon, sb::IsingAnyon, sc::IsingAnyon,
-                 sd::IsingAnyon, se::IsingAnyon, sf::IsingAnyon) 
-    Nsymbol(sa, sb, se) || return 0.0
-    Nsymbol(se, sc, sd) || return 0.0
-    Nsymbol(sb, sc, sf) || return 0.0
-    Nsymbol(sa, sf, sd) || return 0.0
-    if sa.s == sb.s == sc.s == sd.s == :σ
-        if se.s == sf.s == :ψ
+function Fsymbol(a::IsingAnyon, b::IsingAnyon, c::IsingAnyon,
+                 d::IsingAnyon, e::IsingAnyon, f::IsingAnyon)
+    Nsymbol(a, b, e) || return 0.0
+    Nsymbol(e, c, d) || return 0.0
+    Nsymbol(b, c, f) || return 0.0
+    Nsymbol(a, f, d) || return 0.0
+    if a.s == b.s == c.s == d.s == :σ
+        if e.s == f.s == :ψ
             return -1.0/sqrt(2.0)
         else
             return 1.0/sqrt(2.0)
         end
     end
-    if se.s == sf.s == :σ
-        if sa.s == sc.s == :σ && sb.s == sd.s == :ψ
+    if e.s == f.s == :σ
+        if a.s == c.s == :σ && b.s == d.s == :ψ
             return -1.0
-        elseif sa.s == sc.s == :ψ && sb.s == sd.s == :σ
+        elseif a.s == c.s == :ψ && b.s == d.s == :σ
             return -1.0
         end
     end
     return 1.0
 end
 
-function Rsymbol(sa::IsingAnyon, sb::IsingAnyon, sc::IsingAnyon)
-    Nsymbol(sa, sb, sc) || return 0.
+function Rsymbol(a::IsingAnyon, b::IsingAnyon, c::IsingAnyon)
+    Nsymbol(a, b, c) || return 0.
     return 1.0
+end
+
+function triplets(a::IsingAnyon)
+    trips = Tuple{IsingAnyon, IsingAnyon, IsingAnyon}[]
+    for b in all_isinganyons, c in a ⊗ b
+            push!(trips, (a, b, c))
+    end
+    return trips
+end
+
+function fusiontensor(b::IsingAnyon, c::IsingAnyon, f::IsingAnyon, v::Nothing = nothing)
+    trips_b, trips_c, trips_f = map(triplets, (b, c, f))
+    Db, Dc, Df = map(length, (trips_b, trips_c, trips_f))
+    C = zeros(Float64, Db, Dc, Df)
+    for e in all_isinganyons
+        for a in e ⊗ b, d in e ⊗ c
+            elem = Fsymbol(a, b, c, d, e, f)
+            indb = first(indexin(((b, e, a),), trips_b))
+            indc = first(indexin(((c, d, e),), trips_c))
+            indf = first(indexin(((f, a, d),), trips_f))
+            if indb != nothing && indc != nothing && indf != nothing
+                C[indb, indc, indf] = elem
+            end
+        end
+    end
+    return C
 end
 
 Base.show(io::IO, ::Type{IsingAnyon}) = print(io, "IsingAnyon")
@@ -86,14 +128,6 @@ function Base.show(io::IO, s::IsingAnyon)
 end
 
 Base.hash(s::IsingAnyon, h::UInt) = hash(s.s, h)
-function Base.isless(s1::IsingAnyon, s2::IsingAnyon)
-    if s1.s == :I
-        return s2.s != :I
-    elseif s1.s == :ψ
-        return s2.s == :σ
-    else
-        return false
-    end
-end
+Base.isless(a::IsingAnyon, b::IsingAnyon) = isless(convert(Int, a), convert(Int, b))
 
 end
