@@ -1,5 +1,5 @@
-using TensorFactorizations
-using TensorOperations
+using TensorKit
+using KrylovKit
 using Printf
 using LinearAlgebra
 using Logging
@@ -9,13 +9,13 @@ using Logging
 # The data type
 
 mutable struct MERA
-    uw_list::Vector{Tuple{Array, Array}}
-    top::Array
+    uw_list::Vector{Tuple{TensorMap, TensorMap}}
+    top::Tensor
     depth::Int
 
     function MERA(uw_list, top)
         m = new(uw_list, top, length(uw_list))
-        bonddimension_invar(m)
+        space_invar(m)
         return m
     end
 end
@@ -24,13 +24,15 @@ end
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Utility functions
 
+# TODO Could we remove these functions?
 function build_u_dg(u)
-    u_dg = permutedims(conj(u), (3,4,1,2))
+    u_dg = u'
     return u_dg
 end
 
+# TODO Could we remove these functions?
 function build_w_dg(w)
-    w_dg = permutedims(conj(w), (2,3,1))
+    w_dg = w'
     return w_dg
 end
 
@@ -52,7 +54,7 @@ end
 
 function set_uw!(m, u, w, layer)
     m.uw_list[layer] = (u, w)
-    bonddimension_invar(m)
+    space_invar(m)
     return m
 end
 
@@ -66,14 +68,14 @@ end
 
 function set_top!(m, top)
     m.top = top
-    bonddimension_invar(m)
+    space_invar(m)
     return m
 end
 
 function addlayer!(m, u, w, layer)
     insert!(m.uw_list, layer, (u, w))
     m.depth += 1
-    bonddimension_invar(m)
+    space_invar(m)
     depth_invar(m)
     return m
 end
@@ -81,22 +83,22 @@ end
 function removelayer!(m, layer)
     deleat!(m.uw_list, layer)
     m.depth -= 1
-    bonddimension_invar(m)
+    space_invar(m)
     depth_invar(m)
     return m
 end
 
-function getbonddimension(m, layer)
+function getspace(m, layer)
     if layer == m.depth+1
-        chi = size(m.top)[1]
+        V = space(m.top, 1)'
     elseif layer <= m.depth
         u = m.uw_list[layer][1]
-        chi = size(u)[3]
+        V = space(u, 3)'
     else
         errmsg = "layer > depth of MERA"
         throw(ArgumentError(errmsg))
     end
-    return chi
+    return V
 end
 
 
@@ -111,50 +113,50 @@ function depth_invar(m)
     return true
 end
 
-function bonddimension_invar(m)
+function space_invar(m)
     uw_list = m.uw_list
     u, w = uw_list[1]
     for i in 2:m.depth
         unext, wnext = uw_list[i]
-        if !bonddimension_invar_intralayer(u, w)
+        if !space_invar_intralayer(u, w)
             errmsg = "Mismatching bonds in MERA within layer $(i-1)."
             throw(ArgumentError(errmsg))
         end
-        if !bonddimension_invar_interlayer(w, unext)
+        if !space_invar_interlayer(w, unext)
             errmsg = "Mismatching bonds in MERA between layers $(i-1) and $i."
             throw(ArgumentError(errmsg))
         end
         u, w = unext, wnext
     end
 
-    if !bonddimension_invar_intralayer(u, w)
+    if !space_invar_intralayer(u, w)
         errmsg = "Mismatching bonds in MERA within layer $(m.depth)."
         throw(ArgumentError(errmsg))
     end
 
-    if !bonddimension_invar_top(w, m.top)
+    if !space_invar_top(w, m.top)
         errmsg = "Mismatching bonds in MERA for the top tensor."
         throw(ArgumentError(errmsg))
     end
     return true
 end
 
-function bonddimension_invar_intralayer(u, w)
-    matching_bonds = [(size(u)[1], size(w)[3]),
-                      (size(u)[2], size(w)[2])]
+function space_invar_intralayer(u, w)
+    matching_bonds = [(space(u, 1), space(w, 3)'),
+                      (space(u, 2), space(w, 2)')]
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end
 
-function bonddimension_invar_interlayer(w, unext)
-    matching_bonds = [(size(w)[1], size(unext)[3]),
-                      (size(w)[1], size(unext)[4])]
+function space_invar_interlayer(w, unext)
+    matching_bonds = [(space(w, 1), space(unext, 3)'),
+                      (space(w, 1), space(unext, 4)')]
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end
 
-function bonddimension_invar_top(w, top)
-    allmatch = (size(w)[1] == size(top)[1] == size(top)[2] == size(top)[3])
+function space_invar_top(w, top)
+    allmatch = (space(w, 1)' == space(top, 1) == space(top, 2) == space(top, 3))
     return allmatch
 end
 
@@ -162,78 +164,62 @@ end
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Functions for creating and replacing tensors
 
-function random_complex_tensor(chi::Integer, rank::Integer)
-    chis = fill(chi, (rank,))
-    return random_complex_tensor(chis)
-end
-
-function random_complex_tensor(chis::Vector{T}) where {T<:Integer}
-    real = randn(chis...)
-    imag = randn(chis...)
-    res = complex.(real, imag)
-    return res
-end
-
-function randomisometry(chisin::Vector{Int}, chisout::Vector{Int})
-    chisall = vcat(chisin, chisout)
-    chitotalin = prod(chisin)
-    chitotalout = prod(chisout)
-    temp = random_complex_tensor([chitotalin, chitotalout])
-    temp_svd = svd(temp)
-    u = temp_svd.U * temp_svd.Vt
-    u = reshape(u, (chisall...,))
+function randomisometry(Vout, Vin)
+    temp = TensorMap(rand, ComplexF64, Vout ← Vin)
+    U, S, Vt = svd(temp)
+    u = U * Vt
     return u
 end
 
-function randomtop(chi)
-    top = random_complex_tensor(chi, 3)
+function randomtop(V)
+    top = Tensor(rand, ComplexF64, V' ⊗ V' ⊗ V')
     top /= norm(top)
     return top
 end
 
-function randomlayer(chiin, chiout)
-    u = randomisometry([chiin, chiin], [chiin, chiin])
-    w = randomisometry([chiout], [chiin, chiin])
+function randomlayer(Vin, Vout)
+    u = randomisometry(Vin ⊗ Vin, Vin ⊗ Vin)
+    w = randomisometry(Vout, Vin ⊗ Vin)
     return u, w
 end
 
-function addrandomlayer!(m, layer, chiin=getbonddimension(m, layer))
-    chiout = getbonddimension(m, layer)
-    u, w = randomlayer(chiin, chiout)
+function addrandomlayer!(m, layer, Vin=getspace(m, layer))
+    Vout = getspace(m, layer)
+    u, w = randomlayer(Vin, Vout)
     addlayer!(m, u, w, layer)
     return m
 end
 
 function randomizelayer!(m, layer)
-    chiin = getbonddimension(m, layer)
-    chiout = getbonddimension(m, layer+1)
-    u, w = randomlayer(chiin, chiout)
+    Vin = getspace(m, layer)
+    Vout = getspace(m, layer+1)
+    u, w = randomlayer(Vin, Vout)
     set_uw!(m, u, w, layer)
     return m
 end
 
 function randomizetop!(m)
-    chi = getbonddimension(m, m.depth+1)
-    top = randomtop(chi)
+    V = getspace(m, m.depth+1)
+    top = randomtop(V)
     set_top!(m, top)
     return m
 end
 
-function build_random_MERA(chi::Int, layers)
-    chis = fill(chi, (layers+1,))
-    return build_random_MERA(chis)
+function build_random_MERA(V, layers)
+    Vs = repeat([V], layers+1)
+    return build_random_MERA(Vs)
 end
 
-function build_random_MERA(chis::Vector{Int})
-    layers = length(chis)-1
+function build_random_MERA(Vs)
+    layers = length(Vs)-1
     uw_list = []
     for i in 1:layers
-        chi = chis[i]
-        chinext = chis[i+1]
-        u, w = randomlayer(chi, chinext)
+        V = Vs[i]
+        Vnext = Vs[i+1]
+        u, w = randomlayer(V, Vnext)
         push!(uw_list, (u, w))
     end
-    top = randomtop(chis[length(chis)])
+    top = randomtop(Vs[length(Vs)])
     m = MERA(uw_list, top)
     return m
 end
@@ -339,7 +325,7 @@ end
 function build_rho(mera, scale)
     depth = mera.depth
     top = mera.top
-    @tensor rho[-1,-2,-3,-11,-12,-13] := conj(top)[-1,-2,-3] * top[-11,-12,-13]
+    @tensor rho[-1,-2,-3,-11,-12,-13] := conj(top[-1,-2,-3]) * top[-11,-12,-13]
     rho = desc_threesite(rho, mera; endscale=scale, startscale=depth+1)
     return rho
 end
@@ -364,10 +350,11 @@ function expect(op, mera; opscale=1, evalscale=mera.depth+1)
     op = asc_threesite(op, mera; startscale=opscale, endscale=evalscale)
     # TODO this averaging shouldn't be hardcoded.
     opavg = (op
-            + permutedims(op, [2,3,1,5,6,4])
-            + permutedims(op, [3,1,2,6,4,5])
+            + permuteind(op, (2,3,1,5,6,4))
+            + permuteind(op, (3,1,2,6,4,5))
            )/3
     @tensor value_tens[] := rho[1,2,3,11,12,13] * opavg[11,12,13,1,2,3]
+    # TODO Probably shouldn't have to explicitly mention TensorKit.
     value = scalar(value_tens)
     if abs(imag(value)/value) > 1e-13
         @warn("Non-real expectation value: $value")
@@ -438,7 +425,6 @@ function minimize_expectation_u(h, u, w, rho)
             w_dg[5,7,17] * w_dg[12,11,18] * w_dg[19,8,10]
            )
                 
-
     @tensor(
             env2[-1,-2,-3,-4] :=
             rho[4,15,6,3,10,5] *
@@ -449,7 +435,6 @@ function minimize_expectation_u(h, u, w, rho)
             w_dg[1,13,4] * w_dg[14,16,15] * w_dg[17,2,6]
            )
                 
-
     @tensor(
             env3[-1,-2,-3,-4] :=
             rho[6,15,4,5,10,3] *
@@ -459,7 +444,6 @@ function minimize_expectation_u(h, u, w, rho)
             u_dg[8,7,17,16] * u_dg[18,12,14,13] *
             w_dg[2,17,6] * w_dg[16,14,15] * w_dg[13,1,4]
            )
-
 
     @tensor(
             env4[-1,-2,-3,-4] :=
@@ -472,8 +456,9 @@ function minimize_expectation_u(h, u, w, rho)
            )
 
     env = env1 + env2 + env3 + env4
-    U, S, V = tensorsvd(env, [1,2], [3,4])
-    @tensor u[-1,-2,-3,-4] := conj(U)[-1,-2,1] * conj(V)[1,-3,-4]
+    U, S, Vt = svd(env, (1,2), (3,4))
+    @tensor u[-1,-2,-3,-4] := conj(U[-1,-2,1]) * conj(Vt[1,-3,-4])
+    u = permuteind(u, (1,2), (3,4))
     return u
 end
 
@@ -545,17 +530,22 @@ function minimize_expectation_w(h, u, w, rho)
            )
 
     env = env1 + env2 + env3 + env4 + env5 + env6
-    U, S, V = tensorsvd(env, [1], [2,3])
-    @tensor w[-1,-2,-3] := conj(U)[-1,1] * conj(V)[1,-2,-3]
+    U, S, Vt = svd(env, (1,), (2,3))
+    @tensor w[-1,-2,-3] := conj(U[-1,1]) * conj(Vt[1,-2,-3])
+    w = permuteind(w, (1,), (2,3))
     return w
 end
 
 function minimize_expectation_top(h, pars)
     havg = (h
-            + permutedims(h, [2,3,1,5,6,4])
-            + permutedims(h, [3,1,2,6,4,5])
+            + permuteind(h, (2,3,1,5,6,4))
+            + permuteind(h, (3,1,2,6,4,5))
            )/3
-    top = tensoreig(havg, [1,2,3], [4,5,6], hermitian=true)[2][:,:,:,1]
+    top = eigsolve(v -> @tensor(res[-1,-2,-3]
+                                := havg[1,2,3,-1,-2,-3] * v[1,2,3]),
+                   Tensor(randn, ComplexF64, space(havg, (1,2,3))');
+                   ishermitian=true
+                  )[2][1]
     return top
 end
 
