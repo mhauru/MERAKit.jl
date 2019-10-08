@@ -14,7 +14,7 @@ using .TernaryMERAInf
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
-        , "--chi", arg_type=Int, default=4
+        , "--chi", arg_type=Int, default=10
         , "--layers", arg_type=Int, default=3
         , "--symmetry", arg_type=String, default="none"
         , "--group", arg_type=Int, default=2
@@ -132,9 +132,18 @@ function get_scaldims(m)
     b = blocks(S)
     scaldims = Dict()
     for (k, v) in b
-        scaldims[k] = -log.(3, abs.(diag(v)))./2  # TODO Why the abs?
+        scaldims[k] = -log.(3, abs.(diag(v)))  # TODO Why the abs?
     end
     return scaldims
+end
+
+function optimize_layerbylayer!(m, fixedlayers, normalization, pars)
+    while fixedlayers >= 0
+        minimize_expectation!(m, h, pars;
+                              lowest_to_optimize=fixedlayers+1,
+                              normalization=normalization)
+        fixedlayers -= 1
+    end
 end
 
 
@@ -143,52 +152,47 @@ chi = cmdlinepars[:chi]
 layers = cmdlinepars[:layers]
 symmetry = cmdlinepars[:symmetry]
 group = cmdlinepars[:group]
-parsrandom = Dict(:energy_delta => 1e-5,
-                  :energy_maxiter => 500,
-                  :havg_depth => 5,
-                  :uw_iters => 10,
-                  :u_iters => 3,
-                  :w_iters => 3)
-parsinitialized = Dict(:energy_delta => 1e-6,
-                       :energy_maxiter => 500,
-                       :havg_depth => 5,
-                       :uw_iters => 3,
-                       :u_iters => 3,
-                       :w_iters => 3)
+pars = Dict(:rho_delta => 1e-7,
+            :energy_delta => 1e-7,
+            :energy_maxiter => 500,
+            :energy_miniter => 100,
+            :havg_depth => 5,
+            :uw_iters => 10,
+            :u_iters => 3,
+            :w_iters => 3)
 
 h, dmax = build_H_Ising(symmetry=symmetry, group=group)
 V_phys = space(h, 1)
 if symmetry == "none"
-    V_virt = ℂ^chi
+    V_virt = ℂ^1
 elseif symmetry == "Z2"
-    V_virt = ℂ[ℤ₂](0=>chi, 1=>chi)
+    V_virt = ℂ[ℤ₂](0=>1, 1=>0)
 elseif symmetry == "anyons"
-    V_virt = RepresentationSpace{IsingAnyon}(:I => chi, :ψ => chi, :σ => chi)
+    V_virt = RepresentationSpace{IsingAnyon}(:I => 1, :ψ => 0, :σ => 0)
 else
     error("Unknown symmetry $symmetry")
 end
-m = build_random_MERA((V_phys, V_virt, V_virt))
-fixedlayers = 0
+
+Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
+m = build_random_MERA(Vs)
 energies = Vector{Float64}()
 rhoeevects = Vector{Vector{Float64}}()
 normalization(x) = normalize_energy(x, dmax, group)
 
-minimize_expectation!(m, h, parsinitialized, normalization=normalization)
-
-while num_translayers(m)+1 < layers
-    release_transitionlayer!(m)
-    fixedlayers = num_translayers(m)
-    parsrandom[:energy_delta] /= 2
-    parsinitialized[:energy_delta] /= 2
-
-    println()
-    minimize_expectation!(m, h, parsrandom; lowest_to_optimize=fixedlayers+1,
-                          normalization=normalization)
-    fixedlayers -= 1
-    minimize_expectation!(m, h, parsinitialized;
-                          lowest_to_optimize=fixedlayers+1,
-                          normalization=normalization)
-    minimize_expectation!(m, h, parsinitialized, normalization=normalization)
+optimize_layerbylayer!(m, 0, normalization, pars)
+current_chi = 2
+while current_chi <= chi
+    global current_chi
+    for i in 1:num_translayers(m)+1
+        d = dim(get_outputspace(m, i))
+        if d < current_chi
+            expand_bonddim!(m, i, current_chi)
+            msg = "Expanded layer $i to bond dimenson $current_chi."
+            @info(msg)
+            fixedlayers = i-1
+            optimize_layerbylayer!(m, fixedlayers, normalization, pars)
+        end
+    end
 
     energy = expect(h, m)
     energy = normalize_energy(energy, dmax, group)
@@ -196,18 +200,22 @@ while num_translayers(m)+1 < layers
     rhoees = getrhoees(m)
     push!(rhoeevects, rhoees)
 
-    println("Done with $(num_translayers(m)+1) layers.")
+    println("Done with bond dimension $(current_chi).")
     println("Energy numerical: $energy")
     println("Energy exact:     $(-4/pi)")
     println("rho ees:")
     println(rhoees)
+
+    scaldims = get_scaldims(m)
+    println("Scaling dimensions:")
+    println(scaldims)
+
+    current_chi += 1
 end
 
 energyerrs = energies .+ 4/pi
 energyerrs = abs.(energyerrs ./ energies)
 energyerrs = log.(10, energyerrs)
-
-scaldims = get_scaldims(m)
 
 println("------------------------------")
 @show rhoeevects
@@ -215,8 +223,6 @@ println("------------------------------")
 @show energies
 println("------------------------------")
 @show energyerrs
-println("------------------------------")
-@show scaldims
 
 eeplot = plot(y=rhoeevects[length(rhoeevects)])
 energyplot = plot(y=energies)

@@ -7,6 +7,7 @@ using LinearAlgebra
 using Logging
 
 export get_uw, get_u, get_w, num_translayers
+export get_outputspace, get_inputspace
 export build_rho, build_rhos, build_random_MERA
 export release_transitionlayer!, expand_bonddim!
 export expect, randomlayer!, minimize_expectation!
@@ -91,6 +92,10 @@ function expand_bonddim!(m, layer, newdims)
     w_next = pad_with_zeros_to(w_next, 2, V_new')
     w_next = pad_with_zeros_to(w_next, 3, V_new')
     w_next = pad_with_zeros_to(w_next, 4, V_new')
+    if layer >= num_translayers(m)
+        # w_next is the scale invariant part.
+        w_next = pad_with_zeros_to(w_next, 1, V_new)
+    end
     set_uw!(m, u_next, w_next, layer+1)
 end
 
@@ -109,10 +114,10 @@ end
 
 function space_invar(m)
     uw_list = m.uw_list
-    u, w = uw_list[1]
+    u, w = get_uw(m, 1)
     # We go to num_translayers(m)+2, to go a bit into the scale invariant part.
-    for i in 2:(num_translayers(m)+1)
-        unext, wnext = uw_list[i]
+    for i in 2:(num_translayers(m)+2)
+        unext, wnext = get_uw(m, i)
         if !space_invar_intralayer(u, w)
             errmsg = "Mismatching bonds in MERA within layer $(i-1)."
             throw(ArgumentError(errmsg))
@@ -170,11 +175,11 @@ function build_random_MERA(V, layers)
 end
 
 function build_random_MERA(Vs)
-    layers = length(Vs)-1
+    layers = length(Vs)
     uw_list = []
     for i in 1:layers
         V = Vs[i]
-        Vnext = Vs[i+1]
+        Vnext = (i < layers ? Vs[i+1] : V)
         u, w = randomlayer(V, Vnext)
         push!(uw_list, (u, w))
     end
@@ -401,16 +406,23 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
     horig = asc_twosite(h, m; endscale=lowest_to_optimize)
     energy = Inf
     energy_change = Inf
+    rhos = nothing
+    rhos_maxchange = Inf
     counter = 0
-    while (abs(energy_change) > pars[:energy_delta]
-           && counter < pars[:energy_maxiter])
-        h = horig
-        rhos = build_rhos(m, lowest_to_optimize+1)
-
+    while (
+           counter < pars[:energy_miniter]
+           || ((abs(energy_change) > pars[:energy_delta]
+                || abs(rhos_maxchange) > pars[:rho_delta])
+               && counter < pars[:energy_maxiter])
+          )
         counter += 1
-        oldenergy = energy
+        old_rhos = rhos
+        old_energy = energy
+        rhos = build_rhos(m, lowest_to_optimize)
+
+        h = horig
         for l in lowest_to_optimize:nt
-            rho = rhos[l-lowest_to_optimize+1]
+            rho = rhos[l-lowest_to_optimize+2]
             u, w = get_uw(m, l)
             u, w = minimize_expectation_uw(h, u, w, rho, pars)
             set_uw!(m, u, w, l)
@@ -431,9 +443,14 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
 
         energy = expect(h, m, opscale=nt+1, evalscale=nt+1)
         energy = normalization(energy)
-        energy_change = (energy - oldenergy)/energy
-        @printf("Energy = %.5e,    change = %.5e,    counter = %d\n",
-                energy, energy_change, counter)
+        energy_change = (energy - old_energy)/energy
+
+        if old_rhos !== nothing
+            rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
+            rhos_maxchange = maximum(rho_diffs)
+        end
+        @printf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.\n",
+                energy, energy_change, counter, rhos_maxchange)
     end
     return m
 end
