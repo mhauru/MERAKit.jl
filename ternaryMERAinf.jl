@@ -6,9 +6,10 @@ using Printf
 using LinearAlgebra
 using Logging
 
-export get_uw, get_u, get_w
-export build_rho, build_rhos, build_random_MERA, release_transitionlayer!
-export num_translayers, expect, randomlayer!, minimize_expectation!
+export get_uw, get_u, get_w, num_translayers
+export build_rho, build_rhos, build_random_MERA
+export release_transitionlayer!, expand_bonddim!
+export expect, randomlayer!, minimize_expectation!
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # The data type
@@ -47,22 +48,22 @@ function get_w(m, layer)
     return get_uw(m, layer)[2]
 end
 
-function set_uw!(m, u, w, layer)
+function set_uw!(m, u, w, layer; check_invar=true)
     if layer > num_translayers(m)
         m.uw_list[end] = (u, w)
     else
         m.uw_list[layer] = (u, w)
     end
-    space_invar(m)
+    check_invar && space_invar(m)
     return m
 end
 
-function set_u!(m, u, layer)
-    return set_uw!(m, u, get_w(m, layer), layer)
+function set_u!(m, u, layer; check_invar=true)
+    return set_uw!(m, u, get_w(m, layer), layer; check_invar=check_invar)
 end
 
-function set_w!(m, w, layer)
-    return set_uw!(m, get_u(m, layer), w, layer)
+function set_w!(m, w, layer; check_invar=true)
+    return set_uw!(m, get_u(m, layer), w, layer; check_invar=check_invar)
 end
 
 function release_transitionlayer!(m)
@@ -72,25 +73,25 @@ function release_transitionlayer!(m)
     return m
 end
 
-function expand_bonddim!(m, layer; sector=Trivial())
+function expand_bonddim!(m, layer, newdims)
     # Note that this breaks the isometricity of the MERA. A round of
     # optimization will fix that.
     V = get_outputspace(m, layer)
-    V_new = # TODO
+    V_new = expand_vectorspace(V, newdims)
 
     w = get_w(m, layer)
-    w = pad_with_zeros_to(w, 1, V)
-    set_w!(m, w, layer)
+    w = pad_with_zeros_to(w, 1, V_new)
+    set_w!(m, w, layer; check_invar=false)
 
     u_next, w_next = get_uw(m, layer+1)
-    u_next = pad_with_zeros_to(u_next, 1, V)
-    u_next = pad_with_zeros_to(u_next, 2, V)
-    u_next = pad_with_zeros_to(u_next, 3, V)
-    u_next = pad_with_zeros_to(u_next, 4, V)
-    w_next = pad_with_zeros_to(w_next, 2, V)
-    w_next = pad_with_zeros_to(w_next, 3, V)
-    w_next = pad_with_zeros_to(w_next, 4, V)
-    set_uw!(m, u, w, layer+1)
+    u_next = pad_with_zeros_to(u_next, 1, V_new)
+    u_next = pad_with_zeros_to(u_next, 2, V_new)
+    u_next = pad_with_zeros_to(u_next, 3, V_new')
+    u_next = pad_with_zeros_to(u_next, 4, V_new')
+    w_next = pad_with_zeros_to(w_next, 2, V_new')
+    w_next = pad_with_zeros_to(w_next, 3, V_new')
+    w_next = pad_with_zeros_to(w_next, 4, V_new')
+    set_uw!(m, u_next, w_next, layer+1)
 end
 
 function get_inputspace(m, layer)
@@ -140,7 +141,7 @@ function space_invar_interlayer(w, unext)
 end
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Functions for creating and replacing tensors
+# Functions for creating and replacing tensors and vector spaces.
 
 function randomisometry(Vout, Vin)
     temp = TensorMap(rand, ComplexF64, Vout ← Vin)
@@ -181,8 +182,41 @@ function build_random_MERA(Vs)
     return m
 end
 
-function pad_with_zeros(T)
-    # TODO
+function expand_vectorspace(V::CartesianSpace, newdim)
+    return typeof(V)(newdim)
+end
+
+function expand_vectorspace(V::CartesianSpace, newdim)
+    return typeof(V)(newdim)
+end
+
+function expand_vectorspace(V::ComplexSpace, newdim)
+    return typeof(V)(newdim, V.dual)
+end
+
+function expand_vectorspace(V::GeneralSpace, newdim)
+    return typeof(V)(newdim, V.dual, V.conj)
+end
+
+function expand_vectorspace(V::RepresentationSpace, newdims)
+    sectordict = merge(Dict(s => dim(V, s) for s in sectors(V)), newdims)
+    return typeof(V)(sectordict, V.dual)
+end
+
+function pad_with_zeros_to(T, ind, V)
+    expander = TensorMap(I, eltype(T), space(T, ind)' ← V');
+    sizedomain = length(domain(T))
+    sizecodomain = length(codomain(T))
+    numinds = sizedomain + sizecodomain
+    indsfinal = collect(-1:-1:-numinds);
+    indsT = copy(indsfinal)
+    indsT[ind] = ind;
+    indsexpander = [ind, -ind]
+    eval(:(@tensor T_new_tensor[$(indsfinal...)] := $T[$(indsT...)] * $expander[$(indsexpander...)]))
+    T_new = permuteind(T_new_tensor,
+                       tuple(1:sizecodomain...),
+                       tuple(sizecodomain+1:numinds...))
+    return T_new
 end
 
 
@@ -314,9 +348,7 @@ function build_fixedpoint_rho(mera)
     vals, vecs, info = eigsolve(f, x0)
     rho = vecs[1]
     # rho is Hermitian only up to a phase. Divide out that phase.
-    # TODO Remove this workaround for taking a trace.
-    eye = TensorMap(I, typ, V ← V)
-    @tensor tr[] := rho[1,2,3,4] * eye[3,1] * eye[4,2]
+    @tensor tr[] := rho[1,2,1,2]
     rho /= scalar(tr)
     return rho
 end
