@@ -5,18 +5,21 @@ using Gadfly
 using ArgParse
 using LinearAlgebra
 using TensorKit
+using Serialization
 import Cairo, Fontconfig  # For Gadfly
 include("ternaryMERAinf.jl")
 include("IsingAnyons.jl")
 using .IsingAnyons
 using .TernaryMERAInf
 
+version = 1.0
+
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
         , "--chi", arg_type=Int, default=10
         , "--layers", arg_type=Int, default=3
-        , "--symmetry", arg_type=String, default="none"
+        , "--symmetry", arg_type=String, default="Z2"
         , "--group", arg_type=Int, default=2
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -137,99 +140,183 @@ function get_scaldims(m)
     return scaldims
 end
 
-function optimize_layerbylayer!(m, fixedlayers, normalization, pars)
+function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
     while fixedlayers >= 0
-        minimize_expectation!(m, h, pars;
+        minimize_expectation!(m, h, opt_pars;
                               lowest_to_optimize=fixedlayers+1,
                               normalization=normalization)
         fixedlayers -= 1
     end
 end
 
-
-cmdlinepars = parse_pars()
-chi = cmdlinepars[:chi]
-layers = cmdlinepars[:layers]
-symmetry = cmdlinepars[:symmetry]
-group = cmdlinepars[:group]
-pars = Dict(:rho_delta => 1e-7,
-            :energy_delta => 1e-7,
-            :energy_maxiter => 500,
-            :energy_miniter => 100,
-            :havg_depth => 5,
-            :uw_iters => 10,
-            :u_iters => 3,
-            :w_iters => 3)
-
-h, dmax = build_H_Ising(symmetry=symmetry, group=group)
-V_phys = space(h, 1)
-if symmetry == "none"
-    V_virt = ℂ^1
-elseif symmetry == "Z2"
-    V_virt = ℂ[ℤ₂](0=>1, 1=>0)
-elseif symmetry == "anyons"
-    V_virt = RepresentationSpace{IsingAnyon}(:I => 1, :ψ => 0, :σ => 0)
-else
-    error("Unknown symmetry $symmetry")
+function store_mera(path, m)
+    # TODO JLD, JLD2 and plain HDF5 all suck, and fail with my MERA type.
+    # Switch them to if they stop sucking.
+    serialize(path, m)
 end
 
-Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
-m = build_random_MERA(Vs)
-energies = Vector{Float64}()
-rhoeevects = Vector{Vector{Float64}}()
-normalization(x) = normalize_energy(x, dmax, group)
+function load_mera(path)
+    # TODO JLD, JLD2 and plain HDF5 all suck, and fail with my MERA type.
+    # Switch them to if they stop sucking.
+    m = deserialize(path)
+    return m
+end
 
-optimize_layerbylayer!(m, 0, normalization, pars)
-current_chi = 2
-while current_chi <= chi
-    global current_chi
-    for i in 1:num_translayers(m)+1
-        d = dim(get_outputspace(m, i))
-        if d < current_chi
-            expand_bonddim!(m, i, current_chi)
-            msg = "Expanded layer $i to bond dimenson $current_chi."
-            @info(msg)
-            fixedlayers = i-1
-            optimize_layerbylayer!(m, fixedlayers, normalization, pars)
+function get_optimized_mera(h, normalization, pars; loadfromdisk=true)
+    chi = pars[:chi]
+    layers = pars[:layers]
+    symmetry = pars[:symmetry]
+    group = pars[:group]
+    global version
+
+    datafolder = "./JLDdata"
+    mkpath(datafolder)
+    filename = "MERA_$(chi)_$(group)_$(symmetry)_$(layers)_$(version)"
+    path = "$datafolder/$filename.jls"
+
+    if loadfromdisk && isfile(path)
+        m = load_mera(path)
+        return m
+    else
+        if chi == 1
+            V_phys = space(h, 1)
+            if symmetry == "none"
+                V_virt = ℂ^1
+            elseif symmetry == "Z2"
+                V_virt = ℂ[ℤ₂](0=>1, 1=>0)
+            elseif symmetry == "anyons"
+                V_virt = RepresentationSpace{IsingAnyon}(:I => 1,
+                                                         :ψ => 0,
+                                                         :σ => 0)
+            else
+                error("Unknown symmetry $symmetry")
+            end
+
+            Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
+            m = build_random_MERA(Vs)
+
+            optimize_layerbylayer!(m, h, 0, normalization,
+                                   pars[:final_opt_pars])
+            store_mera(path, m)
+            return m
+        else
+            prevpars = deepcopy(pars)
+            prevpars[:chi] -= 1
+            m = get_optimized_mera(h, normalization, prevpars; loadfromdisk=loadfromdisk)
+
+            if symmetry == "none"
+                allsectors = (Trivial(),)
+            elseif symmetry == "Z2"
+                allsectors = (ℤ₂(0), ℤ₂(1))
+            else
+                allsectors = (FibonacciAnyon(:I),
+                              FibonacciAnyon(:ψ),
+                              FibonacciAnyon(:σ))
+            end
+
+            for i in 1:num_translayers(m)+1
+                V = get_outputspace(m, i)
+                d = dim(V)
+                if d < chi  # This should always be true.
+                    expanded_meras = Dict()
+                    for s in allsectors
+                        ms = deepcopy(m)
+                        ds = dim(V, s)
+                        chi_s = ds + (chi - d)
+                        expand_bonddim!(ms, i, Dict(s => chi_s))
+                        msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
+                        @info(msg)
+                        optimize_layerbylayer!(ms, h, i-1, normalization,
+                                               pars[:initial_opt_pars])
+                        expanded_meras[s] = ms
+                    end
+                    expanded_meras_array = collect(expanded_meras)
+                    minindex = argmin(map(pair -> expect(h, pair[2]),
+                                          expanded_meras_array))
+                    s, m = expanded_meras_array[minindex]
+                    msg = "Expanding sector $s yielded the lowest energy, keeping that. Optimizing it further."
+                    @info(msg)
+                    optimize_layerbylayer!(m, h, 0, normalization,
+                                           pars[:final_opt_pars])
+                end
+            end
+
+            store_mera(path, m)
+            return m
         end
     end
-
-    energy = expect(h, m)
-    energy = normalize_energy(energy, dmax, group)
-    push!(energies, energy)
-    rhoees = getrhoees(m)
-    push!(rhoeevects, rhoees)
-
-    println("Done with bond dimension $(current_chi).")
-    println("Energy numerical: $energy")
-    println("Energy exact:     $(-4/pi)")
-    println("rho ees:")
-    println(rhoees)
-
-    scaldims = get_scaldims(m)
-    println("Scaling dimensions:")
-    println(scaldims)
-
-    current_chi += 1
 end
 
-energyerrs = energies .+ 4/pi
-energyerrs = abs.(energyerrs ./ energies)
-energyerrs = log.(10, energyerrs)
+function main()
+    pars = parse_pars()
+    chi = pars[:chi]
+    layers = pars[:layers]
+    symmetry = pars[:symmetry]
+    group = pars[:group]
+    pars[:initial_opt_pars] = Dict(:rho_delta => 1e-3,
+                                   :maxiter => 100,
+                                   :miniter => 10,
+                                   :havg_depth => 10,
+                                   :uw_iters => 1,
+                                   :u_iters => 1,
+                                   :w_iters => 1)
+    pars[:final_opt_pars] = Dict(:rho_delta => 1e-7,
+                                 :maxiter => 10000,
+                                 :miniter => 10,
+                                 :havg_depth => 10,
+                                 :uw_iters => 1,
+                                 :u_iters => 1,
+                                 :w_iters => 1)
 
-println("------------------------------")
-@show rhoeevects
-println("------------------------------")
-@show energies
-println("------------------------------")
-@show energyerrs
+    h, dmax = build_H_Ising(symmetry=symmetry, group=group)
+    normalization(x) = normalize_energy(x, dmax, group)
 
-eeplot = plot(y=rhoeevects[length(rhoeevects)])
-energyplot = plot(y=energies)
-energyerrsplot = plot(y=energyerrs)
+    energies = Vector{Float64}()
+    rhoeevects = Vector{Vector{Float64}}()
+    for current_chi in 1:chi
+        temppars = deepcopy(pars)
+        temppars[:chi] = current_chi
+        m = get_optimized_mera(h, normalization, temppars)
 
-draw(PDF("eeplot.pdf", 4inch, 3inch), eeplot)
-draw(PDF("energyplot.pdf", 4inch, 3inch), energyplot)
-draw(PDF("energyerrsplot.pdf", 4inch, 3inch), energyerrsplot)
+        energy = expect(h, m)
+        energy = normalize_energy(energy, dmax, group)
+        push!(energies, energy)
+        rhoees = getrhoees(m)
+        push!(rhoeevects, rhoees)
+
+        println("Done with bond dimension $(current_chi).")
+        println("Energy numerical: $energy")
+        println("Energy exact:     $(-4/pi)")
+        println("rho ees:")
+        println(rhoees)
+
+        scaldims = get_scaldims(m)
+        println("Scaling dimensions:")
+        println(scaldims)
+
+        current_chi += 1
+    end
+
+    energyerrs = energies .+ 4/pi
+    energyerrs = abs.(energyerrs ./ energies)
+    energyerrs = log.(10, energyerrs)
+
+    println("------------------------------")
+    @show rhoeevects
+    println("------------------------------")
+    @show energies
+    println("------------------------------")
+    @show energyerrs
+
+    eeplot = plot(y=rhoeevects[length(rhoeevects)])
+    energyplot = plot(y=energies)
+    energyerrsplot = plot(y=energyerrs)
+
+    draw(PDF("eeplot.pdf", 4inch, 3inch), eeplot)
+    draw(PDF("energyplot.pdf", 4inch, 3inch), energyplot)
+    draw(PDF("energyerrsplot.pdf", 4inch, 3inch), energyerrsplot)
+end
+
+main()
 
 end  # module

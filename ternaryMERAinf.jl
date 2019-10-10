@@ -15,7 +15,7 @@ export expect, randomlayer!, minimize_expectation!
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # The data type
 
-mutable struct MERA
+struct MERA
     uw_list::Vector{Tuple{TensorMap, TensorMap}}
 
     function MERA(uw_list)
@@ -149,38 +149,45 @@ end
 # Functions for creating and replacing tensors and vector spaces.
 
 function randomisometry(Vout, Vin)
-    temp = TensorMap(rand, ComplexF64, Vout ← Vin)
+    temp = TensorMap(randn, ComplexF64, Vout ← Vin)
     U, S, Vt = svd(temp)
     u = U * Vt
     return u
 end
 
-function randomlayer(Vin, Vout)
-    u = randomisometry(Vin ⊗ Vin, Vin ⊗ Vin)
+function identitytensor(Vout, Vin)
+    u = TensorMap(I, ComplexF64, Vout ← Vin)
+    return u
+end
+
+function randomlayer(Vin, Vout; random_u=false)
+    u = (random_u ?
+         randomisometry(Vin ⊗ Vin, Vin ⊗ Vin)
+         : identitytensor(Vin ⊗ Vin, Vin ⊗ Vin))
     w = randomisometry(Vout, Vin ⊗ Vin ⊗ Vin)
     return u, w
 end
 
-function randomizelayer!(m, layer)
+function randomizelayer!(m, layer; random_u=false)
     Vin = get_inputspace(m, layer)
     Vout = get_outputspace(m, layer)
-    u, w = randomlayer(Vin, Vout)
+    u, w = randomlayer(Vin, Vout; random_u=random_u)
     set_uw!(m, u, w, layer)
     return m
 end
 
-function build_random_MERA(V, layers)
+function build_random_MERA(V, layers; random_u=false)
     Vs = repeat([V], layers+1)
-    return build_random_MERA(Vs)
+    return build_random_MERA(Vs; random_u=random_u)
 end
 
-function build_random_MERA(Vs)
+function build_random_MERA(Vs; random_u=false)
     layers = length(Vs)
     uw_list = []
     for i in 1:layers
         V = Vs[i]
         Vnext = (i < layers ? Vs[i+1] : V)
-        u, w = randomlayer(V, Vnext)
+        u, w = randomlayer(V, Vnext; random_u=random_u)
         push!(uw_list, (u, w))
     end
     m = MERA(uw_list)
@@ -188,24 +195,28 @@ function build_random_MERA(Vs)
 end
 
 function expand_vectorspace(V::CartesianSpace, newdim)
-    return typeof(V)(newdim)
+    d = collect(values(newdim))[1]
+    return typeof(V)(d)
 end
 
 function expand_vectorspace(V::CartesianSpace, newdim)
-    return typeof(V)(newdim)
+    d = collect(values(newdim))[1]
+    return typeof(V)(d)
 end
 
 function expand_vectorspace(V::ComplexSpace, newdim)
-    return typeof(V)(newdim, V.dual)
+    d = collect(values(newdim))[1]
+    return typeof(V)(d, V.dual)
 end
 
 function expand_vectorspace(V::GeneralSpace, newdim)
-    return typeof(V)(newdim, V.dual, V.conj)
+    d = collect(values(newdim))[1]
+    return typeof(V)(d, V.dual, V.conj)
 end
 
 function expand_vectorspace(V::RepresentationSpace, newdims)
     sectordict = merge(Dict(s => dim(V, s) for s in sectors(V)), newdims)
-    return typeof(V)(sectordict, V.dual)
+    return typeof(V)(sectordict; dual=V.dual)
 end
 
 function pad_with_zeros_to(T, ind, V)
@@ -410,10 +421,9 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
     rhos_maxchange = Inf
     counter = 0
     while (
-           counter < pars[:energy_miniter]
-           || ((abs(energy_change) > pars[:energy_delta]
-                || abs(rhos_maxchange) > pars[:rho_delta])
-               && counter < pars[:energy_maxiter])
+           counter <= pars[:miniter]
+           || (abs(rhos_maxchange) > pars[:rho_delta]
+               && counter < pars[:maxiter])
           )
         counter += 1
         old_rhos = rhos
@@ -424,7 +434,10 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
         for l in lowest_to_optimize:nt
             rho = rhos[l-lowest_to_optimize+2]
             u, w = get_uw(m, l)
-            u, w = minimize_expectation_uw(h, u, w, rho, pars)
+            # We only optimize u starting from the last of the compulsory
+            # iterations, to not have a screwed up w mislead us.
+            u, w = minimize_expectation_uw(h, u, w, rho, pars;
+                                           do_u=counter>=pars[:miniter])
             set_uw!(m, u, w, l)
             h = asc_twosite(h, m; startscale=l, endscale=l+1)
         end
@@ -438,7 +451,8 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
             havg = havg + hi
         end
         u, w = get_uw(m, Inf)
-        u, w = minimize_expectation_uw(havg, u, w, rhos[end], pars)
+        u, w = minimize_expectation_uw(havg, u, w, rhos[end], pars;
+                                       do_u=counter>=pars[:miniter])
         set_uw!(m, u, w, Inf)
 
         energy = expect(h, m, opscale=nt+1, evalscale=nt+1)
@@ -450,15 +464,17 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
             rhos_maxchange = maximum(rho_diffs)
         end
         @printf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.\n",
-                energy, energy_change, counter, rhos_maxchange)
+                energy, energy_change, rhos_maxchange, counter)
     end
     return m
 end
 
-function minimize_expectation_uw(h, u, w, rho, pars)
+function minimize_expectation_uw(h, u, w, rho, pars; do_u=true)
     for i in 1:pars[:uw_iters]
-        for j in 1:pars[:u_iters]
-            u = minimize_expectation_u(h, u, w, rho)
+        if do_u
+            for j in 1:pars[:u_iters]
+                u = minimize_expectation_u(h, u, w, rho)
+            end
         end
         for j in 1:pars[:w_iters]
             w = minimize_expectation_w(h, u, w, rho)
