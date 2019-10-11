@@ -6,6 +6,8 @@ using Printf
 using LinearAlgebra
 using Logging
 
+export MERA
+export asc_twosite, desc_twosite
 export get_uw, get_u, get_w, num_translayers
 export get_outputspace, get_inputspace
 export build_rho, build_rhos, build_random_MERA
@@ -420,6 +422,7 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
     rhos = nothing
     rhos_maxchange = Inf
     counter = 0
+    last_status_print = -Inf
     while (
            counter <= pars[:miniter]
            || (abs(rhos_maxchange) > pars[:rho_delta]
@@ -463,8 +466,14 @@ function minimize_expectation!(m, h, pars; lowest_to_optimize=1,
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
         end
-        @printf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.\n",
-                energy, energy_change, rhos_maxchange, counter)
+
+        # As the optimization gets further, don't print status updates at every
+        # iteration any more.
+        if (counter - last_status_print)/counter > 0.02
+            @printf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.\n",
+                    energy, energy_change, rhos_maxchange, counter)
+            last_status_print = counter
+        end
     end
     return m
 end
