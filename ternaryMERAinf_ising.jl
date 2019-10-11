@@ -6,6 +6,8 @@ using ArgParse
 using LinearAlgebra
 using TensorKit
 using Serialization
+using MAT
+using KrylovKit
 import Cairo, Fontconfig  # For Gadfly
 include("ternaryMERAinf.jl")
 include("IsingAnyons.jl")
@@ -17,10 +19,10 @@ version = 1.0
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
-        , "--chi", arg_type=Int, default=10
-        , "--layers", arg_type=Int, default=3
-        , "--symmetry", arg_type=String, default="Z2"
-        , "--group", arg_type=Int, default=2
+                   , "--chis", arg_type=Vector{Int}, default=collect(1:16)
+                   , "--layers", arg_type=Int, default=3
+                   , "--symmetry", arg_type=String, default="Z2"
+                   , "--group", arg_type=Int, default=2
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -130,12 +132,31 @@ function build_superop_onesite(m)
 end
 
 function get_scaldims(m)
-    superop = build_superop_onesite(m)
-    S, U = eig(superop, (1,2), (3,4))
-    b = blocks(S)
-    scaldims = Dict()
-    for (k, v) in b
-        scaldims[k] = -log.(3, abs.(diag(v)))  # TODO Why the abs?
+    superoperator = :onesite  # TODO Hard constant.
+    if superoperator == :onesite
+        superop = build_superop_onesite(m)
+        S, U = eig(superop, (1,2), (3,4))
+    elseif superoperator == :twosite
+        V = get_outputspace(m, Inf)
+        typ = eltype(get_u(m, Inf))
+        chi = dim(V)
+        maxmany = Int(ceil(chi^2/2))
+        howmany = min(maxmany, 20)   # TODO Hard constant.
+        f(x) = asc_twosite(x, m; endscale=num_translayers(m)+2,
+                           startscale=num_translayers(m)+1)
+        x0 = Tensor(randn, typ, V ⊗ V ⊗ V' ⊗ V')
+        S, U, info = eigsolve(f, x0, howmany, :LM)
+    else
+        raise(ArgumentError("Unknown superoperator type $(superoperator)."))
+    end
+    if isa(S, Tensor) || isa(S, TensorMap)
+        b = blocks(S)
+        scaldims = Dict()
+        for (k, v) in b
+            scaldims[k] = sort(-log.(3, abs.(real(diag(v)))))  # TODO Why the abs?
+        end
+    else
+        scaldims = sort(-log.(3, abs.(real(S))))  # TODO Why the abs?
     end
     return scaldims
 end
@@ -160,6 +181,28 @@ function load_mera(path)
     # Switch them to if they stop sucking.
     m = deserialize(path)
     return m
+end
+
+function store_mera_matlab(path, m)
+    d = Dict{String, Array}()
+    for i in 1:(num_translayers(m)+1)
+        u, w = map(x -> convert(Array, x), get_uw(m, i))
+        # Permute indices to match Mathias's convention.
+        d["u$i"] = permutedims(u, (3,4,1,2))
+        d["w$i"] = permutedims(w, (2,3,4,1))
+    end
+    matwrite(path, d)
+end
+
+function load_mera_matlab(path)
+    d = matread(path)
+    chi = size(d["u"], 1)
+    V = ℂ^chi
+    u = TensorMap(zeros, Complex{Float64}, V ⊗ V ← V ⊗ V)
+    w = TensorMap(zeros, Complex{Float64}, V ← V ⊗ V ⊗ V)
+    u.data[:] = permutedims(d["u"], (3,4,1,2))
+    w.data[:] = permutedims(d["w"], (4,1,2,3))
+    m = MERA([(u, w)])
 end
 
 function get_optimized_mera(h, normalization, pars; loadfromdisk=true)
@@ -214,7 +257,7 @@ function get_optimized_mera(h, normalization, pars; loadfromdisk=true)
                               FibonacciAnyon(:σ))
             end
 
-            for i in 1:num_translayers(m)+1
+            for i in 1:num_translayers(m)
                 V = get_outputspace(m, i)
                 d = dim(V)
                 if d < chi  # This should always be true.
@@ -236,8 +279,11 @@ function get_optimized_mera(h, normalization, pars; loadfromdisk=true)
                     s, m = expanded_meras_array[minindex]
                     msg = "Expanding sector $s yielded the lowest energy, keeping that. Optimizing it further."
                     @info(msg)
-                    optimize_layerbylayer!(m, h, 0, normalization,
-                                           pars[:final_opt_pars])
+                    opt_pars = (i == num_translayers(m) ?
+                                pars[:final_opt_pars]
+                                : pars[:mid_opt_pars]
+                               )
+                    optimize_layerbylayer!(m, h, 0, normalization, opt_pars)
                 end
             end
 
@@ -249,17 +295,29 @@ end
 
 function main()
     pars = parse_pars()
-    chi = pars[:chi]
+    chis = pars[:chis]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
     group = pars[:group]
-    pars[:initial_opt_pars] = Dict(:rho_delta => 1e-3,
+    # Used when determining which sector to give bond dimension to.
+    pars[:initial_opt_pars] = Dict(:rho_delta => 1e-5,
                                    :maxiter => 100,
                                    :miniter => 10,
                                    :havg_depth => 10,
                                    :uw_iters => 1,
                                    :u_iters => 1,
                                    :w_iters => 1)
+    # Used when optimizing a MERA that has some layers expanded to desired bond
+    # dimension, but not all.
+    pars[:mid_opt_pars] = Dict(:rho_delta => 1e-5,
+                                   :maxiter => 1000,
+                                   :miniter => 10,
+                                   :havg_depth => 10,
+                                   :uw_iters => 1,
+                                   :u_iters => 1,
+                                   :w_iters => 1)
+    # Used when optimizing a MERA that has all bond dimensions at the full,
+    # desired value.
     pars[:final_opt_pars] = Dict(:rho_delta => 1e-7,
                                  :maxiter => 10000,
                                  :miniter => 10,
@@ -273,9 +331,9 @@ function main()
 
     energies = Vector{Float64}()
     rhoeevects = Vector{Vector{Float64}}()
-    for current_chi in 1:chi
+    for chi in chis
         temppars = deepcopy(pars)
-        temppars[:chi] = current_chi
+        temppars[:chi] = chi
         m = get_optimized_mera(h, normalization, temppars)
 
         energy = expect(h, m)
@@ -284,7 +342,7 @@ function main()
         rhoees = getrhoees(m)
         push!(rhoeevects, rhoees)
 
-        println("Done with bond dimension $(current_chi).")
+        println("Done with bond dimension $(chi).")
         println("Energy numerical: $energy")
         println("Energy exact:     $(-4/pi)")
         println("rho ees:")
@@ -293,8 +351,6 @@ function main()
         scaldims = get_scaldims(m)
         println("Scaling dimensions:")
         println(scaldims)
-
-        current_chi += 1
     end
 
     energyerrs = energies .+ 4/pi
