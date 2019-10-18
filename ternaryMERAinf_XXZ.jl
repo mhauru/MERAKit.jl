@@ -17,7 +17,7 @@ version = 1.0
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
-                   , "--chis", arg_type=Vector{Int}, default=[3]
+                   , "--chis", arg_type=Vector{Int}, default=[3,4,5,6,7]
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="U1"
                    , "--group", arg_type=Int, default=2
@@ -200,8 +200,10 @@ function get_sectors_to_expand(V)
         # The `collect` makes a copy, so that we don't iterate over the ones
         # just added.
         for s in collect(result)
-            splus = U₁(s.charge+1)
-            sminus = U₁(s.charge-1)
+            # We make jumps by twos, for because of the Hamiltonian the odd
+            # sectors are useless.
+            splus = U₁(s.charge+2)
+            sminus = U₁(s.charge-2)
             push!(result, splus)
             push!(result, sminus)
         end
@@ -245,12 +247,15 @@ function get_optimized_mera(h, normalization, pars; loadfromdisk=true)
         m = MERA(uw_array_nosym)
         return m
     else
-        if chi == 1
+        if chi == 1 || chi == 2
+            msg = "chi should be at least 3."
+            throw(ArgumentError(msg))
+        elseif chi == 3
             V_phys = space(h, 1)
             if symmetry == "none"
-                V_virt = ℂ^1
+                V_virt = ℂ^chi
             elseif symmetry == "U1"
-                V_virt = ℂ[U₁](0=>1)
+                V_virt = ℂ[U₁](-2=> 1, 0=>1, 2=> 1)
             else
                 error("Unknown symmetry $symmetry")
             end
