@@ -2,7 +2,7 @@ module IsingAnyons
 export IsingAnyon
 
 using TensorKit
-import TensorKit.⊗, TensorKit.dim, TensorKit.SectorSet
+import TensorKit.⊗, TensorKit.dim
 import TensorKit.Nsymbol, TensorKit.Fsymbol, TensorKit.Rsymbol
 import TensorKit.FusionStyle, TensorKit.BraidingStyle
 import TensorKit.fusiontensor
@@ -17,7 +17,7 @@ struct IsingAnyon <: Sector
     end
 end
 
-all_isinganyons = (IsingAnyon(:I), IsingAnyon(:σ), IsingAnyon(:ψ))
+const all_anyons = (IsingAnyon(:I), IsingAnyon(:σ), IsingAnyon(:ψ))
 
 function Base.convert(::Type{Int}, a::IsingAnyon)
     if a.s == :I
@@ -36,15 +36,15 @@ Base.one(::Type{IsingAnyon}) = IsingAnyon(:I)
 Base.conj(s::IsingAnyon) = s
 function ⊗(a::IsingAnyon, b::IsingAnyon)
     if a.s == :I
-        return SectorSet{IsingAnyon}((b,))
+        return (b,)
     elseif b.s == :I
-        return SectorSet{IsingAnyon}((a,))
+        return (a,)
     elseif a.s == :ψ && b.s == :ψ
-        return SectorSet{IsingAnyon}((IsingAnyon(:I),))
+        return (IsingAnyon(:I),)
     elseif (a.s == :σ && b.s == :ψ) || (a.s == :ψ && b.s == :σ)
-        return SectorSet{IsingAnyon}((IsingAnyon(:σ),))
+        return (IsingAnyon(:σ),)
     elseif a.s == :σ && b.s == :σ
-        return SectorSet{IsingAnyon}((IsingAnyon(:I), IsingAnyon(:ψ)))
+        return (IsingAnyon(:I), IsingAnyon(:ψ))
     end
 end
 
@@ -61,7 +61,6 @@ function Nsymbol(a::IsingAnyon, b::IsingAnyon, c::IsingAnyon)
     return ((a.s == :I && b.s == c.s)
             || (b.s == :I && a.s == c.s)
             || (c.s == :I && a.s == b.s)
-            || (a.s == b.s && c.s == :I)
             || (a.s == :σ && b.s == :σ && c.s == :ψ)
             || (a.s == :σ && b.s == :ψ && c.s == :σ)
             || (a.s == :ψ && b.s == :σ && c.s == :σ)
@@ -98,7 +97,7 @@ end
 
 function triplets(a::IsingAnyon)
     trips = Tuple{IsingAnyon, IsingAnyon, IsingAnyon}[]
-    for b in all_isinganyons, c in a ⊗ b
+    for b in all_anyons, c in a ⊗ b
             push!(trips, (a, b, c))
     end
     return trips
@@ -108,7 +107,7 @@ function fusiontensor(b::IsingAnyon, c::IsingAnyon, f::IsingAnyon, v::Nothing = 
     trips_b, trips_c, trips_f = map(triplets, (b, c, f))
     Db, Dc, Df = map(length, (trips_b, trips_c, trips_f))
     C = zeros(Float64, Db, Dc, Df)
-    for e in all_isinganyons
+    for e in all_anyons
         for a in e ⊗ b, d in e ⊗ c
             elem = Fsymbol(a, b, c, d, e, f)
             indb = first(indexin(((b, e, a),), trips_b))
