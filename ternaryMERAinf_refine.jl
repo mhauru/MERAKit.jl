@@ -42,8 +42,8 @@ function main()
     block = pars[:block]
     reps = pars[:reps]
     # Used when determining which sector to give bond dimension to.
-    opt_pars = Dict(:rho_delta => 1e-13,
-                    :maxiter => 100,
+    opt_pars = Dict(:rho_delta => 1e-15,
+                    :maxiter => 1000,
                     :miniter => 10,
                     :havg_depth => 10,
                     :uw_iters => 1,
