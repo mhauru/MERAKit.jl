@@ -61,11 +61,11 @@ function main()
     end
     normalization(x) = normalize_energy(x, dmax, block)
 
-    datafolder = "./JLDdata"
+    datafolder = "./JLMdata"
     mkpath(datafolder)
     filename = "MERA_$(model)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
-    path = "$datafolder/$filename.jld2"
-    path_ref = "$datafolder/$(filename)_refined.jld2"
+    path = "$datafolder/$filename.jlm"
+    path_ref = "$datafolder/$(filename)_refined.jlm"
     matlab_path_ref = "./matlabdata/$(filename)_refined.mat"
 
     if isfile(path_ref)

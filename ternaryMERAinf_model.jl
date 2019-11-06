@@ -1,4 +1,4 @@
-d2odule TernaryMERAInfModel
+module TernaryMERAInfModel
 
 using ArgParse
 using LinearAlgebra
@@ -11,9 +11,9 @@ using .TernaryMERAInf
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
-                   , "--model", arg_type=String, default=""
+                   , "--model", arg_type=String, default="Ising"
                    , "--threads", arg_type=Int, default=1
-                   , "--chis", arg_type=Vector{Int}, default=collect(9:10)
+                   , "--chis", arg_type=Vector{Int}, default=collect(10:10)
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="group"
                    , "--block", arg_type=Int, default=2
@@ -82,7 +82,7 @@ function main()
     for chi in chis
         temppars = deepcopy(pars)
         temppars[:chi] = chi
-        m = get_optimized_mera("JLDdata", model, temppars)
+        m = get_optimized_mera("JLMdata", model, temppars)
 
         energy = expect(h, m)
         energy = normalize_energy(energy, dmax, block)

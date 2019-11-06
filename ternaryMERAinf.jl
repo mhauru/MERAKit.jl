@@ -13,6 +13,7 @@ export get_outputspace, get_inputspace
 export build_rho, build_rhos, build_random_MERA
 export release_transitionlayer!, expand_bonddim!
 export expect, randomlayer!, minimize_expectation!
+export pseudoserialize, pseudodeserialize
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # The data type
@@ -109,6 +110,101 @@ end
 
 function get_outputspace(m, layer)
     return get_inputspace(m, layer+1)
+end
+
+# Strip all the TensorKit stuff and other user defined types, and return an
+# object consisting of only base types, that can be used to reconstruct this
+# MERA.
+function pseudoserialize(m)
+    eltyp = eltype(get_u(m, Inf))
+    spacetype = typeof(get_outputspace(m, Inf))
+    if spacetype == ComplexSpace
+        symmetry = :none
+    elseif spacetype == Z2Space
+        symmetry = :Z2
+    elseif spacetype == U1Space
+        symmetry = :U1
+    end
+    dims = []
+    data = []
+    for l in 1:(num_translayers(m)+1)
+        V = get_inputspace(m, l)
+        if symmetry == :none
+            sects = dim(V)
+        elseif symmetry == :Z2
+            sects = Dict(s.n => dim(V, s) for s in sectors(V))
+        elseif symmetry == :U1
+            sects = Dict(s.charge => dim(V, s) for s in sectors(V))
+        end
+        Vinfo = (sects, V.dual)
+        u, w = get_uw(m, l)
+        if symmetry == :none
+            udata = deepcopy(u.data)
+            wdata = deepcopy(w.data)
+        elseif symmetry == :Z2
+            udata = Dict(s.n => deepcopy(u.data[s]) for s in keys(u.data))
+            wdata = Dict(s.n => deepcopy(w.data[s]) for s in keys(w.data))
+        elseif symmetry == :U1
+            udata = Dict(s.charge => deepcopy(u.data[s]) for s in keys(u.data))
+            wdata = Dict(s.charge => deepcopy(w.data[s]) for s in keys(w.data))
+        end
+        push!(dims, Vinfo)
+        push!(data, (udata, wdata))
+    end
+    return (eltyp, symmetry, dims, data)
+end
+
+function pseudodeserialize(arg)
+    eltyp, symmetry, dims, data = arg
+    if symmetry == :none
+        spacetype = ComplexSpace
+    elseif symmetry == :Z2
+        spacetype = Z2Space
+        irreptype = ZNIrrep{2}
+    elseif symmetry == :U1
+        spacetype = U1Space
+        irreptype = U1Irrep
+    end
+
+    nt = length(dims)-1
+    uw_list = []
+    for l in 1:(nt+1)
+        sects, dual = dims[l]
+        # TODO Complain to Jutho about the inconsistency in syntax.
+        if symmetry == :none
+            inspace = spacetype(sects, dual)
+        else
+            inspace = spacetype(sects, dual=dual)
+        end
+        if l <= nt
+            sects_next, dual_next = dims[l+1]
+            if symmetry == :none
+                outspace = spacetype(sects_next, dual_next)
+            else
+                outspace = spacetype(sects_next, dual=dual_next)
+            end
+        else
+            outspace = inspace
+        end
+
+        u = TensorMap(zeros, eltyp, inspace ⊗ inspace ← inspace ⊗ inspace)
+        w = TensorMap(zeros, eltyp, outspace ← inspace ⊗ inspace ⊗ inspace)
+        udata, wdata = data[l]
+        if symmetry == :none
+            u.data[:] = udata
+            w.data[:] = wdata
+        else
+            for k in keys(udata)
+                u.data[irreptype(k)][:] = udata[k]
+            end
+            for k in keys(wdata)
+                w.data[irreptype(k)][:] = wdata[k]
+            end
+        end
+        push!(uw_list, (u, w))
+    end
+    m = MERA(uw_list)
+    return m
 end
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -514,7 +610,7 @@ function minimize_expectation_u(h, u, w, rho)
             u_dg[11,12,61,62] *
             w_dg[21,22,61,41] * w_dg[62,31,32,51]
            )
-                
+
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env3[-1,-2,-3,-4] :=

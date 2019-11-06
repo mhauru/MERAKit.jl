@@ -280,11 +280,17 @@ function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
 end
 
 function store_mera(path, m)
-    @save path m
+    # JLD2 still sucks on the workstation. Sigh.
+    #@save path m
+    deser = pseudoserialize(m)
+    @save path deser
 end
 
 function load_mera(path)
-    @load path m
+    # JLD2 still sucks on the workstation. Sigh.
+    #@load path m
+    @load path deser
+    m = pseudodeserialize(deser)
     return m
 end
 
@@ -338,7 +344,7 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
 
     mkpath(datafolder)
     filename = "MERA_$(model)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
-    path = "$datafolder/$filename.jld2"
+    path = "$datafolder/$filename.jlm"
     matlab_path = "./matlabdata/$(filename).mat"
 
     if loadfromdisk && isfile(path)
