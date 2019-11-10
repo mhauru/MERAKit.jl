@@ -31,6 +31,8 @@ function main()
     chi = pars[:chi]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
+    threads = pars[:threads]
+    BLAS.set_num_threads(threads)
     if symmetry == "group"
         if model == "Ising"
             symmetry = "Z2"
