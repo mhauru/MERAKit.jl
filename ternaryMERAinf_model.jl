@@ -3,17 +3,16 @@ module TernaryMERAInfModel
 using ArgParse
 using LinearAlgebra
 using TensorKit
-include("ternaryMERAinf.jl")
 include("ternaryMERAinf_modeltools.jl")
 using .TernaryMERAInfModelTools
-using .TernaryMERAInf
+using .TernaryMERAInfModelTools.MERA
 
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
                    , "--threads", arg_type=Int, default=1
-                   , "--chis", arg_type=Vector{Int}, default=collect(10:10)
+                   , "--chis", arg_type=Vector{Int}, default=collect(4:4)
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="group"
                    , "--block", arg_type=Int, default=2
@@ -40,31 +39,31 @@ function main()
     end
     block = pars[:block]
     # Used when determining which sector to give bond dimension to.
-    pars[:initial_opt_pars] = Dict(:rho_delta => 1e-5,
+    pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
                                    :maxiter => 100,
                                    :miniter => 10,
                                    :havg_depth => 10,
-                                   :uw_iters => 1,
-                                   :u_iters => 1,
-                                   :w_iters => 1)
+                                   :layer_iters => 1,
+                                   :disentangler_iters => 1,
+                                   :isometry_iters => 1)
     # Used when optimizing a MERA that has some layers expanded to desired bond
     # dimension, but not all.
-    pars[:mid_opt_pars] = Dict(:rho_delta => 1e-5,
+    pars[:mid_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
                                :maxiter => 1000,
                                :miniter => 10,
                                :havg_depth => 10,
-                               :uw_iters => 1,
-                               :u_iters => 1,
-                               :w_iters => 1)
+                               :layer_iters => 1,
+                               :disentangler_iters => 1,
+                               :isometry_iters => 1)
     # Used when optimizing a MERA that has all bond dimensions at the full,
     # desired value.
-    pars[:final_opt_pars] = Dict(:rho_delta => 1e-7,
+    pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
                                  :maxiter => 10000,
                                  :miniter => 10,
                                  :havg_depth => 10,
-                                 :uw_iters => 1,
-                                 :u_iters => 1,
-                                 :w_iters => 1)
+                                 :layer_iters => 1,
+                                 :disentangler_iters => 1,
+                                 :isometry_iters => 1)
 
     if model == "Ising"
         h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block=block)

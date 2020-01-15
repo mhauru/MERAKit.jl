@@ -5,8 +5,8 @@ using TensorKit
 using JLD2
 using MAT
 using KrylovKit
-include("ternaryMERAinf.jl")
-using .TernaryMERAInf
+include("MERA.jl")
+using .MERA
 
 version = 1.0
 
@@ -201,7 +201,7 @@ function getrhoee(rho)
 end
 
 function getrhoees(m)
-    rhos = build_rhos(m)
+    rhos = densitymatrices(m)
     ees = Vector{Float64}()
     for rho in rhos
         ee = getrhoee(rho)
@@ -216,14 +216,14 @@ function normalize_energy(energy, dmax, block)
 end
 
 function build_superop_onesite(m)
-    w = get_w(m, Inf)
+    w = get_isometry(m, Inf)
     w_dg = w'
     @tensor(superop[-1,-2,-11,-12] := w[-1,1,-11,2] * w_dg[1,-12,2,-2])
     return superop
 end
 
-function remove_symmetry(m)
-    uw_list_sym = m.uw_list
+function remove_symmetry(m::T) where T <: GenericMERA
+    uw_list_sym = m.layers
     uw_list_nosym = []
     for (u_sym, w_sym) in uw_list_sym
         V_in = ℂ^dim(space(u_sym, 3))
@@ -234,7 +234,7 @@ function remove_symmetry(m)
         w_nosym.data[:] = convert(Array, w_sym)
         push!(uw_list_nosym, (u_nosym, w_nosym))
     end
-    m_nosym = MERA(uw_list_nosym)
+    m_nosym = T(uw_list_nosym)
     return m_nosym
 end
 
@@ -246,8 +246,8 @@ function get_scaldims(m; mode=:onesite)
         superop = build_superop_onesite(m)
         S, U = eig(superop, (1,2), (3,4))
     elseif mode == :twosite
-        V = get_outputspace(m, Inf)
-        typ = eltype(get_u(m, Inf))
+        V = outputspace(m, Inf)
+        typ = eltype(get_disentangler(m, Inf))
         chi = dim(V)
         maxmany = Int(ceil(chi^2/2))
         howmany = min(maxmany, 20)   # TODO Hard constant.
@@ -273,7 +273,7 @@ end
 function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
     while fixedlayers >= 0
         minimize_expectation!(m, h, opt_pars;
-                              lowest_to_optimize=fixedlayers+1,
+                              lowest_depth=fixedlayers+1,
                               normalization=normalization)
         fixedlayers -= 1
     end
@@ -290,14 +290,14 @@ function load_mera(path)
     # JLD2 still sucks on the workstation. Sigh.
     #@load path m
     @load path deser
-    m = pseudodeserialize(deser)
+    m = depseudoserialize(deser...)
     return m
 end
 
 function store_mera_matlab(path, m)
     d = Dict{String, Array}()
     for i in 1:(num_translayers(m)+1)
-        u, w = map(x -> convert(Array, x), get_uw(m, i))
+        u, w = map(x -> convert(Array, x), get_layer(m, i))
         # Permute indices to match Mathias's convention.
         d["u$i"] = permutedims(u, (3,4,1,2))
         d["w$i"] = permutedims(w, (2,3,4,1))
@@ -345,7 +345,9 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     mkpath(datafolder)
     filename = "MERA_$(model)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
     path = "$datafolder/$filename.jlm"
-    matlab_path = "./matlabdata/$(filename).mat"
+    matlab_folder = "./matlabdata"
+    mkpath(matlab_folder)
+    matlab_path = "$(matlab_folder)/$(filename).mat"
 
     if loadfromdisk && isfile(path)
         println("Found $filename on disk, loading it.")
@@ -387,7 +389,7 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
             end
 
             Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
-            m = build_random_MERA(Vs)
+            m = random_MERA(TernaryMERA, Vs)
 
             optimize_layerbylayer!(m, h, 0, normalization,
                                    pars[:final_opt_pars])
@@ -396,10 +398,10 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
         else
             prevpars = deepcopy(pars)
             prevpars[:chi] -= 1
-            m = get_optimized_mera(h, normalization, prevpars; loadfromdisk=loadfromdisk)
+            m = get_optimized_mera(datafolder, model, prevpars; loadfromdisk=loadfromdisk)
 
             for i in 1:num_translayers(m)
-                V = get_outputspace(m, i)
+                V = outputspace(m, i)
                 d = dim(V)
                 if d < chi  # This should always be true.
                     expanded_meras = Dict()
