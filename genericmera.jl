@@ -80,6 +80,19 @@ invariance) indices of the layer at that depth.
 """
 outputspace(m::GenericMERA, depth) = outputspace(get_layer(m, depth))
 
+function densitymatrix_entropy(rho)
+    eigs = eigh(rho)[1]
+    eigs = real.(diag(convert(Array, eigs)))
+    if sum(abs.(eigs[eigs .<= 0.])) > 1e-13
+        warn("Significant negative eigenvalues for a density matrix: $eigs")
+    end
+    eigs = eigs[eigs .> 0.]
+    S = -dot(eigs, log.(eigs))
+    return S
+end
+
+densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatrices(m))
+
 # # # Generating random MERAs
 
 """

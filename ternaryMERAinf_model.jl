@@ -86,7 +86,7 @@ function main()
         energy = expect(h, m)
         energy = normalize_energy(energy, dmax, block)
         push!(energies, energy)
-        rhoees = getrhoees(m)
+        rhoees = densitymatrix_entropies(m)
         push!(rhoeevects, rhoees)
         model == "Ising" && symmetry == "none" && (magnetization = expect(magop, remove_symmetry(m)))
 

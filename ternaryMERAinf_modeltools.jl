@@ -14,7 +14,6 @@ export version
 export load_mera, store_mera, load_mera_matlab, store_mera_matlab
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
-export getrhoee, getrhoees
 export build_superop_onesite, get_scaldims, remove_symmetry
 export get_optimized_mera, optimize_layerbylayer!
 
@@ -128,27 +127,6 @@ function build_magop(;block=1)
     magop = (XI + IX)/2
     magop = block_H(mapop, block)
     return magop
-end
-
-function getrhoee(rho)
-    eigs = eigen(rho, (1,2), (3,4))[1]
-    eigs = real.(diag(convert(Array, eigs)))
-    if sum(abs.(eigs[eigs .<= 0.])) > 1e-13
-        warn("Significant negative eigenvalues: $eigs")
-    end
-    eigs = eigs[eigs .> 0.]
-    S = - dot(eigs, log.(eigs))
-    return S
-end
-
-function getrhoees(m)
-    rhos = densitymatrices(m)
-    ees = Vector{Float64}()
-    for rho in rhos
-        ee = getrhoee(rho)
-        push!(ees, ee)
-    end
-    return ees
 end
 
 function normalize_energy(energy, dmax, block)
