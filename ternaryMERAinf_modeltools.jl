@@ -123,38 +123,10 @@ function build_magop(;block=1)
     X = TensorMap(zeros, Float64, V ← V)
     eye = TensorMap(I, Float64, V ← V)
     X.data .= [0.0 1.0; 1.0 0.0]
-    @tensor XI[-1,-2,-11,-12] := X[-1,-11] * eye[-2,-12]
-    @tensor IX[-1,-2,-11,-12] := eye[-1,-11] * X[-2,-12]
+    XI = X ⊗ eye
+    IX = eye ⊗ X
     magop = (XI + IX)/2
-    while block > 1
-        VL = space(magop, 1)
-        VR = space(magop, 2)
-        eyeL = TensorMap(I, Float64, VL ← VL)
-        eyeR = TensorMap(I, Float64, VR ← VR)
-        @tensor(magopcross[-1,-2,-3,-4,-11,-12,-13,-14] := 
-                eyeR[-1,-11] * magop[-2,-3,-12,-13] * eyeL[-4,-14])
-        @tensor(magopleft[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                magop[-1,-2,-11,-12] * eyeL[-3,-13] * eyeR[-4,-14])
-        @tensor(magopright[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                eyeL[-1,-11] * eyeR[-2,-12] * magop[-3,-4,-13,-14])
-        magop_new_unfused = magopcross + 0.5*(magopleft + magopright)
-        fusionspace = space(magop, (1,2))
-        fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
-        fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
-        @tensor(
-                magop_new[-1,-2,-11,-12] :=
-                fusetop[-1,1,2] * fusetop[-2,3,4]
-                * magop_new_unfused[1,2,3,4,11,12,13,14]
-                * fusebottom[11,12,-11] * fusebottom[13,14,-12]
-               )
-        magop = magop_new
-        block /= 2
-    end
-    if block != 1
-        msg = "`block` needs to be a power of 2"
-        throw(ArgumentError(msg))
-    end
-    magop = permuteind(magop, (1,2), (3,4))
+    magop = block_H(mapop, block)
     return magop
 end
 
