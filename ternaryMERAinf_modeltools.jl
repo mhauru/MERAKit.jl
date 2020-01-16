@@ -18,59 +18,30 @@ export getrhoee, getrhoees
 export build_superop_onesite, get_scaldims, remove_symmetry
 export get_optimized_mera, optimize_layerbylayer!
 
-function build_H_XXZ(Delta=0.0; symmetry="none", block=1)
-    if symmetry == "U1" || symmetry == "group"
-        V = ℂ[U₁](-1=>1, 1=>1)
-        Z = TensorMap(zeros, Float64, V ← V)
-        Z.data[U₁(1)] .= 1.0
-        Z.data[U₁(-1)] .= -1.0
-        @tensor ZZ[-1,-2,-11,-12] := Z[-1,-11] * Z[-2,-12]
-        XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
-        XXplusYY.data[U₁(0)] .= [0.0 2.0; 2.0 0.0]
-        XXplusYY = permuteind(XXplusYY, (1,2,3,4))
-        H = -(XXplusYY + Delta*ZZ)
-    elseif symmetry == "none"
-        V = ℂ^2
-        Z = TensorMap(zeros, Float64, V ← V)
-        Z.data .= [1.0 0.0; 0.0 -1.0]
-        @tensor ZZ[-1,-2,-11,-12] := Z[-1,-11] * Z[-2,-12]
-        XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
-        XXplusYY.data[2,3] = 2.0
-        XXplusYY.data[3,2] = 2.0
-        XXplusYY = permuteind(XXplusYY, (1,2,3,4))
-        H = -(XXplusYY + Delta*ZZ)
-    else
-        error("Unknown symmetry $symmetry")
-    end
+function block_H(H, block)
     while block > 1
         VL = space(H, 1)
         VR = space(H, 2)
         eyeL = TensorMap(I, Float64, VL ← VL)
         eyeR = TensorMap(I, Float64, VR ← VR)
-        @tensor(Hcross[-1,-2,-3,-4,-11,-12,-13,-14] := 
-                eyeR[-1,-11] * H[-2,-3,-12,-13] * eyeL[-4,-14])
-        @tensor(Hleft[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                H[-1,-2,-11,-12] * eyeL[-3,-13] * eyeR[-4,-14])
-        @tensor(Hright[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                eyeL[-1,-11] * eyeR[-2,-12] * H[-3,-4,-13,-14])
+        Hcross = eyeR ⊗ H ⊗ eyeL
+        Hleft = H ⊗ eyeL ⊗ eyeR
+        Hright = eyeL ⊗ eyeR ⊗ H
         H_new_unfused = Hcross + 0.5*(Hleft + Hright)
-        fusionspace = space(H, (1,2))
+        fusionspace = domain(H)
         fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
         fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
-        @tensor(
-                H_new[-1,-2,-11,-12] :=
-                fusetop[-1,1,2] * fusetop[-2,3,4]
-                * H_new_unfused[1,2,3,4,11,12,13,14]
-                * fusebottom[11,12,-11] * fusebottom[13,14,-12]
-               )
-        H = H_new
+        H = (fusetop ⊗ fusetop) * H_new_unfused * (fusebottom ⊗ fusebottom)
         block /= 2
     end
     if block != 1
         msg = "`block` needs to be a power of 2"
         throw(ArgumentError(msg))
     end
-    H = permuteind(H, (1,2), (3,4))
+    return H
+end
+
+function normalize_H(H)
     # Subtract a constant, so that the spectrum is negative
     # TODO Switch to using an eigendecomposition?
     D_max = norm(H)
@@ -79,73 +50,71 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block=1)
     return H, D_max
 end
 
+function build_H_XXZ(Delta=0.0; symmetry="none", block=1)
+    if symmetry == "U1" || symmetry == "group"
+        V = ℂ[U₁](-1=>1, 1=>1)
+        Z = TensorMap(zeros, Float64, V ← V)
+        Z.data[U₁(1)] .= 1.0
+        Z.data[U₁(-1)] .= -1.0
+        ZZ = Z ⊗ Z
+        XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
+        XXplusYY.data[U₁(0)] .= [0.0 2.0; 2.0 0.0]
+        H = -(XXplusYY + Delta*ZZ)
+    elseif symmetry == "none"
+        V = ℂ^2
+        Z = TensorMap(zeros, Float64, V ← V)
+        Z.data .= [1.0 0.0; 0.0 -1.0]
+        ZZ = Z ⊗ Z
+        XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
+        XXplusYY.data[2,3] = 2.0
+        XXplusYY.data[3,2] = 2.0
+        H = -(XXplusYY + Delta*ZZ)
+    else
+        error("Unknown symmetry $symmetry")
+    end
+    H = block_H(H, block)
+    H, D_max = normalize_H(H)
+    return H, D_max
+end
+
 # Ising model with transverse magnetic field h (critical h=1 by default)
 function build_H_Ising(h=1.0; symmetry="none", block=1)
     if symmetry == "Z2"
         V = ℂ[ℤ₂](0=>1, 1=>1)
+        # Pauli Z
         Z = TensorMap(zeros, Float64, V ← V)
         Z.data[ℤ₂(0)] .= 1.0
         Z.data[ℤ₂(1)] .= -1.0
         eye = TensorMap(I, Float64, V ← V)
-        @tensor ZI[-1,-2,-11,-12] := Z[-1,-11] * eye[-2,-12]
-        @tensor IZ[-1,-2,-11,-12] := eye[-1,-11] * Z[-2,-12]
-        XX = Tensor(zeros, Float64, V ⊗ V ⊗ V' ⊗ V')
-        XX.data[ℤ₂(0)] .= [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0]
+        ZI = Z ⊗ eye
+        IZ = eye ⊗ Z
+        # Pauli XX
+        XX = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
+        XX.data[ℤ₂(0)] .= [0.0 1.0; 1.0 0.0]
+        XX.data[ℤ₂(1)] .= [0.0 1.0; 1.0 0.0]
         H = -(XX + h/2 * (ZI+IZ))
     elseif symmetry == "anyons"
         V = RepresentationSpace{IsingAnyon}(:I => 0, :ψ => 0, :σ => 1)
         H = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
         H.data[IsingAnyon(:I)] .= 1.0
         H.data[IsingAnyon(:ψ)] .= -1.0
-        eye = TensorMap(I, Float64, V ← V)
     elseif symmetry == "none"
         V = ℂ^2
+        # Pauli matrices
         X = TensorMap(zeros, Float64, V ← V)
         Z = TensorMap(zeros, Float64, V ← V)
         eye = TensorMap(I, Float64, V ← V)
         X.data .= [0.0 1.0; 1.0 0.0]
         Z.data .= [1.0 0.0; 0.0 -1.0]
-        @tensor XX[-1,-2,-11,-12] := X[-1,-11] * X[-2,-12]
-        @tensor ZI[-1,-2,-11,-12] := Z[-1,-11] * eye[-2,-12]
-        @tensor IZ[-1,-2,-11,-12] := eye[-1,-11] * Z[-2,-12]
+        XX = X ⊗ X
+        ZI = Z ⊗ eye
+        IZ = eye ⊗ Z
         H = -(XX + h/2 * (ZI+IZ))
     else
         error("Unknown symmetry $symmetry")
     end
-    while block > 1
-        VL = space(H, 1)
-        VR = space(H, 2)
-        eyeL = TensorMap(I, Float64, VL ← VL)
-        eyeR = TensorMap(I, Float64, VR ← VR)
-        @tensor(Hcross[-1,-2,-3,-4,-11,-12,-13,-14] := 
-                eyeR[-1,-11] * H[-2,-3,-12,-13] * eyeL[-4,-14])
-        @tensor(Hleft[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                H[-1,-2,-11,-12] * eyeL[-3,-13] * eyeR[-4,-14])
-        @tensor(Hright[-1,-2,-3,-4,-11,-12,-13,-14] :=
-                eyeL[-1,-11] * eyeR[-2,-12] * H[-3,-4,-13,-14])
-        H_new_unfused = Hcross + 0.5*(Hleft + Hright)
-        fusionspace = space(H, (1,2))
-        fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
-        fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
-        @tensor(
-                H_new[-1,-2,-11,-12] :=
-                fusetop[-1,1,2] * fusetop[-2,3,4]
-                * H_new_unfused[1,2,3,4,11,12,13,14]
-                * fusebottom[11,12,-11] * fusebottom[13,14,-12]
-               )
-        H = H_new
-        block /= 2
-    end
-    if block != 1
-        msg = "`block` needs to be a power of 2"
-        throw(ArgumentError(msg))
-    end
-    H = permuteind(H, (1,2), (3,4))
-    # Subtract a constant, so that the spectrum is negative
-    # TODO Switch to using an eigendecomposition?
-    D_max = norm(H)
-    bigeye = TensorMap(I, codomain(H) ← domain(H))
-    H = H - bigeye*D_max
+    H = block_H(H, block)
+    H, D_max = normalize_H(H)
     return H, D_max
 end
 
