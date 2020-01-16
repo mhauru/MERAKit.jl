@@ -51,7 +51,7 @@ Return true/false.
 """
 function space_invar_intralayer(layer::TernaryLayer)
     u, w, = layer
-    matching_bonds = [(space(u, 1), space(w, 3)'),
+    matching_bonds = [(space(u, 1), space(w, 4)'),
                       (space(u, 2), space(w, 2)')]
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
