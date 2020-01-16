@@ -1,4 +1,4 @@
-module TernaryMERAInfModelTools
+module DemoTools
 
 using LinearAlgebra
 using TensorKit

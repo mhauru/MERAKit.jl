@@ -1,11 +1,11 @@
-module TernaryMERAInfModel
+module Demo
 
 using ArgParse
 using LinearAlgebra
 using TensorKit
-include("ternaryMERAinf_modeltools.jl")
-using .TernaryMERAInfModelTools
-using .TernaryMERAInfModelTools.MERA
+include("demo_tools.jl")
+using .DemoTools
+using .DemoTools.MERA
 
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
