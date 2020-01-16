@@ -30,6 +30,12 @@ layertype(m::T) where {T <: GenericMERA} = layertype(T)
 layertype(::Type{GenericMERA{T}}) where {T <: Layer} = T
 
 """
+Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.
+Return that width.
+"""
+causal_cone_width(::Type{GenericMERA{T}}) where T <: Layer = causal_cone_width(T)
+
+"""
 Return the number of transition layers, i.e. layers below the scale invariant one, in the
 MERA.
 """
@@ -106,6 +112,14 @@ function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
     m = T(layers)
     return m
 end
+
+"""
+A function for which the first argument is the Layer type, and the second and third are the
+input and output spaces, that returns a MERA layer with random tensors. May take further
+keyword arguments depending on the Layer type. Each subtype of Layer should have its own
+method for this function.
+"""
+function randomlayer end
 
 # TODO Fix the preservation of isometricity.
 """

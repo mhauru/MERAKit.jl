@@ -1,4 +1,4 @@
-# File for the TernaryLayer and TernaryMERA types, and methods thereof.
+# TernaryLayer and TernaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
 # TODO We could parametrise this as TernaryLayer{T1, T2}, disentagler::T1, isometry::T2.
@@ -11,7 +11,10 @@ end
 
 TernaryMERA = GenericMERA{TernaryLayer}
 
-Base.convert(::Type{TernaryLayer}, tuple::Tuple{T1, T2}) where {T1 <: TensorMap, T2 <: TensorMap} = TernaryLayer(tuple...)
+function Base.convert(::Type{TernaryLayer}, tuple::Tuple{T1, T2}
+                     ) where {T1 <: TensorMap, T2 <: TensorMap}
+    return TernaryLayer(tuple...)
+end
 
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
@@ -31,16 +34,21 @@ get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry
 
 function set_disentangler!(m::TernaryMERA, u, depth; check_invar=true)
-    return set_layer!(m, (u, get_isometry(m, depth)), depth; check_invar=check_invar)
+    w = get_isometry(m, depth)
+    return set_layer!(m, (u, w), depth; check_invar=check_invar)
 end
 
 function set_isometry!(m::TernaryMERA, w, depth; check_invar=true)
-    return set_layer!(m, (get_disentangler(m, depth), w), depth; check_invar=check_invar)
+    u = get_disentangler(m, depth)
+    return set_layer!(m, (u, w), depth; check_invar=check_invar)
 end
 
-causal_cone_width(::Type{TernaryMERA}) = causal_cone_width(TernaryLayer)
 causal_cone_width(::Type{TernaryLayer}) = 2
 
+"""
+Check the compatibility of the legs connecting the disentanglers and the isometries.
+Return true/false.
+"""
 function space_invar_intralayer(layer::TernaryLayer)
     u, w, = layer
     matching_bonds = [(space(u, 1), space(w, 3)'),
@@ -49,6 +57,10 @@ function space_invar_intralayer(layer::TernaryLayer)
     return allmatch
 end
 
+"""
+Check the compatibility of the legs connecting the isometries of the first layer to the
+disentanglers of the layer above it. Return true/false.
+"""
 function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     u, w, = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
@@ -61,12 +73,20 @@ end
 inputspace(layer::TernaryLayer) = space(layer.disentangler, 3)
 outputspace(layer::TernaryLayer) = space(layer.isometry, 1)
 
+"""
+Return a new layer where the isometries have been padded with zeros to change the top vector
+space to be V_new.
+"""
 function expand_outputspace(layer::TernaryLayer, V_new)
     u, w = layer
     w = pad_with_zeros_to(w, 1, V_new)
     return TernaryLayer(u, w)
 end
 
+"""
+Return a new layer where the disentanglers and isometries have been padded with zeros to
+change the bottom vector space to be V_new.
+"""
 function expand_inputspace(layer::TernaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 1, V_new)
@@ -79,6 +99,11 @@ function expand_inputspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
+"""
+Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
+If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
+(default), it is the identity.
+"""
 function randomlayer(::Type{TernaryLayer}, Vin, Vout; random_disentangler=false)
     u = (random_disentangler ?
          randomisometry(Vin ⊗ Vin, Vin ⊗ Vin)
@@ -88,12 +113,17 @@ function randomlayer(::Type{TernaryLayer}, Vin, Vout; random_disentangler=false)
 end
 
 pseudoserialize(layer::TernaryLayer) = (repr(TernaryLayer), map(pseudoserialize, layer))
-depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...) for d in  data]...)
+depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...)
+                                                              for d in data]...)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Ascending and descending superoperators
 
-function ascend(op, layer::TernaryLayer; pos=:avg)
+"""
+Ascend a twosite `op` from the bottom of the given layer to the top.
+"""
+function ascend(op::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; pos=:avg
+               ) where {S1, S2, T1, T2, T3}
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -139,7 +169,12 @@ function ascend(op, layer::TernaryLayer; pos=:avg)
     return scaled_op
 end
 
-function descend(rho, layer::TernaryLayer; pos=:avg)
+
+"""
+Decend a twosite `rho` from the top of the given layer to the bottom.
+"""
+function descend(rho::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; pos=:avg
+                ) where {S1, S2, T1, T2, T3}
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -185,6 +220,10 @@ function descend(rho, layer::TernaryLayer; pos=:avg)
     return scaled_rho
 end
 
+"""
+Loop over the tensors of the layer, optimizing each one in turn to minimize the expecation
+value of `h`. `rho` is the density matrix right above this layer.
+"""
 function minimize_expectation_layer(h, layer::TernaryLayer, rho, pars;
                                     do_disentanglers=true)
     for i in 1:pars[:layer_iters]
@@ -200,7 +239,13 @@ function minimize_expectation_layer(h, layer::TernaryLayer, rho, pars;
     return layer
 end
 
-function minimize_expectation_disentangler(h, layer::TernaryLayer, rho)
+"""
+Return a new layer, where the disentangler has been changed to the locally optimal one to
+minimize the expectation of a twosite operator `h`.
+"""
+function minimize_expectation_disentangler(h::TensorMap{S1, 2, 2, S2, T1, T2, T3},
+                                           layer::TernaryLayer, rho
+                                          ) where {S1, S2, T1, T2, T3}
     u, w = layer
     w_dg = w'
     u_dg = u'
@@ -241,7 +286,13 @@ function minimize_expectation_disentangler(h, layer::TernaryLayer, rho)
     return TernaryLayer(u, w)
 end
 
-function minimize_expectation_isometry(h, layer::TernaryLayer, rho)
+"""
+Return a new layer, where the isometry has been changed to the locally optimal one to
+minimize the expectation of a twosite operator `h`.
+"""
+function minimize_expectation_isometry(h::TensorMap{S1, 2, 2, S2, T1, T2, T3},
+                                       layer::TernaryLayer, rho
+                                      ) where {S1, S2, T1, T2, T3}
     u, w = layer
     w_dg = w'
     u_dg = u'
