@@ -11,10 +11,11 @@ function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
+                   , "--meratype", arg_type=String, default="binary"
                    , "--threads", arg_type=Int, default=1
-                   , "--chis", arg_type=Vector{Int}, default=collect(4:4)
-                   , "--layers", arg_type=Int, default=3
-                   , "--symmetry", arg_type=String, default="group"
+                   , "--chis", arg_type=Vector{Int}, default=collect(1:4)
+                   , "--layers", arg_type=Int, default=4
+                   , "--symmetry", arg_type=String, default="none"
                    , "--block", arg_type=Int, default=2
                    , "--h", arg_type=Float64, default=1.0
                    , "--Delta", arg_type=Float64, default=-0.5
@@ -38,6 +39,7 @@ function main()
         pars[:symmetry] = symmetry
     end
     block = pars[:block]
+
     # Used when determining which sector to give bond dimension to.
     pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
                                    :maxiter => 100,
@@ -58,7 +60,7 @@ function main()
     # Used when optimizing a MERA that has all bond dimensions at the full,
     # desired value.
     pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
-                                 :maxiter => 10000,
+                                 :maxiter => 1000,
                                  :miniter => 10,
                                  :havg_depth => 10,
                                  :layer_iters => 1,

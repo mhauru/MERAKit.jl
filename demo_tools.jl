@@ -11,7 +11,7 @@ using .MERA
 version = 1.0
 
 export version
-export load_mera, store_mera, load_mera_matlab, store_mera_matlab
+export load_mera, store_mera, store_mera_matlab
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
 export build_superop_onesite, get_scaldims, remove_symmetry
@@ -125,7 +125,7 @@ function build_magop(;block=1)
     XI = X ⊗ eye
     IX = eye ⊗ X
     magop = (XI + IX)/2
-    magop = block_H(mapop, block)
+    magop = block_H(magop, block)
     return magop
 end
 
@@ -141,7 +141,7 @@ function build_superop_onesite(m)
     return superop
 end
 
-function remove_symmetry(m::T) where T <: GenericMERA
+function remove_symmetry(m::TernaryMERA)
     uw_list_sym = m.layers
     uw_list_nosym = []
     for (u_sym, w_sym) in uw_list_sym
@@ -153,11 +153,32 @@ function remove_symmetry(m::T) where T <: GenericMERA
         w_nosym.data[:] = convert(Array, w_sym)
         push!(uw_list_nosym, (u_nosym, w_nosym))
     end
-    m_nosym = T(uw_list_nosym)
+    m_nosym = TernaryMERA(uw_list_nosym)
     return m_nosym
 end
 
-function get_scaldims(m; mode=:onesite)
+function remove_symmetry(m::BinaryMERA)
+    uw_list_sym = m.layers
+    uw_list_nosym = []
+    for (u_sym, w_sym) in uw_list_sym
+        V_in = ℂ^dim(space(u_sym, 3))
+        V_out = ℂ^dim(space(w_sym, 1))
+        u_nosym = TensorMap(zeros, eltype(u_sym), V_in ⊗ V_in ← V_in ⊗ V_in)
+        w_nosym = TensorMap(zeros, eltype(u_sym), V_out ← V_in ⊗ V_in)
+        u_nosym.data[:] = convert(Array, u_sym)
+        w_nosym.data[:] = convert(Array, w_sym)
+        push!(uw_list_nosym, (u_nosym, w_nosym))
+    end
+    m_nosym = BinaryMERA(uw_list_nosym)
+    return m_nosym
+end
+
+function get_scaldims(m::BinaryMERA)
+    # TODO
+    return []
+end
+
+function get_scaldims(m::TernaryMERA; mode=:onesite)
     # TODO we remove symmetries because we are lazy to code a symmetric
     # eigenvalue search.
     m = remove_symmetry(m)
@@ -217,22 +238,10 @@ function store_mera_matlab(path, m)
     d = Dict{String, Array}()
     for i in 1:(num_translayers(m)+1)
         u, w = map(x -> convert(Array, x), get_layer(m, i))
-        # Permute indices to match Mathias's convention.
-        d["u$i"] = permutedims(u, (3,4,1,2))
-        d["w$i"] = permutedims(w, (2,3,4,1))
+        d["u$i"] = u
+        d["w$i"] = w
     end
     matwrite(path, d)
-end
-
-function load_mera_matlab(path)
-    d = matread(path)
-    chi = size(d["u"], 1)
-    V = ℂ^chi
-    u = TensorMap(zeros, Complex{Float64}, V ⊗ V ← V ⊗ V)
-    w = TensorMap(zeros, Complex{Float64}, V ← V ⊗ V ⊗ V)
-    u.data[:] = permutedims(d["u"], (3,4,1,2))
-    w.data[:] = permutedims(d["w"], (4,1,2,3))
-    m = MERA([(u, w)])
 end
 
 function get_sectors_to_expand(V)
@@ -259,10 +268,19 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     block = pars[:block]
     threads = pars[:threads]
     BLAS.set_num_threads(threads)
+    meratypestr = pars[:meratype]
+    if meratypestr == "binary"
+        meratype = BinaryMERA
+    elseif meratypestr == "ternary"
+        meratype = TernaryMERA
+    else
+        msg = "Unknown MERA type: $(meratypestr)"
+        throw(ArgumentError(msg))
+    end
     global version
 
     mkpath(datafolder)
-    filename = "MERA_$(model)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
+    filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
     path = "$datafolder/$filename.jlm"
     matlab_folder = "./matlabdata"
     mkpath(matlab_folder)
@@ -308,7 +326,7 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
             end
 
             Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
-            m = random_MERA(TernaryMERA, Vs)
+            m = random_MERA(meratype, Vs)
 
             optimize_layerbylayer!(m, h, 0, normalization,
                                    pars[:final_opt_pars])
