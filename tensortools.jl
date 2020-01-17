@@ -1,6 +1,12 @@
 # Utilities for creating and modifying vector spaces and TensorMaps.
 # To be `included` in MERA.jl.
 
+# TODO I feel like there's a nicer way of writing this, than the really long where {...}.
+"""
+A TensorMap from N indices to N indices.
+"""
+SquareTensorMap{N} = TensorMap{S1, N, N, S2, T1, T2, T3} where {S1, S2, T1, T2, T3}
+
 """
 Given two vector spaces, create an isometric/unitary TensorMap from one to the other.
 """
@@ -18,6 +24,30 @@ is the identity, with truncations as needed.
 function identitytensor(Vout, Vin)
     u = TensorMap(I, ComplexF64, Vout ← Vin)
     return u
+end
+
+"""
+Return the number of sites/indices `m` that an operator is supported on, assuming it is an
+operator from `m` sites to `m` sites.
+"""
+support(op::SquareTensorMap{N}) where {N} = N
+
+"""
+Given an operator as TensorMap from a number of indices to the same number of indices,
+expand its support to a larger number of sites `n` by tensoring with the identity. The
+different ways of doing the expansion are averaged over.
+"""
+function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
+    V = space(op, 1)
+    eye = TensorMap(I, eltype(op), V ← V)
+    m = N
+    while m < n
+        opeye = op ⊗ eye
+        eyeop = eye ⊗ op
+        op = (opeye + eyeop)/2
+        m += 1
+    end
+    return op
 end
 
 """
