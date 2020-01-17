@@ -324,8 +324,7 @@ function fixedpoint_densitymatrix(m::T) where T <: GenericMERA
     vals, vecs, info = eigsolve(f, x0)
     rho = vecs[1]
     # rho is Hermitian only up to a phase. Divide out that phase.
-    @tensor tr[] := rho[1,2,1,2]
-    rho /= scalar(tr)
+    rho /= tr(rho)
     return rho
 end
 
@@ -368,6 +367,8 @@ descended.
 function expect(op, m::GenericMERA; opscale=1, evalscale=num_translayers(m)+1)
     rho = densitymatrix(m, evalscale)
     op = ascend(op, m; startscale=opscale, endscale=evalscale)
+    # If the operator is defined on a smaller support (number of sites) than rho, expand it.
+    op = expand_support(op, support(rho))
     value = tr(rho * op)
     if abs(imag(value)/value) > 1e-13
         @warn("Non-real expectation value: $value")
@@ -408,9 +409,9 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
         for l in lowest_depth:nt
             rho = rhos[l-lowest_depth+2]
             layer = get_layer(m, l)
-            # We only optimize u starting from the last of the compulsory
-            # iterations, to not have a screwed up w mislead us.
-            do_disentanglers = (counter >= pars[:miniter])
+            # We only optimize u starting after half of the compulsory iterations have been
+            # done, to not have a screwed up w mislead us.
+            do_disentanglers = (counter >= pars[:miniter]/2)
             layer = minimize_expectation_layer(h, layer, rho, pars;
                                                do_disentanglers=do_disentanglers)
             set_layer!(m, layer, l)
@@ -426,7 +427,7 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
             havg = havg + hi
         end
         layer = get_layer(m, Inf)
-        do_disentanglers = (counter >= pars[:miniter])
+        do_disentanglers = (counter >= pars[:miniter]/2)
         layer = minimize_expectation_layer(havg, layer, rhos[end], pars;
                                            do_disentanglers=do_disentanglers)
         set_layer!(m, layer, Inf)
