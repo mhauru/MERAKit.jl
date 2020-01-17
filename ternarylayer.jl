@@ -33,14 +33,14 @@ get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
 
 get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry
 
-function set_disentangler!(m::TernaryMERA, u, depth; check_invar=true)
+function set_disentangler!(m::TernaryMERA, u, depth; kwargs...)
     w = get_isometry(m, depth)
-    return set_layer!(m, (u, w), depth; check_invar=check_invar)
+    return set_layer!(m, (u, w), depth; kwargs...)
 end
 
-function set_isometry!(m::TernaryMERA, w, depth; check_invar=true)
+function set_isometry!(m::TernaryMERA, w, depth; kwargs...)
     u = get_disentangler(m, depth)
-    return set_layer!(m, (u, w), depth; check_invar=check_invar)
+    return set_layer!(m, (u, w), depth; kwargs...)
 end
 
 causal_cone_width(::Type{TernaryLayer}) = 2
@@ -122,8 +122,7 @@ depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(
 """
 Ascend a twosite `op` from the bottom of the given layer to the top.
 """
-function ascend(op::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; pos=:avg
-               ) where {S1, S2, T1, T2, T3}
+function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -158,9 +157,9 @@ function ascend(op::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; po
                 w_dg[31,32,42,-300] * w_dg[52,21,22,-400]
                )
     elseif in(pos, (:a, :avg, :average))
-        l = ascend(op, layer; pos=:l)
-        r = ascend(op, layer; pos=:r)
-        m = ascend(op, layer; pos=:m)
+        l = ascend(op, layer, :l)
+        r = ascend(op, layer, :r)
+        m = ascend(op, layer, :m)
         scaled_op = (l+r+m)/3.
     else
         throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
@@ -173,8 +172,7 @@ end
 """
 Decend a twosite `rho` from the top of the given layer to the bottom.
 """
-function descend(rho::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; pos=:avg
-                ) where {S1, S2, T1, T2, T3}
+function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -209,9 +207,9 @@ function descend(rho::TensorMap{S1, 2, 2, S2, T1, T2, T3}, layer::TernaryLayer; 
                 u[51,52,-300,-400]
                )
     elseif in(pos, (:a, :avg, :average))
-        l = descend(rho, layer; pos=:l)
-        r = descend(rho, layer; pos=:r)
-        m = descend(rho, layer; pos=:m)
+        l = descend(rho, layer, :l)
+        r = descend(rho, layer, :r)
+        m = descend(rho, layer, :m)
         scaled_rho = (l+r+m)/3.
     else
         throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
@@ -243,9 +241,7 @@ end
 Return a new layer, where the disentangler has been changed to the locally optimal one to
 minimize the expectation of a twosite operator `h`.
 """
-function minimize_expectation_disentangler(h::TensorMap{S1, 2, 2, S2, T1, T2, T3},
-                                           layer::TernaryLayer, rho
-                                          ) where {S1, S2, T1, T2, T3}
+function minimize_expectation_disentangler(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
@@ -290,9 +286,7 @@ end
 Return a new layer, where the isometry has been changed to the locally optimal one to
 minimize the expectation of a twosite operator `h`.
 """
-function minimize_expectation_isometry(h::TensorMap{S1, 2, 2, S2, T1, T2, T3},
-                                       layer::TernaryLayer, rho
-                                      ) where {S1, S2, T1, T2, T3}
+function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
