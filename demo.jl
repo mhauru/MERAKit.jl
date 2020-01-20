@@ -16,7 +16,7 @@ function parse_pars()
                    , "--chis", arg_type=Vector{Int}, default=collect(1:4)
                    , "--layers", arg_type=Int, default=4
                    , "--symmetry", arg_type=String, default="none"
-                   , "--block", arg_type=Int, default=2
+                   , "--block_size", arg_type=Int, default=2
                    , "--h", arg_type=Float64, default=1.0
                    , "--Delta", arg_type=Float64, default=-0.5
     )
@@ -38,7 +38,7 @@ function main()
         end
         pars[:symmetry] = symmetry
     end
-    block = pars[:block]
+    block_size = pars[:block_size]
 
     # Used when determining which sector to give bond dimension to.
     pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
@@ -68,15 +68,15 @@ function main()
                                  :isometry_iters => 1)
 
     if model == "Ising"
-        h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block=block)
-        symmetry == "none" && (magop = build_magop(block=block))
+        h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
+        symmetry == "none" && (magop = build_magop(block_size=block_size))
     elseif model == "XXZ"
-        h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block=block)
+        h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
     end
-    normalization(x) = normalize_energy(x, dmax, block)
+    normalization(x) = normalize_energy(x, dmax, block_size)
 
     energies = Vector{Float64}()
     rhoeevects = Vector{Vector{Float64}}()
@@ -86,7 +86,7 @@ function main()
         m = get_optimized_mera("JLMdata", model, temppars)
 
         energy = expect(h, m)
-        energy = normalize_energy(energy, dmax, block)
+        energy = normalize_energy(energy, dmax, block_size)
         push!(energies, energy)
         rhoees = densitymatrix_entropies(m)
         push!(rhoeevects, rhoees)

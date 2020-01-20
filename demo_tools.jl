@@ -17,8 +17,8 @@ export normalize_energy
 export build_superop_onesite, get_scaldims, remove_symmetry
 export get_optimized_mera, optimize_layerbylayer!
 
-function block_H(H, block)
-    while block > 1
+function block_H(H, num_sites)
+    while num_sites > 1
         VL = space(H, 1)
         VR = space(H, 2)
         eyeL = TensorMap(I, Float64, VL ← VL)
@@ -31,10 +31,10 @@ function block_H(H, block)
         fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
         fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
         H = (fusetop ⊗ fusetop) * H_new_unfused * (fusebottom ⊗ fusebottom)
-        block /= 2
+        num_sites /= 2
     end
-    if block != 1
-        msg = "`block` needs to be a power of 2"
+    if num_sites != 1
+        msg = "`num_sites` needs to be a power of 2"
         throw(ArgumentError(msg))
     end
     return H
@@ -49,7 +49,7 @@ function normalize_H(H)
     return H, D_max
 end
 
-function build_H_XXZ(Delta=0.0; symmetry="none", block=1)
+function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     if symmetry == "U1" || symmetry == "group"
         V = ℂ[U₁](-1=>1, 1=>1)
         Z = TensorMap(zeros, Float64, V ← V)
@@ -71,13 +71,13 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block=1)
     else
         error("Unknown symmetry $symmetry")
     end
-    H = block_H(H, block)
+    H = block_H(H, block_size)
     H, D_max = normalize_H(H)
     return H, D_max
 end
 
 # Ising model with transverse magnetic field h (critical h=1 by default)
-function build_H_Ising(h=1.0; symmetry="none", block=1)
+function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     if symmetry == "Z2"
         V = ℂ[ℤ₂](0=>1, 1=>1)
         # Pauli Z
@@ -112,12 +112,12 @@ function build_H_Ising(h=1.0; symmetry="none", block=1)
     else
         error("Unknown symmetry $symmetry")
     end
-    H = block_H(H, block)
+    H = block_H(H, block_size)
     H, D_max = normalize_H(H)
     return H, D_max
 end
 
-function build_magop(;block=1)
+function build_magop(;block_size=1)
     V = ℂ^2
     X = TensorMap(zeros, Float64, V ← V)
     eye = TensorMap(I, Float64, V ← V)
@@ -125,12 +125,12 @@ function build_magop(;block=1)
     XI = X ⊗ eye
     IX = eye ⊗ X
     magop = (XI + IX)/2
-    magop = block_H(magop, block)
+    magop = block_H(magop, block_size)
     return magop
 end
 
-function normalize_energy(energy, dmax, block)
-    energy = (energy + dmax)/block
+function normalize_energy(energy, dmax, block_size)
+    energy = (energy + dmax)/block_size
     return energy
 end
 
@@ -265,7 +265,7 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     chi = pars[:chi]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
-    block = pars[:block]
+    block_size = pars[:block_size]
     threads = pars[:threads]
     BLAS.set_num_threads(threads)
     meratypestr = pars[:meratype]
@@ -280,7 +280,7 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     global version
 
     mkpath(datafolder)
-    filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block)_$(symmetry)_$(layers)_$(version)"
+    filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)_$(version)"
     path = "$datafolder/$filename.jlm"
     matlab_folder = "./matlabdata"
     mkpath(matlab_folder)
@@ -293,14 +293,14 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     else
         println("Did not find $filename on disk, generating it.")
         if model == "XXZ"
-            h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block=block)
+            h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
         elseif model == "Ising"
-            h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block=block)
+            h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
         else
             msg = "Unknown model: $(model)"
             throw(ArgumentError(msg))
         end
-        normalization(x) = normalize_energy(x, dmax, block)
+        normalization(x) = normalize_energy(x, dmax, block_size)
 
         chitoosmall = ((symmetry == "U1" && chi < 3)
                        || (symmetry == "Z2" && chi < 2)
