@@ -16,8 +16,16 @@ export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
 export build_superop_onesite, get_scaldims, remove_symmetry
 export get_optimized_mera, optimize_layerbylayer!
+export remove_symmetry
 
-function block_H(H, num_sites)
+# # # Functions for creating Hamiltonians.
+
+"""
+Take a two-site operator `H` that defines the local term of a global operator, and block
+sites together to form a new two-site operator for which each site corresponds to
+`num_sites` sites of the original operator. `num_sites` should be a power of 2.
+"""
+function block_H(H::SquareTensorMap{2}, num_sites)
     while num_sites > 1
         VL = space(H, 1)
         VR = space(H, 2)
@@ -40,8 +48,11 @@ function block_H(H, num_sites)
     return H
 end
 
+"""
+Normalize an operator by subtracting a constant so that it's spectrum is negative
+semidefinite. Return the normalized operator and the constant that was subtracted.
+"""
 function normalize_H(H)
-    # Subtract a constant, so that the spectrum is negative
     # TODO Switch to using an eigendecomposition?
     D_max = norm(H)
     bigeye = TensorMap(I, codomain(H) ← domain(H))
@@ -49,6 +60,14 @@ function normalize_H(H)
     return H, D_max
 end
 
+"""
+Return the local Hamiltonian term for the XXZ model: -XX - YY - Delta*ZZ.
+`symmetry` should be "none" or "group", and determmines whether the Hamiltonian should be an
+explicitly U(1) symmetric TensorMap or a dense one. `block_size` determines how many sites
+to block together, and should be a power of 2. The Hamiltonian is normalized with an
+additive constant to be negative semidefinite, and the constant of normalization is also
+returned.
+"""
 function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     if symmetry == "U1" || symmetry == "group"
         V = ℂ[U₁](-1=>1, 1=>1)
@@ -58,7 +77,6 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
         ZZ = Z ⊗ Z
         XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
         XXplusYY.data[U₁(0)] .= [0.0 2.0; 2.0 0.0]
-        H = -(XXplusYY + Delta*ZZ)
     elseif symmetry == "none"
         V = ℂ^2
         Z = TensorMap(zeros, Float64, V ← V)
@@ -67,16 +85,23 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
         XXplusYY = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
         XXplusYY.data[2,3] = 2.0
         XXplusYY.data[3,2] = 2.0
-        H = -(XXplusYY + Delta*ZZ)
     else
         error("Unknown symmetry $symmetry")
     end
+    H = -(XXplusYY + Delta*ZZ)
     H = block_H(H, block_size)
     H, D_max = normalize_H(H)
     return H, D_max
 end
 
-# Ising model with transverse magnetic field h (critical h=1 by default)
+"""
+Return the local Hamiltonian term for the Ising model: -XX - h*Z
+`symmetry` should be "none", "group", or "anyon" and determmines whether the Hamiltonian
+should be an explicitly Z2 symmetric or anyonic TensorMap, or a dense one. `block_size`
+determines how many sites to block together, and should be a power of 2. The Hamiltonian is
+normalized with an additive constant to be negative semidefinite, and the constant of
+normalization is also returned.
+"""
 function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     if symmetry == "Z2"
         V = ℂ[ℤ₂](0=>1, 1=>1)
@@ -129,84 +154,56 @@ function build_magop(;block_size=1)
     return magop
 end
 
-function normalize_energy(energy, dmax, block_size)
-    energy = (energy + dmax)/block_size
-    return energy
+"""
+Given the normalization and block_size constants used in creating a Hamiltonian, and the
+expectation value of the normalized and blocked Hamiltonian, return the actual energy.
+"""
+normalize_energy(energy, D_max, block_size) = (energy + D_max)/block_size
+
+"""
+Given a MERA which may possibly be built of symmetry preserving TensorMaps, and return
+another MERA that has the symmetry structure stripped from it, and all tensors are dense.
+"""
+remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
+"""Strip a TernaryLayer of its internal symmetries."""
+remove_symmetry(layer::TernaryLayer) = TernaryLayer(map(remove_symmetry, layer)...)
+"""Strip a BinaryLayer of its internal symmetries."""
+remove_symmetry(layer::BinaryLayer) = BinaryLayer(map(remove_symmetry, layer)...)
+"""Strip a real ElementarySpace of its symmetry structure."""
+remove_symmetry(V::ElementarySpace{ℝ}) = CartesianSpace(dim(V))
+"""Strip a complex ElementarySpace of its symmetry structure."""
+remove_symmetry(V::ElementarySpace{ℂ}) = ComplexSpace(dim(V), isdual(V))
+
+""" Strip a TensorMap of its internal symmetries."""
+function remove_symmetry(t::TensorMap)
+    domain_nosym = reduce(⊗, map(remove_symmetry, domain(t)))
+    codomain_nosym = reduce(⊗, map(remove_symmetry, codomain(t)))
+    t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
+    t_nosym.data[:] = convert(Array, t)
+    return t_nosym
 end
 
-function build_superop_onesite(m)
-    w = get_isometry(m, Inf)
-    w_dg = w'
-    @tensor(superop[-1,-2,-11,-12] := w[-1,1,-11,2] * w_dg[1,-12,2,-2])
-    return superop
-end
-
-function remove_symmetry(m::TernaryMERA)
-    uw_list_sym = m.layers
-    uw_list_nosym = []
-    for (u_sym, w_sym) in uw_list_sym
-        V_in = ℂ^dim(space(u_sym, 3))
-        V_out = ℂ^dim(space(w_sym, 1))
-        u_nosym = TensorMap(zeros, eltype(u_sym), V_in ⊗ V_in ← V_in ⊗ V_in)
-        w_nosym = TensorMap(zeros, eltype(u_sym), V_out ← V_in ⊗ V_in ⊗ V_in)
-        u_nosym.data[:] = convert(Array, u_sym)
-        w_nosym.data[:] = convert(Array, w_sym)
-        push!(uw_list_nosym, (u_nosym, w_nosym))
-    end
-    m_nosym = TernaryMERA(uw_list_nosym)
-    return m_nosym
-end
-
-function remove_symmetry(m::BinaryMERA)
-    uw_list_sym = m.layers
-    uw_list_nosym = []
-    for (u_sym, w_sym) in uw_list_sym
-        V_in = ℂ^dim(space(u_sym, 3))
-        V_out = ℂ^dim(space(w_sym, 1))
-        u_nosym = TensorMap(zeros, eltype(u_sym), V_in ⊗ V_in ← V_in ⊗ V_in)
-        w_nosym = TensorMap(zeros, eltype(u_sym), V_out ← V_in ⊗ V_in)
-        u_nosym.data[:] = convert(Array, u_sym)
-        w_nosym.data[:] = convert(Array, w_sym)
-        push!(uw_list_nosym, (u_nosym, w_nosym))
-    end
-    m_nosym = BinaryMERA(uw_list_nosym)
-    return m_nosym
-end
-
-function get_scaldims(m::BinaryMERA)
-    # TODO
-    return []
-end
-
-function get_scaldims(m::TernaryMERA; mode=:onesite)
-    # TODO we remove symmetries because we are lazy to code a symmetric
-    # eigenvalue search.
+function get_scaldims(m::GenericMERA; howmany=20)
+    # TODO we remove symmetries because we are lazy to code a symmetric eigenvalue search.
     m = remove_symmetry(m)
-    if mode == :onesite
-        superop = build_superop_onesite(m)
-        S, U = eig(superop, (1,2), (3,4))
-    elseif mode == :twosite
-        V = outputspace(m, Inf)
-        typ = eltype(get_disentangler(m, Inf))
-        chi = dim(V)
-        maxmany = Int(ceil(chi^2/2))
-        howmany = min(maxmany, 20)   # TODO Hard constant.
-        f(x) = asc_twosite(x, m; endscale=num_translayers(m)+2,
-                           startscale=num_translayers(m)+1)
-        x0 = Tensor(randn, typ, V ⊗ V ⊗ V' ⊗ V')
-        S, U, info = eigsolve(f, x0, howmany, :LM)
-    else
-        raise(ArgumentError("Unknown superoperator type $(superoperator)."))
-    end
-    if isa(S, Tensor) || isa(S, TensorMap)
-        b = blocks(S)
-        scaldims = Dict()
-        for (k, v) in b
-            scaldims[k] = sort(-log.(3, abs.(real(diag(v)))))
-        end
-    else
-        scaldims = sort(-log.(3, abs.(real(S))))
-    end
+    V = outputspace(m, Inf)
+    typ = eltype(m)
+    chi = dim(V)
+    width = causal_cone_width(typeof(m))
+    # Don't even try to get more than half of the eigenvalues.
+    maxmany = Int(ceil(chi^width/2))
+    howmany = min(maxmany, howmany)
+    # Define a function that takes an operator and ascends it once through the scale
+    # invariant layer.
+    nm = num_translayers(m)
+    f(x) = ascend(x, m; endscale=nm+2, startscale=nm+1)
+    interlayer_space = reduce(⊗, repeat([V], width))
+    # The initial guess for the eigenvalue search. Also defines the type for eigenvectors.
+    x0 = TensorMap(randn, typ, interlayer_space ← interlayer_space)
+    S, U, info = eigsolve(f, x0, howmany, :LM)
+    # sfact is the ratio by which the number of sites changes at each coarse-graining.
+    sfact = scalefactor(typeof(m))
+    scaldims = sort(-log.(sfact, abs.(real(S))))
     return scaldims
 end
 
@@ -247,11 +244,10 @@ end
 function get_sectors_to_expand(V)
     result = Set(sectors(V))
     if typeof(V) == U₁Space
-        # The `collect` makes a copy, so that we don't iterate over the ones
-        # just added.
+        # The `collect` makes a copy, so that we don't iterate over the ones just added.
         for s in collect(result)
-            # We make jumps by twos, for because of the Hamiltonian the odd
-            # sectors are useless.
+            # We make jumps by twos, for because of the Hamiltonian the odd sectors are
+            # useless.
             splus = U₁(s.charge+2)
             sminus = U₁(s.charge-2)
             push!(result, splus)
