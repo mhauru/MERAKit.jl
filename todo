@@ -9,5 +9,4 @@ FIXES:
 pad_with_zeros_to should be changed to not break isometricity
 set everything up as a Julia package: manifests, readme, directory structure, etc.
 implement proper computation of scaldims, with KrylovKit, for all MERA types
-clean up the _model files to some demo.jl type thing
-incorporate ternaryMERAinf_refine.jl into the demo files
+clean up the demo files and unify them as much as possible
