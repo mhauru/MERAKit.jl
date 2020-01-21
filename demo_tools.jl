@@ -21,32 +21,58 @@ export remove_symmetry
 # # # Functions for creating Hamiltonians.
 
 """
-Take a two-site operator `H` that defines the local term of a global operator, and block
+Take a two-site operator `op` that defines the local term of a global operator, and block
 sites together to form a new two-site operator for which each site corresponds to
 `num_sites` sites of the original operator. `num_sites` should be a power of 2.
 """
-function block_H(H::SquareTensorMap{2}, num_sites)
+function block_op(op::SquareTensorMap{2}, num_sites)
     while num_sites > 1
-        VL = space(H, 1)
-        VR = space(H, 2)
+        VL = space(op, 1)
+        VR = space(op, 2)
         eyeL = TensorMap(I, Float64, VL ← VL)
         eyeR = TensorMap(I, Float64, VR ← VR)
-        Hcross = eyeR ⊗ H ⊗ eyeL
-        Hleft = H ⊗ eyeL ⊗ eyeR
-        Hright = eyeL ⊗ eyeR ⊗ H
-        H_new_unfused = Hcross + 0.5*(Hleft + Hright)
-        fusionspace = domain(H)
+        opcross = eyeR ⊗ op ⊗ eyeL
+        opleft = op ⊗ eyeL ⊗ eyeR
+        opright = eyeL ⊗ eyeR ⊗ op
+        op_new_unfused = opcross + 0.5*(opleft + opright)
+        fusionspace = domain(op)
         fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
         fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
-        H = (fusetop ⊗ fusetop) * H_new_unfused * (fusebottom ⊗ fusebottom)
+        op = (fusetop ⊗ fusetop) * op_new_unfused * (fusebottom ⊗ fusebottom)
         num_sites /= 2
     end
     if num_sites != 1
         msg = "`num_sites` needs to be a power of 2"
         throw(ArgumentError(msg))
     end
-    return H
+    return op
 end
+
+"""
+Take a one-site operator `op` that defines the local term of a global operator, and block
+sites together to form a new one-site operator for which each site corresponds to
+`num_sites` sites of the original operator. `num_sites` should be a power of 2.
+"""
+function block_op(op::SquareTensorMap{1}, num_sites)
+    while num_sites > 1
+        V = space(op, 1)
+        eye = TensorMap(I, Float64, V ← V)
+        opleft = op ⊗ eye
+        opright = eye ⊗ op
+        op_new_unfused = opleft + opright
+        fusionspace = domain(op_new_unfused)
+        fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
+        fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
+        op = fusetop * op_new_unfused * fusebottom
+        num_sites /= 2
+    end
+    if num_sites != 1
+        msg = "`num_sites` needs to be a power of 2"
+        throw(ArgumentError(msg))
+    end
+    return op
+end
+
 
 """
 Normalize an operator by subtracting a constant so that it's spectrum is negative
@@ -89,7 +115,7 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
         error("Unknown symmetry $symmetry")
     end
     H = -(XXplusYY + Delta*ZZ)
-    H = block_H(H, block_size)
+    H = block_op(H, block_size)
     H, D_max = normalize_H(H)
     return H, D_max
 end
@@ -137,20 +163,21 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     else
         error("Unknown symmetry $symmetry")
     end
-    H = block_H(H, block_size)
+    H = block_op(H, block_size)
     H, D_max = normalize_H(H)
     return H, D_max
 end
 
+"""
+Return the magnetization operator for the Ising model, possibly blocked over `block_size`
+sites.
+"""
 function build_magop(;block_size=1)
     V = ℂ^2
     X = TensorMap(zeros, Float64, V ← V)
     eye = TensorMap(I, Float64, V ← V)
     X.data .= [0.0 1.0; 1.0 0.0]
-    XI = X ⊗ eye
-    IX = eye ⊗ X
-    magop = (XI + IX)/2
-    magop = block_H(magop, block_size)
+    magop = block_op(X, block_size)
     return magop
 end
 
