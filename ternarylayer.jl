@@ -66,7 +66,7 @@ Check the compatibility of the legs connecting the isometries of the first layer
 disentanglers of the layer above it. Return true/false.
 """
 function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
-    u, w, = layer.disentangler, layer.isometry
+    u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
     matching_bonds = [(space(w, 1), space(unext, 3)'),
                       (space(w, 1), space(unext, 4)')]
