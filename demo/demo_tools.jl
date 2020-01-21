@@ -5,8 +5,7 @@ using TensorKit
 using JLD2
 using MAT
 using KrylovKit
-include("MERA.jl")
-using .MERA
+using MERA
 
 version = 1.0
 
