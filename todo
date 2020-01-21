@@ -6,7 +6,6 @@ ModifiedBinaryLayer
 isometric disentanglers
 
 Fixes:
-prints -> proper logging
 pad_with_zeros_to should be changed to not break isometricity
 clean up the _model files to some demo.jl type thing
 set everything up as a Julia package: manifests, readme, directory structure, etc.

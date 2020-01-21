@@ -252,7 +252,7 @@ function space_invar(m::GenericMERA{T}) where T
             end
         else
             msg = "space_invar_intralayer has no method for type $(T). We recommend writing one, to enable checking for space mismatches when assigning tensors."
-            println(msg)
+            @warn(msg)
         end
 
         if applicable(space_invar_interlayer, layer, next_layer)
@@ -262,7 +262,7 @@ function space_invar(m::GenericMERA{T}) where T
             end
         else
             msg = "space_invar_interlayer has no method for type $(T). We recommend writing one, to enable checking for space mismatches when assigning tensors."
-            println(msg)
+            @warn(msg)
         end
         layer = next_layer
     end
@@ -394,8 +394,8 @@ TODO Write this docstring.
 """
 function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
                                normalization=identity)
-    println("Optimizing a MERA with $(num_translayers(m)+1) layers,"*
-            " keeping the lowest $(lowest_depth-1) fixed.")
+    @info("Optimizing a MERA with $(num_translayers(m)+1) layers,"*
+          " keeping the lowest $(lowest_depth-1) fixed.")
     nt = num_translayers(m)
     horig = ascend(h, m; endscale=lowest_depth)
     energy = Inf
@@ -453,8 +453,8 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
         # As the optimization gets further, don't print status updates at every
         # iteration any more.
         if (counter - last_status_print)/counter > 0.02
-            @printf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.\n",
-                    energy, energy_change, rhos_maxchange, counter)
+            @info(@sprintf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.",
+                           energy, energy_change, rhos_maxchange, counter))
             last_status_print = counter
         end
     end

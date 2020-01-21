@@ -283,11 +283,11 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     matlab_path = "$(matlab_folder)/$(filename).mat"
 
     if loadfromdisk && isfile(path)
-        println("Found $filename on disk, loading it.")
+        @info("Found $filename on disk, loading it.")
         m = load_mera(path)
         return m
     else
-        println("Did not find $filename on disk, generating it.")
+        @info("Did not find $filename on disk, generating it.")
         if model == "XXZ"
             h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
         elseif model == "Ising"

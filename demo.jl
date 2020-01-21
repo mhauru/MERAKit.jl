@@ -14,7 +14,7 @@ function parse_pars()
                    , "--meratype", arg_type=String, default="binary"
                    , "--threads", arg_type=Int, default=1
                    , "--chis", arg_type=Vector{Int}, default=collect(1:4)
-                   , "--layers", arg_type=Int, default=4
+                   , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="none"
                    , "--block_size", arg_type=Int, default=2
                    , "--h", arg_type=Float64, default=1.0
@@ -60,7 +60,7 @@ function main()
     # Used when optimizing a MERA that has all bond dimensions at the full,
     # desired value.
     pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
-                                 :maxiter => 1000,
+                                 :maxiter => 10000,
                                  :miniter => 10,
                                  :havg_depth => 10,
                                  :layer_iters => 1,
@@ -92,24 +92,21 @@ function main()
         push!(rhoeevects, rhoees)
         model == "Ising" && symmetry == "none" && (magnetization = expect(magop, remove_symmetry(m)))
 
-        println("Done with bond dimension $(chi).")
-        println("Energy numerical: $energy")
-        model == "Ising" && println("Energy exact:     $(-4/pi)")
-        model == "Ising" && symmetry == "none" && println("Magnetization: $(magnetization)")
-        println("rho ees:")
-        println(rhoees)
+        @info("Done with bond dimension $(chi).")
+        @info("Energy numerical: $energy")
+        model == "Ising" && @info("Energy exact:     $(-4/pi)")
+        model == "Ising" && symmetry == "none" && @info("Magnetization: $(magnetization)")
+        @info("rho ees:")
+        @info(rhoees)
 
         scaldims = get_scaldims(m)
-        println("Scaling dimensions:")
-        println(scaldims)
+        @info("Scaling dimensions:")
+        @info(scaldims)
     end
 
-    println("------------------------------")
     @show rhoeevects
-    println("------------------------------")
     @show energies
     if model == "Ising"
-        println("------------------------------")
         energyerrs = energies .+ 4/pi
         energyerrs = abs.(energyerrs ./ energies)
         energyerrs = log.(10, energyerrs)
