@@ -11,10 +11,7 @@ end
 
 TernaryMERA = GenericMERA{TernaryLayer}
 
-function Base.convert(::Type{TernaryLayer}, tuple::Tuple{T1, T2}
-                     ) where {T1 <: TensorMap, T2 <: TensorMap}
-    return TernaryLayer(tuple...)
-end
+Base.convert(::Type{TernaryLayer}, tuple::Tuple) = TernaryLayer(tuple...)
 
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
@@ -28,6 +25,13 @@ function Base.getindex(layer::TernaryLayer, i)
     i == 2 && return layer.isometry
     throw(BoundsError(layer, i))
 end
+
+Base.eltype(layer::TernaryLayer) = reduce(promote_type, map(eltype, layer))
+
+"""
+The ratio by which the number of sites changes when go down through this layer.
+"""
+scalefactor(::Type{TernaryMERA}) = 3
 
 get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
 
@@ -50,7 +54,7 @@ Check the compatibility of the legs connecting the disentanglers and the isometr
 Return true/false.
 """
 function space_invar_intralayer(layer::TernaryLayer)
-    u, w, = layer
+    u, w = layer
     matching_bonds = [(space(u, 1), space(w, 4)'),
                       (space(u, 2), space(w, 2)')]
     allmatch = all([==(pair...) for pair in matching_bonds])
@@ -118,6 +122,20 @@ depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Ascending and descending superoperators
+
+"""
+Return the ascending superoperator of the one site in the middle of the isometries in a
+TernaryMERA, as a TensorMap. Unlike most ascending superoperators, this one is actually
+affordable to construct as a full tensor.
+"""
+ascending_superop_onesite(m::TernaryMERA) = ascending_superop_onesite(get_layer(m, Inf))
+
+function ascending_superop_onesite(layer::TernaryLayer)
+    w = layer.isometry
+    w_dg = w'
+    @tensor(superop[-1,-2,-11,-12] := w[-1,1,-11,2] * w_dg[1,-12,2,-2])
+    return superop
+end
 
 """
 Ascend a twosite `op` from the bottom of the given layer to the top.

@@ -11,9 +11,10 @@ collection of tensors, the orders and shapes of which depend on the type.
 abstract type Layer end
 
 """
-A GenericMERA is a collection of Layers. The type of these layers then determines whether the
-MERA is binary, ternary, etc. The counting starts from the bottom, i.e. from the physical
-layer. The last layer is the scale invariant one, that then repeats upwards to infinity.
+A GenericMERA is a collection of Layers. The type of these layers then determines whether
+the MERA is binary, ternary, etc. The counting starts from the bottom, i.e. from the
+physical layer. The last layer is the scale invariant one, that then repeats upwards to
+infinity.
 """
 struct GenericMERA{T}
     layers::Vector{T}
@@ -28,6 +29,14 @@ Return the type of the layers of `m`.
 """
 layertype(m::T) where {T <: GenericMERA} = layertype(T)
 layertype(::Type{GenericMERA{T}}) where {T <: Layer} = T
+
+Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
+
+
+"""
+The ratio by which the number of sites changes when go down by a layer.
+"""
+scalefactor(::Type{GenericMERA{T}}) where T = scalefactor(T)
 
 """
 Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.
@@ -434,7 +443,7 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
 
         energy = expect(h, m, opscale=nt+1, evalscale=nt+1)
         energy = normalization(energy)
-        energy_change = (energy - old_energy)/energy
+        energy_change = (energy - old_energy)/abs(energy)
 
         if old_rhos !== nothing
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]

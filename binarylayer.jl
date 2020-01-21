@@ -26,6 +26,13 @@ function Base.getindex(layer::BinaryLayer, i)
     throw(BoundsError(layer, i))
 end
 
+Base.eltype(layer::BinaryLayer) = reduce(promote_type, map(eltype, layer))
+
+"""
+The ratio by which the number of sites changes when go down through this layer.
+"""
+scalefactor(::Type{BinaryMERA}) = 2
+
 get_disentangler(m::BinaryMERA, depth) = get_layer(m, depth).disentangler
 
 get_isometry(m::BinaryMERA, depth) = get_layer(m, depth).isometry

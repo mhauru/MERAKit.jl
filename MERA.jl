@@ -7,9 +7,11 @@ using LinearAlgebra
 using Logging
 
 export GenericMERA, TernaryMERA, BinaryMERA
+export TernaryLayer, BinaryLayer
+export SquareTensorMap
 export ascend, descend
 export get_layer, get_disentangler, get_isometry, num_translayers
-export outputspace, inputspace, causal_cone_width
+export outputspace, inputspace, causal_cone_width, scalefactor
 export densitymatrix, densitymatrices, densitymatrix_entropies, random_MERA
 export release_transitionlayer!, expand_bonddim!
 export expect, randomlayer!, minimize_expectation!
