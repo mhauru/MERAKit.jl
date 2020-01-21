@@ -379,7 +379,7 @@ function expect(op, m::GenericMERA; opscale=1, evalscale=num_translayers(m)+1)
     # If the operator is defined on a smaller support (number of sites) than rho, expand it.
     op = expand_support(op, support(rho))
     value = tr(rho * op)
-    if abs(imag(value)/value) > 1e-13
+    if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")
     end
     value = real(value)
