@@ -108,7 +108,7 @@ function main()
         @info("rho ees:")
         @info(rhoees)
 
-        scaldims = get_scaldims(m)
+        scaldims = scalingdimensions(m)
         @info("Scaling dimensions:")
         @info(scaldims)
     end

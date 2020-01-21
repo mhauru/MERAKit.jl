@@ -13,7 +13,7 @@ function parse_pars()
                    , "--model", arg_type=String, default="Ising"
                    , "--meratype", arg_type=String, default="binary"
                    , "--threads", arg_type=Int, default=1
-                   , "--chis", arg_type=Vector{Int}, default=collect(1:4)
+                   , "--chis", arg_type=Vector{Int}, default=collect(2:4)
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="none"
                    , "--block_size", arg_type=Int, default=2
@@ -99,7 +99,7 @@ function main()
         @info("rho ees:")
         @info(rhoees)
 
-        scaldims = get_scaldims(m)
+        scaldims = scalingdimensions(m)
         @info("Scaling dimensions:")
         @info(scaldims)
     end
