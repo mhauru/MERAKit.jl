@@ -11,6 +11,4 @@ implement extrapolation
 
 FIXES:
 pad_with_zeros_to should be changed to not break isometricity
-add a README and LICENSE
-implement proper computation of scaldims, with KrylovKit, for all MERA types
 clean up the demo files and unify them as much as possible
