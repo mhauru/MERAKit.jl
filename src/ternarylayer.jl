@@ -186,6 +186,58 @@ function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     return scaled_op
 end
 
+# TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
+# network contractions? @ncon could do it, but Jutho's testing says it's significantly
+# slower.
+"""
+Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
+"""
+function ascend(op::TensorMap{S1,2,3,S2,T1,T2,T3}, layer::TernaryLayer, pos=:avg) where {S1, S2, T1, T2, T3}
+    u, w = layer
+    u_dg = u'
+    w_dg = w'
+    if in(pos, (:left, :l, :L))
+        # Cost: 2X^8 + 2X^7 + 2X^6
+        @tensor(
+                scaled_op[-100,-200,-300,-400,-1000] :=
+                w[-100,51,52,53] * w[-200,54,11,12] *
+                u[53,54,41,42] *
+                op[52,41,31,32,-1000] *
+                u_dg[32,42,21,55] *
+                w_dg[51,31,21,-300] * w_dg[55,11,12,-400]
+               )
+    elseif in(pos, (:right, :r, :R))
+        # Cost: 2X^8 + 2X^7 + 2X^6
+        @tensor(
+                scaled_op[-100,-200,-300,-400,-1000] :=
+                w[-100,11,12,65] * w[-200,63,61,62] *
+                u[65,63,51,52] *
+                op[52,61,31,41,-1000] *
+                u_dg[51,31,64,21] *
+                w_dg[11,12,64,-300] * w_dg[21,41,62,-400]
+               )
+    elseif in(pos, (:middle, :mid, :m, :M))
+        # Cost: 6X^6
+        @tensor(
+                scaled_op[-100,-200,-300,-400,-1000] :=
+                w[-100,31,32,41] * w[-200,51,21,22] *
+                u[41,51,1,2] *
+                op[1,2,11,12,-1000] *
+                u_dg[11,12,42,52] *
+                w_dg[31,32,42,-300] * w_dg[52,21,22,-400]
+               )
+    elseif in(pos, (:a, :avg, :average))
+        l = ascend(op, layer, :l)
+        r = ascend(op, layer, :r)
+        m = ascend(op, layer, :m)
+        scaled_op = (l+r+m)/3.
+    else
+        throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
+    end
+    scaled_op = permuteind(scaled_op, (1,2), (3,4,5))
+    return scaled_op
+end
+
 
 """
 Decend a twosite `rho` from the top of the given layer to the bottom.

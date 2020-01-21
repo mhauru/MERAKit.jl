@@ -157,6 +157,47 @@ function ascend(op::SquareTensorMap{3}, layer::BinaryLayer, pos=:avg)
     return scaled_op
 end
 
+
+# TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
+# network contractions? @ncon could do it, but Jutho's testing says it's significantly
+# slower.
+"""
+Ascend a threesite `op` with an extra free leg from the bottom of the given layer to the
+top.
+"""
+function ascend(op::TensorMap{S1,3,4,S2,T1,T2,T3}, layer::BinaryLayer, pos=:avg) where {S1, S2, T1, T2, T3}
+    u, w = layer
+    u_dg = u'
+    w_dg = w'
+    if in(pos, (:left, :l, :L))
+        @tensor(
+                scaled_op[-100,-200,-300,-400,-500,-600,-1000] :=
+                w[-100,5,6] * w[-200,9,8] * w[-300,16,15] *
+                u[6,9,1,2] * u[8,16,10,12] *
+                op[1,2,10,3,4,14,-1000] *
+                u_dg[3,4,7,13] * u_dg[14,12,11,17] *
+                w_dg[5,7,-400] * w_dg[13,11,-500] * w_dg[17,15,-600]
+               )
+    elseif in(pos, (:right, :r, :R))
+        @tensor(
+                scaled_op[-100,-200,-300,-400,-500,-600,-1000] :=
+                w[-100,15,16] * w[-200,8,9] * w[-300,6,5] *
+                u[16,8,12,10] * u[9,6,1,2] *
+                op[10,1,2,14,3,4,-1000] *
+                u_dg[12,14,17,11] * u_dg[3,4,13,7] *
+                w_dg[15,17,-400] * w_dg[11,13,-500] * w_dg[7,5,-600]
+               )
+    elseif in(pos, (:a, :avg, :average))
+        l = ascend(op, layer, :left)
+        r = ascend(op, layer, :right)
+        scaled_op = (l+r)/2.
+    else
+        throw(ArgumentError("Unknown position (should be :l, :r, or :avg)."))
+    end
+    scaled_op = permuteind(scaled_op, (1,2,3), (4,5,6,7))
+    return scaled_op
+end
+
 # TODO Write faster versions that actually do only the necessary contractions.
 function ascend(op::SquareTensorMap{2}, layer::BinaryLayer, pos=:avg)
     op = expand_support(op, causal_cone_width(BinaryLayer))

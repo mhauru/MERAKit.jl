@@ -4,9 +4,13 @@ Memoization of things like rho and h_ascended
 Do we still need pseudoserialization? Can we make it less ugly?
 ModifiedBinaryLayer
 isometric disentanglers
+transform many permuteind calls into ;s in index lists
+add a function for evaluating two-point correlators
+implement gradient descent
+implement extrapolation
 
 FIXES:
 pad_with_zeros_to should be changed to not break isometricity
-set everything up as a Julia package: manifests, readme, directory structure, etc.
+add a README and LICENSE
 implement proper computation of scaldims, with KrylovKit, for all MERA types
 clean up the demo files and unify them as much as possible

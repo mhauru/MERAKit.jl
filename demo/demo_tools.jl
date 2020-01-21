@@ -210,13 +210,12 @@ function remove_symmetry(t::TensorMap)
 end
 
 function get_scaldims(m::GenericMERA; howmany=20)
-    # TODO we remove symmetries because we are lazy to code a symmetric eigenvalue search.
-    m = remove_symmetry(m)
     V = outputspace(m, Inf)
     typ = eltype(m)
     chi = dim(V)
     width = causal_cone_width(typeof(m))
-    # Don't even try to get more than half of the eigenvalues.
+    # Don't even try to get more than half of the eigenvalues. Its too expensive, and they
+    # are garbage anyway.
     maxmany = Int(ceil(chi^width/2))
     howmany = min(maxmany, howmany)
     # Define a function that takes an operator and ascends it once through the scale
@@ -224,13 +223,25 @@ function get_scaldims(m::GenericMERA; howmany=20)
     nm = num_translayers(m)
     f(x) = ascend(x, m; endscale=nm+2, startscale=nm+1)
     interlayer_space = reduce(⊗, repeat([V], width))
-    # The initial guess for the eigenvalue search. Also defines the type for eigenvectors.
-    x0 = TensorMap(randn, typ, interlayer_space ← interlayer_space)
-    S, U, info = eigsolve(f, x0, howmany, :LM)
-    # sfact is the ratio by which the number of sites changes at each coarse-graining.
-    sfact = scalefactor(typeof(m))
-    scaldims = sort(-log.(sfact, abs.(real(S))))
-    return scaldims
+    # Find out which symmetry sectors we should do the diagonalization in.
+    sects = sectors(fuse(interlayer_space))
+    scaldim_dict = Dict()
+    for irrep in sects
+        # Diagonalize in each irrep sector.
+        inspace = interlayer_space
+        outspace = interlayer_space
+        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
+        irrep !== Trivial() && (inspace = inspace ⊗ typeof(V)(irrep => 1))
+        # The initial guess for the eigenvalue search. Also defines the type for
+        # eigenvectors.
+        x0 = TensorMap(randn, typ, outspace ← inspace)
+        S, U, info = eigsolve(f, x0, howmany, :LM)
+        # sfact is the ratio by which the number of sites changes at each coarse-graining.
+        sfact = scalefactor(typeof(m))
+        scaldims = sort(-log.(sfact, abs.(real(S))))
+        scaldim_dict[irrep] = scaldims
+    end
+    return scaldim_dict
 end
 
 function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
