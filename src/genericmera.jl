@@ -175,6 +175,12 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
     set_layer!(m, next_layer, depth+1; check_invar=true)
 end
 
+"""
+Given a MERA which may possibly be built of symmetry preserving TensorMaps, and return
+another MERA that has the symmetry structure stripped from it, and all tensors are dense.
+"""
+remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
+
 # # # Pseudo(de)serialization
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia base, and
 # constructing it back. This can be used for storing MERAs on disk.

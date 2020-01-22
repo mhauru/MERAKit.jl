@@ -11,6 +11,7 @@ export GenericMERA, TernaryMERA, BinaryMERA
 export TernaryLayer, BinaryLayer
 export SquareTensorMap
 export ascend, descend
+export remove_symmetry
 export get_layer, get_disentangler, get_isometry, num_translayers
 export outputspace, inputspace
 export causal_cone_width, scalefactor

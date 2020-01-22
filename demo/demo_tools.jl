@@ -13,9 +13,8 @@ export version
 export load_mera, store_mera, store_mera_matlab
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
-export build_superop_onesite, remove_symmetry
+export build_superop_onesite
 export get_optimized_mera, optimize_layerbylayer!
-export remove_symmetry
 
 # # # Functions for creating Hamiltonians.
 
@@ -185,29 +184,6 @@ Given the normalization and block_size constants used in creating a Hamiltonian,
 expectation value of the normalized and blocked Hamiltonian, return the actual energy.
 """
 normalize_energy(energy, D_max, block_size) = (energy + D_max)/block_size
-
-"""
-Given a MERA which may possibly be built of symmetry preserving TensorMaps, and return
-another MERA that has the symmetry structure stripped from it, and all tensors are dense.
-"""
-remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
-"""Strip a TernaryLayer of its internal symmetries."""
-remove_symmetry(layer::TernaryLayer) = TernaryLayer(map(remove_symmetry, layer)...)
-"""Strip a BinaryLayer of its internal symmetries."""
-remove_symmetry(layer::BinaryLayer) = BinaryLayer(map(remove_symmetry, layer)...)
-"""Strip a real ElementarySpace of its symmetry structure."""
-remove_symmetry(V::ElementarySpace{ℝ}) = CartesianSpace(dim(V))
-"""Strip a complex ElementarySpace of its symmetry structure."""
-remove_symmetry(V::ElementarySpace{ℂ}) = ComplexSpace(dim(V), isdual(V))
-
-""" Strip a TensorMap of its internal symmetries."""
-function remove_symmetry(t::TensorMap)
-    domain_nosym = reduce(⊗, map(remove_symmetry, domain(t)))
-    codomain_nosym = reduce(⊗, map(remove_symmetry, codomain(t)))
-    t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
-    t_nosym.data[:] = convert(Array, t)
-    return t_nosym
-end
 
 function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
     while fixedlayers >= 0

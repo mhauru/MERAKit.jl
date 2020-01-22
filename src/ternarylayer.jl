@@ -98,6 +98,9 @@ function expand_inputspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
+"""Strip a TernaryLayer of its internal symmetries."""
+remove_symmetry(layer::TernaryLayer) = TernaryLayer(map(remove_symmetry, layer)...)
+
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`

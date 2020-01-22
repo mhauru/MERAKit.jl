@@ -50,6 +50,20 @@ function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
     return op
 end
 
+"""Strip a real ElementarySpace of its symmetry structure."""
+remove_symmetry(V::ElementarySpace{ℝ}) = CartesianSpace(dim(V))
+"""Strip a complex ElementarySpace of its symmetry structure."""
+remove_symmetry(V::ElementarySpace{ℂ}) = ComplexSpace(dim(V), isdual(V))
+
+""" Strip a TensorMap of its internal symmetries."""
+function remove_symmetry(t::TensorMap)
+    domain_nosym = reduce(⊗, map(remove_symmetry, domain(t)))
+    codomain_nosym = reduce(⊗, map(remove_symmetry, codomain(t)))
+    t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
+    t_nosym.data[:] = convert(Array, t)
+    return t_nosym
+end
+
 """
 Given a vector space and a dictionary of dimensions for the various irrep sectors, return
 another vector space of the same kind but with these new dimension. If some irrep sectors
