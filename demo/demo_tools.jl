@@ -5,13 +5,10 @@ using TensorKit
 using JLD2
 using MERA
 
-version = 1.0
-
-export version
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
-export get_optimized_mera, optimize_layerbylayer!
+export get_optimized_mera
 
 # # # Functions for creating Hamiltonians.
 
@@ -67,7 +64,6 @@ function block_op(op::SquareTensorMap{1}, num_sites)
     end
     return op
 end
-
 
 """
 Normalize an operator by subtracting a constant so that it's spectrum is negative
@@ -182,37 +178,37 @@ expectation value of the normalized and blocked Hamiltonian, return the actual e
 """
 normalize_energy(energy, D_max, block_size) = (energy + D_max)/block_size
 
-function optimize_layerbylayer!(m, h, fixedlayers, normalization, opt_pars)
-    while fixedlayers >= 0
-        minimize_expectation!(m, h, opt_pars;
-                              lowest_depth=fixedlayers+1,
-                              normalization=normalization)
-        fixedlayers -= 1
-    end
-end
+# # # Functions for reading and writing to disk.
 
 function store_mera(path, m)
-    # JLD2 still sucks on the workstation. Sigh.
+    # TODO JLD2 still sucks on the workstation. Sigh.
     #@save path m
     deser = pseudoserialize(m)
     @save path deser
 end
 
 function load_mera(path)
-    # JLD2 still sucks on the workstation. Sigh.
+    # TODO JLD2 still sucks on the workstation. Sigh.
     #@load path m
     @load path deser
     m = depseudoserialize(deser...)
     return m
 end
 
-function get_sectors_to_expand(V)
+# # # Functions for optimizing a MERA.
+
+"""
+Given a VectorSpace `V`, return a list of sectors in which it might make sense to increase
+the dimension of `V`, if we want to increase the total dimension. This means all sectors of
+`V`, but possible some other sectors as well.
+"""
+function sectors_to_expand(V)
     result = Set(sectors(V))
     if typeof(V) == U₁Space
         # The `collect` makes a copy, so that we don't iterate over the ones just added.
         for s in collect(result)
-            # We make jumps by twos, for because of the Hamiltonian the odd sectors are
-            # useless.
+            # TODO The following is specific to XXZ: We make jumps by twos, as because of
+            # the Hamiltonian the odd sectors are useless.
             splus = U₁(s.charge+2)
             sminus = U₁(s.charge-2)
             push!(result, splus)
@@ -222,7 +218,67 @@ function get_sectors_to_expand(V)
     return result
 end
 
-function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
+"""
+For a MERA `m` and its layer number `i`, we want to increase its bond dimension (the output
+dimension) to `chi`. To do that, we may have to decide on which symmetry sector to increase
+the dimension in. For that purpose, go through the possible symmetry sectors, try increasing
+each one, and optimize a bit too see how much it helps bring down the energy. Choose the
+symmetry sector that benefits the energy the most. Return the expanded and slightly
+optimized MERA.
+"""
+function expand_best_sector(m, i, chi, h, normalization, opt_pars)
+    V = outputspace(m, i)
+    d = dim(V)
+    expanded_meras = Dict()
+    for s in sectors_to_expand(V)
+        # Expand the bond dimension of symmetry sector s and try optimizing a bit to see
+        # how useful this expansion is.
+        ms = deepcopy(m)
+        ds = dim(V, s)
+        chi_s = ds + (chi - d)
+        expand_bonddim!(ms, i, Dict(s => chi_s))
+        msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
+        @info(msg)
+        minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        expanded_meras[s] = ms
+    end
+    expanded_meras_array = collect(expanded_meras)
+    # Of the MERAs that got different symmetry sectors expanded, pick the one that has
+    # the smallest energy.
+    minindex = argmin(map(pair -> expect(h, pair[2]), expanded_meras_array))
+    s, m = expanded_meras_array[minindex]
+    msg = "Expanding sector $s yielded the lowest energy, keeping that."
+    @info(msg)
+    return m
+end
+
+"""
+Return the smallest vector space with the given symmetry (either "none", "U1", or "Z2", at
+the moment) that makes sense as a index space of a MERA for the given model (either "Ising"
+or "XXZ"). For instance, the Ising model should have a non-zero bond dimension in both
+symmetry sectors, so the minimal space for Ising and Z2 is ComplexSpace(0 => 1, 1 => 1).
+"""
+function minimal_space(model, symmetry)
+    if symmetry == "none"
+        V = ℂ^1
+    elseif model == "XXZ" && symmetry == "U1"
+        V = ℂ[U₁](-2=>1, 0=>1, 2=>1)
+    elseif model == "Ising" && symmetry == "Z2"
+        V = ℂ[ℤ₂](0=>1, 1=>1)
+    else
+        error("Unknown symmetry $symmetry")
+    end
+    return V
+end
+
+"""
+Get a MERA for the given model, optimized with the parameters `pars`. If the requested MERA
+is already stored on disk, load and return it. If not, optimize for it, store the result on
+disk for future use, and return it. This function often recursively calls itself, because
+MERAs with lower bond dimensions are used as starting points for the optimisation of the
+higher-bond-dimension ones.
+"""
+function get_optimized_mera(datafolder, model, pars)
     chi = pars[:chi]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
@@ -238,99 +294,62 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
         msg = "Unknown MERA type: $(meratypestr)"
         throw(ArgumentError(msg))
     end
-    global version
 
+    # The path to where this MERA should be stored.
     mkpath(datafolder)
-    filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)_$(version)"
+    filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)"
     path = "$datafolder/$filename.jlm"
 
-    if loadfromdisk && isfile(path)
+    if isfile(path)
         @info("Found $filename on disk, loading it.")
         m = load_mera(path)
         return m
+    end
+
+    @info("Did not find $filename on disk, generating it.")
+    # Build the Hamiltonian.
+    if model == "XXZ"
+        h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
+    elseif model == "Ising"
+        h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
     else
-        @info("Did not find $filename on disk, generating it.")
-        if model == "XXZ"
-            h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
-        elseif model == "Ising"
-            h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
-        else
-            msg = "Unknown model: $(model)"
-            throw(ArgumentError(msg))
-        end
-        normalization(x) = normalize_energy(x, dmax, block_size)
+        msg = "Unknown model: $(model)"
+        throw(ArgumentError(msg))
+    end
+    normalization(x) = normalize_energy(x, dmax, block_size)
 
-        chitoosmall = ((symmetry == "U1" && chi < 3)
-                       || (symmetry == "Z2" && chi < 2)
-                       || (chi < 1)
-                      )
-        chiminimal = ((symmetry == "U1" && chi == 3)
-                      || (symmetry == "Z2" && chi == 2)
-                      || (chi == 1)
-                     )
-        if chitoosmall
-            msg = "chi = $chi is too small for the symmetry group $symmetry."
-            throw(ArgumentError(msg))
-        elseif chiminimal
-            V_phys = space(h, 1)
-            if symmetry == "none"
-                V_virt = ℂ^chi
-            elseif symmetry == "U1" && chi == 3
-                V_virt = ℂ[U₁](-2=>1, 0=>1, 2=>1)
-            elseif symmetry == "Z2" && chi == 2
-                V_virt = ℂ[ℤ₂](0=>1, 1=>1)
-            else
-                error("Unknown symmetry $symmetry")
-            end
-
-            Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
-            m = random_MERA(meratype, Vs)
-
-            optimize_layerbylayer!(m, h, 0, normalization,
-                                   pars[:final_opt_pars])
-            store_mera(path, m)
-            return m
-        else
-            prevpars = deepcopy(pars)
-            prevpars[:chi] -= 1
-            m = get_optimized_mera(datafolder, model, prevpars; loadfromdisk=loadfromdisk)
-
-            for i in 1:num_translayers(m)
-                V = outputspace(m, i)
-                d = dim(V)
-                if d < chi  # This should always be true.
-                    expanded_meras = Dict()
-                    for s in get_sectors_to_expand(V)
-                        # Expand the bond dimension of sector s and try
-                        # optimizing a bit to see how useful this expansion is.
-                        ms = deepcopy(m)
-                        ds = dim(V, s)
-                        chi_s = ds + (chi - d)
-                        expand_bonddim!(ms, i, Dict(s => chi_s))
-                        msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
-                        @info(msg)
-                        optimize_layerbylayer!(ms, h, i-1, normalization,
-                                               pars[:initial_opt_pars])
-                        expanded_meras[s] = ms
-                    end
-                    expanded_meras_array = collect(expanded_meras)
-                    minindex = argmin(map(pair -> expect(h, pair[2]),
-                                          expanded_meras_array))
-                    s, m = expanded_meras_array[minindex]
-                    msg = "Expanding sector $s yielded the lowest energy, keeping that. Optimizing it further."
-                    @info(msg)
-                    opt_pars = (i == num_translayers(m) ?
-                                pars[:final_opt_pars]
-                                : pars[:mid_opt_pars]
-                               )
-                    optimize_layerbylayer!(m, h, 0, normalization, opt_pars)
-                end
-            end
-
-            store_mera(path, m)
-            return m
+    # Figure out whether we should start the optimization from a random MERA or a previous
+    # MERA.
+    V_minimal = minimal_space(model, symmetry)
+    if chi < dim(V_minimal)
+        msg = "chi = $chi is too small for a $(symmetry)-symmetric MERA for $(model) model."
+        throw(ArgumentError(msg))
+    elseif chi == dim(V_minimal)
+        # The requested bond dimension is the smallest that makes sense to do with this
+        # symmetry. So just create a random MERA and optimize that.
+        V_virt = V_minimal
+        V_phys = space(h, 1)
+        Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
+        m = random_MERA(meratype, Vs)
+        opt_pars = pars[:final_opt_pars]
+        minimize_expectation!(m, h, opt_pars; normalization=normalization)
+    else
+        # The bond dimensions requested is larger than the smallest that makes sense to do.
+        # Get the MERA with a bond dimension one smaller to use as a starting point, expand
+        # its bond dimension, and optimize that one.
+        prevpars = deepcopy(pars)
+        prevpars[:chi] -= 1
+        m = get_optimized_mera(datafolder, model, prevpars)
+        # Expand the bond dimension of each layer in turn.
+        for i in 1:num_translayers(m)
+            m = expand_best_sector(m, i, chi, h, normalization, pars[:initial_opt_pars])
+            opt_pars = i == num_translayers(m) ? pars[:final_opt_pars] : pars[:mid_opt_pars]
+            minimize_expectation!(m, h, opt_pars; normalization=normalization)
         end
     end
+
+    store_mera(path, m)
+    return m
 end
 
 end  # module

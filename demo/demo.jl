@@ -1,5 +1,3 @@
-module Demo
-
 using ArgParse
 using LinearAlgebra
 using TensorKit
@@ -19,6 +17,7 @@ function parse_pars()
                    , "--block_size", arg_type=Int, default=2
                    , "--h", arg_type=Float64, default=1.0
                    , "--Delta", arg_type=Float64, default=-0.5
+                   , "--datafolder", arg_type=String, default="JLMdata"
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -30,19 +29,17 @@ function main()
     chis = pars[:chis]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
+    datafolder = pars[:datafolder]
     if symmetry == "group"
-        if model == "Ising"
-            symmetry = "Z2"
-        elseif model == "XXZ"
-            symmetry = "U1"
-        end
+        model == "Ising" && (symmetry = "Z2")
+        model == "XXZ" && (symmetry = "U1")
         pars[:symmetry] = symmetry
     end
     block_size = pars[:block_size]
 
     # Used when determining which sector to give bond dimension to.
     pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
-                                   :maxiter => 100,
+                                   :maxiter => 10,
                                    :miniter => 10,
                                    :havg_depth => 10,
                                    :layer_iters => 1,
@@ -51,7 +48,7 @@ function main()
     # Used when optimizing a MERA that has some layers expanded to desired bond
     # dimension, but not all.
     pars[:mid_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
-                               :maxiter => 1000,
+                               :maxiter => 30,
                                :miniter => 10,
                                :havg_depth => 10,
                                :layer_iters => 1,
@@ -60,13 +57,14 @@ function main()
     # Used when optimizing a MERA that has all bond dimensions at the full,
     # desired value.
     pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
-                                 :maxiter => 10000,
+                                 :maxiter => 1000,
                                  :miniter => 10,
                                  :havg_depth => 10,
                                  :layer_iters => 1,
                                  :disentangler_iters => 1,
                                  :isometry_iters => 1)
 
+    # Get the Hamiltonian.
     if model == "Ising"
         h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
         symmetry == "none" && (magop = build_magop(block_size=block_size))
@@ -78,42 +76,31 @@ function main()
     end
     normalization(x) = normalize_energy(x, dmax, block_size)
 
-    energies = Vector{Float64}()
-    rhoeevects = Vector{Vector{Float64}}()
+    # Computing the magnetisation of the Ising model only makes sense if Z2 symmetry isn't
+    # explicitly enforced.
+    do_magnetisation = model == "Ising" && symmetry == "none"
     for chi in chis
+        # For each bond dimension, get the optimized MERA and print out some interesting
+        # numbers for it.
         temppars = deepcopy(pars)
         temppars[:chi] = chi
-        m = get_optimized_mera("JLMdata", model, temppars)
+        m = get_optimized_mera(datafolder, model, temppars)
 
         energy = expect(h, m)
         energy = normalize_energy(energy, dmax, block_size)
-        push!(energies, energy)
         rhoees = densitymatrix_entropies(m)
-        push!(rhoeevects, rhoees)
-        model == "Ising" && symmetry == "none" && (magnetization = expect(magop, remove_symmetry(m)))
+        do_magnetisation && (magnetization = expect(magop, remove_symmetry(m)))
+        scaldims = scalingdimensions(m)
 
         @info("Done with bond dimension $(chi).")
         @info("Energy numerical: $energy")
         model == "Ising" && @info("Energy exact:     $(-4/pi)")
-        model == "Ising" && symmetry == "none" && @info("Magnetization: $(magnetization)")
+        do_magnetisation && @info("Magnetization: $(magnetization)")
         @info("rho ees:")
         @info(rhoees)
-
-        scaldims = scalingdimensions(m)
         @info("Scaling dimensions:")
         @info(scaldims)
-    end
-
-    @show rhoeevects
-    @show energies
-    if model == "Ising"
-        energyerrs = energies .+ 4/pi
-        energyerrs = abs.(energyerrs ./ energies)
-        energyerrs = log.(10, energyerrs)
-        @show energyerrs
     end
 end
 
 main()
-
-end  # module

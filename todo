@@ -1,4 +1,3 @@
-IMPROVEMENTS:
 Switch index convention
 Memoization of things like rho and h_ascended
 Do we still need pseudoserialization? Can we make it less ugly?
@@ -8,6 +7,3 @@ transform many permuteind calls into ;s in index lists
 add a function for evaluating two-point correlators
 implement gradient descent
 implement extrapolation
-
-FIXES:
-clean up the demo files and unify them as much as possible
