@@ -83,7 +83,7 @@ space to be V_new.
 """
 function expand_outputspace(layer::TernaryLayer, V_new)
     u, w = layer
-    w = pad_with_zeros_to(w, 1, V_new)
+    w = pad_with_zeros_to(w, 1 => V_new)
     return TernaryLayer(u, w)
 end
 
@@ -93,13 +93,8 @@ change the bottom vector space to be V_new.
 """
 function expand_inputspace(layer::TernaryLayer, V_new)
     u, w = layer
-    u = pad_with_zeros_to(u, 1, V_new)
-    u = pad_with_zeros_to(u, 2, V_new)
-    u = pad_with_zeros_to(u, 3, V_new')
-    u = pad_with_zeros_to(u, 4, V_new')
-    w = pad_with_zeros_to(w, 2, V_new')
-    w = pad_with_zeros_to(w, 3, V_new')
-    w = pad_with_zeros_to(w, 4, V_new')
+    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
+    w = pad_with_zeros_to(w, 2 => V_new', 3 => V_new', 4 => V_new')
     return TernaryLayer(u, w)
 end
 

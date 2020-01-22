@@ -75,21 +75,31 @@ function expand_vectorspace(V::RepresentationSpace, newdims)
     return typeof(V)(sectordict; dual=V.dual)
 end
 
-# TODO How does this behave if V is smaller than the current space?
 """
-Pad the TensorMap `T` with zeros, so that its index number `ind` now has the space `V`.
+Transform a TensorMap `t` to change the vector spaces of its indices. `spacedict` should be
+a dictionary of index labels to VectorSpaces, that tells which indices should have their
+space changed. Instead of a dictionary, a varargs of Pairs `index => vectorspace` also
+works.
+
+For each index `i`, its current space `Vorig = space(t, i)` and new space `Vnew =
+spacedict[i]` should be of the same type. If `Vnew` is strictly larger than `Vold` then `t`
+is padded with zeros to fill in the new elements. Otherwise some elements of `t` will be
+truncated away.
 """
-function pad_with_zeros_to(T::TensorMap, ind, V)
-    expander = TensorMap(I, eltype(T), space(T, ind)' ← V');
-    sizedomain = length(domain(T))
-    sizecodomain = length(codomain(T))
+function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
+    # Expanders are the matrices by which each index will be multiplied to change the space.
+    expanders = [TensorMap(I, eltype(t), space(t, ind)' ← V') for (ind, V) in spacedict]
+    sizedomain = length(domain(t))
+    sizecodomain = length(codomain(t))
     numinds = sizedomain + sizecodomain
-    indsfinal = collect(-1:-1:-numinds);
-    indsT = copy(indsfinal)
-    indsT[ind] = ind;
-    indsexpander = [ind, -ind]
-    eval(:(@tensor T_new_tensor[$(indsfinal...)] := $T[$(indsT...)] * $expander[$(indsexpander...)]))
-    T_new = permuteind(T_new_tensor, tuple(1:sizecodomain...),
+    inds_t = [ind in keys(spacedict) ? ind : -ind for ind in 1:numinds]
+    inds_expanders = [[ind, -ind] for ind in keys(spacedict)]
+    tensors = [t, expanders...]
+    inds = [inds_t, inds_expanders...]
+    t_new_tensor = @ncon(tensors, inds)
+    t_new = permuteind(t_new_tensor, tuple(1:sizecodomain...),
                        tuple(sizecodomain+1:numinds...))
-    return T_new
+    return t_new
 end
+
+pad_with_zeros_to(t::TensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))

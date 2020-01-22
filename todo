@@ -10,5 +10,4 @@ implement gradient descent
 implement extrapolation
 
 FIXES:
-pad_with_zeros_to should be changed to not break isometricity
 clean up the demo files and unify them as much as possible

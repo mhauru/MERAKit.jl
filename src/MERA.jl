@@ -1,6 +1,7 @@
 module MERA
 
 using TensorKit
+using TensorOperations  # We need this because TensorKit doesn't reexport @ncon
 using KrylovKit
 using Printf
 using LinearAlgebra
