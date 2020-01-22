@@ -3,7 +3,6 @@ module DemoTools
 using LinearAlgebra
 using TensorKit
 using JLD2
-using KrylovKit
 using MERA
 
 version = 1.0
