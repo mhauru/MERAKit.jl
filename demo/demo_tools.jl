@@ -12,7 +12,6 @@ export version
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
-export build_superop_onesite
 export get_optimized_mera, optimize_layerbylayer!
 
 # # # Functions for creating Hamiltonians.
