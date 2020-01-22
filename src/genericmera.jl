@@ -445,8 +445,14 @@ TODO Write this docstring.
 """
 function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
                                normalization=identity)
-    @info("Optimizing a MERA with $(num_translayers(m)+1) layers,"*
-          " keeping the lowest $(lowest_depth-1) fixed.")
+    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers"
+    if lowest_depth > 0
+        msg *= ", keeping the lowest $(lowest_depth-1) fixed."
+    else
+        msg *= "."
+    end
+    @info(msg)
+          
     nt = num_translayers(m)
     horig = ascend(h, m; endscale=lowest_depth)
     energy = Inf
