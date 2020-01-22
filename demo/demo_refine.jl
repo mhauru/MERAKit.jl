@@ -71,7 +71,6 @@ function main()
     filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)_$(version)"
     path = "$datafolder/$filename.jlm"
     path_ref = "$datafolder/$(filename)_refined.jlm"
-    matlab_path_ref = "./matlabdata/$(filename)_refined.mat"
 
     if isfile(path_ref)
         msg = "Found $(path_ref), refining it."
@@ -94,7 +93,6 @@ function main()
         optimize_layerbylayer!(m, h, 0, normalization, opt_pars)
 
         store_mera(path_ref, m)
-        store_mera_matlab(matlab_path_ref, m)
 
         energy = expect(h, m)
         energy = normalize_energy(energy, dmax, block_size)

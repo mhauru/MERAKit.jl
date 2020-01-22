@@ -3,14 +3,13 @@ module DemoTools
 using LinearAlgebra
 using TensorKit
 using JLD2
-using MAT
 using KrylovKit
 using MERA
 
 version = 1.0
 
 export version
-export load_mera, store_mera, store_mera_matlab
+export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
 export build_superop_onesite
@@ -209,16 +208,6 @@ function load_mera(path)
     return m
 end
 
-function store_mera_matlab(path, m)
-    d = Dict{String, Array}()
-    for i in 1:(num_translayers(m)+1)
-        u, w = map(x -> convert(Array, x), get_layer(m, i))
-        d["u$i"] = u
-        d["w$i"] = w
-    end
-    matwrite(path, d)
-end
-
 function get_sectors_to_expand(V)
     result = Set(sectors(V))
     if typeof(V) == U₁Space
@@ -256,9 +245,6 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
     mkpath(datafolder)
     filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)_$(version)"
     path = "$datafolder/$filename.jlm"
-    matlab_folder = "./matlabdata"
-    mkpath(matlab_folder)
-    matlab_path = "$(matlab_folder)/$(filename).mat"
 
     if loadfromdisk && isfile(path)
         @info("Found $filename on disk, loading it.")
@@ -344,7 +330,6 @@ function get_optimized_mera(datafolder, model, pars; loadfromdisk=true)
             end
 
             store_mera(path, m)
-            store_mera_matlab(matlab_path, m)
             return m
         end
     end
