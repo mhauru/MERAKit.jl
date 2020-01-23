@@ -21,10 +21,7 @@ end
 Given two vector spaces, create an isometric/unitary TensorMap from one to the other that
 is the identity, with truncations as needed.
 """
-function identitytensor(Vout, Vin)
-    u = TensorMap(I, ComplexF64, Vout ← Vin)
-    return u
-end
+identitytensor(Vout, Vin) = TensorMap(I, ComplexF64, Vout ← Vin)
 
 """
 Return the number of sites/indices `m` that an operator is supported on, assuming it is an
@@ -90,6 +87,45 @@ function expand_vectorspace(V::RepresentationSpace, newdims)
 end
 
 """
+Return a tuple of objects that can be used to reconstruct a given TensorMap, and that are
+all of Julia base types.
+"""
+function pseudoserialize(t::T) where T <: TensorMap
+    # We make use of the nice fact that many TensorKit objects return on repr
+    # strings that are valid syntax to reconstruct these objects.
+    domstr = repr(t.dom)
+    codomstr = repr(t.codom)
+    eltyp = eltype(t)
+    if isa(t.data, AbstractArray)
+        data = t.data
+    else
+        data = Dict(repr(s) => deepcopy(d) for (s, d) in t.data)
+    end
+    return repr(T), (domstr, codomstr, eltyp, data)
+end
+
+"""
+Reconstruct a TensorMap given the output of `pseudoserialize`.
+"""
+function depseudoserialize(::Type{T}, args) where T <: TensorMap
+    # We make use of the nice fact that many TensorKit objects return on repr
+    # strings that are valid syntax to reconstruct these objects.
+    domstr, codomstr, eltyp, data = args
+    dom = eval(Meta.parse(domstr))
+    codom = eval(Meta.parse(codomstr))
+    t = TensorMap(zeros, eltyp, codom ← dom)
+    if isa(t.data, AbstractArray)
+        t.data[:] = data
+    else
+        for (irrepstr, irrepdata) in data
+            irrep = eval(Meta.parse(irrepstr))
+            t.data[irrep][:] = irrepdata
+        end
+    end
+    return t
+end
+
+"""
 Transform a TensorMap `t` to change the vector spaces of its indices. `spacedict` should be
 a dictionary of index labels to VectorSpaces, that tells which indices should have their
 space changed. Instead of a dictionary, a varargs of Pairs `index => vectorspace` also
@@ -102,12 +138,12 @@ truncated away.
 """
 function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     # Expanders are the matrices by which each index will be multiplied to change the space.
-    expanders = [TensorMap(I, eltype(t), space(t, ind)' ← V') for (ind, V) in spacedict]
+    expanders = [TensorMap(I, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict]
     sizedomain = length(domain(t))
     sizecodomain = length(codomain(t))
     numinds = sizedomain + sizecodomain
     inds_t = [ind in keys(spacedict) ? ind : -ind for ind in 1:numinds]
-    inds_expanders = [[ind, -ind] for ind in keys(spacedict)]
+    inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
     tensors = [t, expanders...]
     inds = [inds_t, inds_expanders...]
     t_new_tensor = @ncon(tensors, inds)

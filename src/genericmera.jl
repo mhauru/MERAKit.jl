@@ -54,7 +54,9 @@ num_translayers(m::GenericMERA) = length(m.layers)-1
 Return the layer at the given depth. 1 is the lowest layer, i.e. the one with physical
 indices.
 """
-get_layer(m::GenericMERA, depth) = depth > num_translayers(m) ?  m.layers[end] : m.layers[depth]
+get_layer(m::GenericMERA, depth) = (depth > num_translayers(m)
+                                    ? m.layers[end]
+                                    : m.layers[depth])
 
 """
 Set, in-place, one of the layers of the MERA to a new, given value. If check_invar=true,
@@ -156,8 +158,6 @@ exactly the same. A round of optimization on the MERA will restore isometricity 
 tensor.
 """
 function expand_bonddim!(m::GenericMERA, depth, newdims)
-    # Note that this breaks the isometricity of the MERA. A round of
-    # optimization will fix that. TODO This shouldn't be allowed to be the case, fix it.
     V = outputspace(m, depth)
     V = expand_vectorspace(V, newdims)
 
@@ -196,45 +196,6 @@ Reconstruct a MERA given the output of `pseudoserialize`.
 """
 depseudoserialize(::Type{T}, args) where T <: GenericMERA = T([depseudoserialize(d...) for d in args])
 depseudoserialize(str::String, args) = depseudoserialize(eval(Meta.parse(str)), args)
-
-"""
-Return a tuple of objects that can be used to reconstruct a given TensorMap, and that are
-all of Julia base types.
-"""
-function pseudoserialize(t::T) where T <: TensorMap
-    # We make use of the nice fact that many TensorKit objects return on repr
-    # strings that are valid syntax to reconstruct these objects.
-    domstr = repr(t.dom)
-    codomstr = repr(t.codom)
-    eltyp = eltype(t)
-    if isa(t.data, AbstractArray)
-        data = t.data
-    else
-        data = Dict(repr(s) => deepcopy(d) for (s, d) in t.data)
-    end
-    return repr(T), (domstr, codomstr, eltyp, data)
-end
-
-"""
-Reconstruct a TensorMap given the output of `pseudoserialize`.
-"""
-function depseudoserialize(::Type{T}, args) where T <: TensorMap
-    # We make use of the nice fact that many TensorKit objects return on repr
-    # strings that are valid syntax to reconstruct these objects.
-    domstr, codomstr, eltyp, data = args
-    dom = eval(Meta.parse(domstr))
-    codom = eval(Meta.parse(codomstr))
-    t = TensorMap(zeros, eltyp, codom ← dom)
-    if isa(t.data, AbstractArray)
-        t.data[:] = data
-    else
-        for (irrepstr, irrepdata) in data
-            irrep = eval(Meta.parse(irrepstr))
-            t.data[irrep][:] = irrepdata
-        end
-    end
-    return t
-end
 
 # Implementations for pseudoserialize(l::T) and depseudoserialize(::Type{T}, args) should be
 # written for each T <: Layer. They can make use of the (de)pseudoserialize methods for
@@ -351,8 +312,7 @@ Return the density matrix right below the layer at `depth`.
 function densitymatrix(m::GenericMERA, depth)
     rho = fixedpoint_densitymatrix(m)
     if depth < num_translayers(m)+1
-        rho = descend(rho, m; endscale=depth,
-                      startscale=num_translayers(m)+1)
+        rho = descend(rho, m; endscale=depth, startscale=num_translayers(m)+1)
     end
     return rho
 end
@@ -446,11 +406,7 @@ TODO Write this docstring.
 function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
                                normalization=identity)
     msg = "Optimizing a MERA with $(num_translayers(m)+1) layers"
-    if lowest_depth > 0
-        msg *= ", keeping the lowest $(lowest_depth-1) fixed."
-    else
-        msg *= "."
-    end
+    msg *= lowest_depth > 0 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
     @info(msg)
           
     nt = num_translayers(m)
