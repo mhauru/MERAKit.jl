@@ -118,8 +118,7 @@ pseudoserialize(layer::TernaryLayer) = (repr(TernaryLayer), map(pseudoserialize,
 depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...)
                                                               for d in data]...)
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Ascending and descending superoperators
+# # # Ascending and descending superoperators
 
 """
 Return the ascending superoperator of the one site in the middle of the isometries in a
@@ -236,6 +235,11 @@ function ascend(op::TensorMap{S1,2,3,S2,T1,T2,T3}, layer::TernaryLayer, pos=:avg
     return scaled_op
 end
 
+# TODO Write faster versions that actually do only the necessary contractions.
+function ascend(op::SquareTensorMap{1}, layer::TernaryLayer, pos=:avg)
+    op = expand_support(op, causal_cone_width(TernaryLayer))
+    return ascend(op, layer, pos)
+end
 
 """
 Decend a twosite `rho` from the top of the given layer to the bottom.
@@ -285,6 +289,8 @@ function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     scaled_rho = permuteind(scaled_rho, (1,2), (3,4))
     return scaled_rho
 end
+
+# # # Optimization
 
 """
 Loop over the tensors of the layer, optimizing each one in turn to minimize the expecation
