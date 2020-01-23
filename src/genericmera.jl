@@ -12,9 +12,15 @@ abstract type Layer end
 
 """
 A GenericMERA is a collection of Layers. The type of these layers then determines whether
-the MERA is binary, ternary, etc. The counting starts from the bottom, i.e. from the
-physical layer. The last layer is the scale invariant one, that then repeats upwards to
-infinity.
+the MERA is binary, ternary, etc.
+
+A few notes on conventions and terminology:
+- The physical indices of the MERA are at the "bottom", the scale invariant part at the
+"top".
+- The counting of layers starts from the bottom, so the layer with physical indices is layer
+#1. The last layer is the scale invariant one, that then repeats upwards to infinity.
+- Each layer is thought of as a linear map from its top, or input space to its bottom, or
+output space.
 """
 struct GenericMERA{T}
     layers::Vector{T}
@@ -83,13 +89,13 @@ end
 Given a MERA and a depth, return the vectorspace of the downwards-pointing (towards the
 physical level) indices of the layer at that depth.
 """
-inputspace(m::GenericMERA, depth) = inputspace(get_layer(m, depth))
+outputspace(m::GenericMERA, depth) = outputspace(get_layer(m, depth))
 
 """
 Given a MERA and a depth, return the vectorspace of the upwards-pointing (towards scale
 invariance) indices of the layer at that depth.
 """
-outputspace(m::GenericMERA, depth) = outputspace(get_layer(m, depth))
+inputspace(m::GenericMERA, depth) = inputspace(get_layer(m, depth))
 
 function densitymatrix_entropy(rho)
     eigs = eigh(rho)[1]
@@ -130,7 +136,7 @@ function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
     for i in 1:num_layers
         V = Vs[i]
         Vnext = (i < num_layers ? Vs[i+1] : V)
-        layer = randomlayer(layertype(T), V, Vnext; kwargs...)
+        layer = randomlayer(layertype(T), Vnext, V; kwargs...)
         push!(layers, layer)
     end
     m = T(layers)
@@ -138,10 +144,10 @@ function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
 end
 
 """
-A function for which the first argument is the Layer type, and the second and third are the
-input and output spaces, that returns a MERA layer with random tensors. May take further
-keyword arguments depending on the Layer type. Each subtype of Layer should have its own
-method for this function.
+Return a MERA layer with random tensors. The first argument is the Layer type, and the
+second and third are the input and output spaces. May take further keyword arguments
+depending on the Layer type. Each subtype of Layer should have its own method for this
+function.
 """
 function randomlayer end
 
@@ -158,22 +164,36 @@ exactly the same. A round of optimization on the MERA will restore isometricity 
 tensor.
 """
 function expand_bonddim!(m::GenericMERA, depth, newdims)
-    V = outputspace(m, depth)
+    V = inputspace(m, depth)
     V = expand_vectorspace(V, newdims)
 
     layer = get_layer(m, depth)
-    layer = expand_outputspace(layer, V)
+    layer = expand_inputspace(layer, V)
     set_layer!(m, layer, depth; check_invar=false)
 
     next_layer = get_layer(m, depth+1)
-    next_layer = expand_inputspace(next_layer, V)
+    next_layer = expand_outputspace(next_layer, V)
     if depth == num_translayers(m)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom..
-        next_layer = expand_outputspace(next_layer, V)
+        next_layer = expand_inputspace(next_layer, V)
     end
     set_layer!(m, next_layer, depth+1; check_invar=true)
 end
+
+"""
+Return a new layer where the tensors have been padded with zeros as necessary to change the
+input space. The first argument is the layer, the second one is the new input space. Each
+subtype of Layer should have its own method for this function.
+"""
+function expand_inputspace end
+
+"""
+Return a new layer where the tensors have been padded with zeros as necessary to change the
+output space. The first argument is the layer, the second one is the new output space. Each
+subtype of Layer should have its own method for this function.
+"""
+function expand_outputspace end
 
 """
 Given a MERA which may possibly be built of symmetry preserving TensorMaps, and return
@@ -295,7 +315,7 @@ Find the fixed point density matrix of the scale invariant part of the MERA.
 """
 function fixedpoint_densitymatrix(m::T) where T <: GenericMERA
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
-    V = outputspace(m, Inf)
+    V = inputspace(m, Inf)
     width = causal_cone_width(T)
     eye = TensorMap(I, Float64, V ← V)
     x0 = ⊗(repeat([eye], width)...)
@@ -342,7 +362,7 @@ for a possible internal symmetry of the MERA (Trivial() if there is no internal 
 and values are scaling dimensions in this symmetry sector.
 """
 function scalingdimensions(m::GenericMERA; howmany=20)
-    V = outputspace(m, Inf)
+    V = inputspace(m, Inf)
     typ = eltype(m)
     chi = dim(V)
     width = causal_cone_width(typeof(m))
@@ -406,7 +426,7 @@ TODO Write this docstring.
 function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
                                normalization=identity)
     msg = "Optimizing a MERA with $(num_translayers(m)+1) layers"
-    msg *= lowest_depth > 0 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
+    msg *= lowest_depth > 1 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
     @info(msg)
           
     nt = num_translayers(m)

@@ -219,7 +219,7 @@ function sectors_to_expand(V)
 end
 
 """
-For a MERA `m` and its layer number `i`, we want to increase its bond dimension (the output
+For a MERA `m` and its layer number `i`, we want to increase its bond dimension (the input
 dimension) to `chi`. To do that, we may have to decide on which symmetry sector to increase
 the dimension in. For that purpose, go through the possible symmetry sectors, try increasing
 each one, and optimize a bit too see how much it helps bring down the energy. Choose the
@@ -227,7 +227,7 @@ symmetry sector that benefits the energy the most. Return the expanded and sligh
 optimized MERA.
 """
 function expand_best_sector(m, i, chi, h, normalization, opt_pars)
-    V = outputspace(m, i)
+    V = inputspace(m, i)
     d = dim(V)
     expanded_meras = Dict()
     for s in sectors_to_expand(V)

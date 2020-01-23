@@ -74,14 +74,14 @@ function space_invar_interlayer(layer::BinaryLayer, next_layer::BinaryLayer)
     return allmatch
 end
 
-inputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
-outputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
+outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
+inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
 
 """
 Return a new layer where the isometries have been padded with zeros to change the top vector
 space to be V_new.
 """
-function expand_outputspace(layer::BinaryLayer, V_new)
+function expand_inputspace(layer::BinaryLayer, V_new)
     u, w = layer
     w = pad_with_zeros_to(w, 3 => V_new')
     return BinaryLayer(u, w)
@@ -91,7 +91,7 @@ end
 Return a new layer where the disentanglers and isometries have been padded with zeros to
 change the bottom vector space to be V_new.
 """
-function expand_inputspace(layer::BinaryLayer, V_new)
+function expand_outputspace(layer::BinaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
     w = pad_with_zeros_to(w, 1 => V_new, 2 => V_new)
@@ -108,9 +108,9 @@ If `random_disentangler=true`, the disentangler is also a random unitary, if `fa
 """
 function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false)
     u = (random_disentangler ?
-         randomisometry(Vin ⊗ Vin, Vin ⊗ Vin)
-         : identitytensor(Vin ⊗ Vin, Vin ⊗ Vin))
-    w = randomisometry(Vin ⊗ Vin, Vout)
+         randomisometry(Vout ⊗ Vout, Vout ⊗ Vout)
+         : identitytensor(Vout ⊗ Vout, Vout ⊗ Vout))
+    w = randomisometry(Vout ⊗ Vout, Vin)
     return BinaryLayer(u, w)
 end
 
