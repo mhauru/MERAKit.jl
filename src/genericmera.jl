@@ -1,5 +1,5 @@
 # The most important types of the package, GenericMERA and Layer, on which all specific MERA
-# implementations (binary, ternary, ...) will be built. Methods and functions that can be
+# implementations (binary, ternary, ...) are built. Methods and functions that can be
 # implemented on this level of abstraction, without having to know the details of the
 # specific MERA type.
 # To be included in MERA.jl.
@@ -38,7 +38,6 @@ layertype(::Type{GenericMERA{T}}) where {T <: Layer} = T
 
 Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
 
-
 """
 The ratio by which the number of sites changes when go down by a layer.
 """
@@ -60,9 +59,8 @@ num_translayers(m::GenericMERA) = length(m.layers)-1
 Return the layer at the given depth. 1 is the lowest layer, i.e. the one with physical
 indices.
 """
-get_layer(m::GenericMERA, depth) = (depth > num_translayers(m)
-                                    ? m.layers[end]
-                                    : m.layers[depth])
+get_layer(m::GenericMERA, depth) = (depth > num_translayers(m) ?
+                                    m.layers[end] : m.layers[depth])
 
 """
 Set, in-place, one of the layers of the MERA to a new, given value. If check_invar=true,
@@ -80,23 +78,26 @@ invariant ones and releasing it to vary independently.
 """
 function release_transitionlayer!(m::GenericMERA)
     layer = get_layer(m, Inf)
-    layer = map(copy, layer)
+    layer = copy(layer)
     push!(m.layers, layer)
     return m
 end
 
 """
-Given a MERA and a depth, return the vectorspace of the downwards-pointing (towards the
+Given a MERA and a depth, return the vector space of the downwards-pointing (towards the
 physical level) indices of the layer at that depth.
 """
 outputspace(m::GenericMERA, depth) = outputspace(get_layer(m, depth))
 
 """
-Given a MERA and a depth, return the vectorspace of the upwards-pointing (towards scale
+Given a MERA and a depth, return the vector space of the upwards-pointing (towards scale
 invariance) indices of the layer at that depth.
 """
 inputspace(m::GenericMERA, depth) = inputspace(get_layer(m, depth))
 
+"""
+Compute the von Neumann entropy of a density matrix `rho`.
+"""
 function densitymatrix_entropy(rho)
     eigs = eigh(rho)[1]
     eigs = real.(diag(convert(Array, eigs)))
@@ -113,7 +114,7 @@ densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatr
 # # # Generating random MERAs
 
 """
-Replace the layer at the given depth with a random tensors. Additional keyword arguments are
+Replace the layer at the given depth with a random one. Additional keyword arguments are
 passed to the function that generates the random layer, the details of which depend on the
 specific layer type (binary, ternary, ...).
 """
@@ -125,11 +126,23 @@ function randomizelayer!(m::GenericMERA{T}, depth; kwargs...) where T
     return m
 end
 
+"""
+Generate a random MERA of type `T`, with `V` as the vector space of all layers, and with
+`num_layers` as the number of different layers (including the scale invariant one).
+Additional keyword arguments are passed on to the function that generates a single random
+layer.
+"""
 function random_MERA(::Type{T}, V, num_layers; kwargs...) where T <: GenericMERA
     Vs = repeat([V], num_layers+1)
     return random_MERA(T, Vs; kwargs...)
 end
 
+"""
+Generate a random MERA of type `T`, with `Vs` as the vector spaces of the various layers.
+Number of layers will be the length of `Vs`, the `Vs[1]` will be the physical index space,
+and `Vs[end]` will be the one at the scale invariant layer.  Additional keyword arguments
+are passed on to the function that generates a single random layer.
+"""
 function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
     num_layers = length(Vs)
     layers = []
@@ -175,7 +188,7 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
     next_layer = expand_outputspace(next_layer, V)
     if depth == num_translayers(m)
         # next_layer is the scale invariant part, so we need to change its top
-        # index too since we changed the bottom..
+        # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
     end
     set_layer!(m, next_layer, depth+1; check_invar=true)
@@ -196,13 +209,13 @@ subtype of Layer should have its own method for this function.
 function expand_outputspace end
 
 """
-Given a MERA which may possibly be built of symmetry preserving TensorMaps, and return
-another MERA that has the symmetry structure stripped from it, and all tensors are dense.
+Given a MERA which may possibly be built of symmetry preserving TensorMaps, return another
+MERA that has the symmetry structure stripped from it, and all tensors are dense.
 """
 remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
 
 # # # Pseudo(de)serialization
-# "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia base, and
+# "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
 # constructing it back. This can be used for storing MERAs on disk.
 # TODO Once JLD or JLD2 works properly we should be able to get rid of this.
 """
@@ -214,12 +227,12 @@ pseudoserialize(m::T) where T <: GenericMERA = (repr(T), map(pseudoserialize, m.
 """
 Reconstruct a MERA given the output of `pseudoserialize`.
 """
-depseudoserialize(::Type{T}, args) where T <: GenericMERA = T([depseudoserialize(d...) for d in args])
-depseudoserialize(str::String, args) = depseudoserialize(eval(Meta.parse(str)), args)
+depseudoserialize(::Type{T}, args) where T <: GenericMERA = T([depseudoserialize(d...)
+                                                               for d in args])
 
-# Implementations for pseudoserialize(l::T) and depseudoserialize(::Type{T}, args) should be
-# written for each T <: Layer. They can make use of the (de)pseudoserialize methods for
-# TensorMaps above.
+# Implementations for pseudoserialize(l::T) and depseudoserialize(::Type{T}, args...) should
+# be written for each T <: Layer. They can make use of the (de)pseudoserialize methods for
+# TensorMaps from `tensortools.jl`.
 
 # # # Invariants
 
@@ -231,7 +244,8 @@ for checking indices between layers. These should be implemented for each subtyp
 """
 function space_invar(m::GenericMERA{T}) where T
     layer = get_layer(m, 1)
-    # We go to num_translayers(m)+2, to go a bit into the scale invariant part.
+    # We go to num_translayers(m)+2, to check that the scale invariant layer is consistent
+    # with itself.
     for i in 2:(num_translayers(m)+2)
         next_layer = get_layer(m, i)
         if applicable(space_invar_intralayer, layer)
@@ -277,10 +291,11 @@ function space_invar_interlayer end
 # # # Scaling functions
 
 """
-Ascend the operator op, that lives on the layer startscale, through the MERA to the layer
-endscale. Living "on" a layer means living on the indices right below it, so startscale=1
-(the default) refers to the physical indices, and endscale=num_translayers(m)=1 (the
-default) to the indices just below the first scale invariant layer.
+Ascend the operator `op`, that lives on the layer `startscale`, through the MERA to the
+layer `endscale`. Living "on" a layer means living on the indices right below it, so
+`startscale=1` (the default) refers to the physical indices, and
+`endscale=num_translayers(m)+1` (the default) to the indices just below the first scale
+invariant layer.
 """
 function ascend(op, m::GenericMERA; endscale=num_translayers(m)+1, startscale=1)
     if endscale < startscale
@@ -294,10 +309,11 @@ function ascend(op, m::GenericMERA; endscale=num_translayers(m)+1, startscale=1)
 end
 
 """
-Descend the operator op, that lives on the layer startscale, through the MERA to the layer
-endscale. Living "on" a layer means living on the indices right below it, so endscale=1 (the
-default) refers to the physical indices, and startscale=num_translayers(m)=1 (the default)
-to the indices just below the first scale invariant layer.
+Descend the operator `op`, that lives on the layer `startscale`, through the MERA to the
+layer `endscale`. Living "on" a layer means living on the indices right below it, so
+`endscale=1` (the default) refers to the physical indices, and
+`startscale=num_translayers(m)+1` (the default) to the indices just below the first scale
+invariant layer.
 """
 function descend(op, m::GenericMERA; endscale=1, startscale=num_translayers(m)+1)
     if endscale > startscale
@@ -374,8 +390,8 @@ function scalingdimensions(m::GenericMERA; howmany=20)
     # invariant layer.
     nm = num_translayers(m)
     f(x) = ascend(x, m; endscale=nm+2, startscale=nm+1)
-    interlayer_space = reduce(⊗, repeat([V], width))
     # Find out which symmetry sectors we should do the diagonalization in.
+    interlayer_space = reduce(⊗, repeat([V], width))
     sects = sectors(fuse(interlayer_space))
     scaldim_dict = Dict()
     for irrep in sects
@@ -421,7 +437,36 @@ end
 # # # Optimization
 
 """
-TODO Write this docstring.
+Optimize the MERA `m` to minimize the expectation value of `h`.
+
+The optimization proceeds by looping over layers and optimizing each in turn, starting from
+the bottom, and repeating this until convergence is reached.
+
+The keyword argument `lowest_depth` sets the lowest layer in the MERA that the optimization
+is allowed to change, by default `lowest=1` so all layers are optimized. They keyword
+argument `normalization` is a function that takes in the expectation value of `h` and
+returns another number that is the actual quantity of interest (because `h` may for instance
+be the Hamiltonian but with a changed normalization).  It is only used for printing log
+messages, and doesn't affect the optimization.
+
+The argument `pars` is a dictionary with symbols as keys, that lists values for different
+parameters for how to do the optimization. They all need to be specified by the user, and
+have no default values. The different parameters are:
+    :miniter, a minimum number of iterations to do over the layers before returning. The
+     first half of the minimum number of iterations will be spent optimizing only isometric
+     tensors, leaving the disentanglers untouched.
+    :maxiter, the maximum number of iterations to do over the layers before returning.
+    :densitymatrix_delta, the convergence threshold. Convergence is measured as changes in
+     the reduced density matrices of the MERA. Once the maximum by which any of them changed
+     over consecutive iterations falls below pars[:densitymatrix_delta], the optimization
+     terminates. Change is measured as Frobenius norm of the difference. Note that this is
+     much more demanding than convergence in just the expectation value.
+    :havg_depth, how deep into the scale invariant layer to go when computing the ascended
+     version of `h` to use for optimizing the scale invariant layer. Should in principle be
+     infinite, but the error goes down exponentially, so in practice 10 is often plenty.
+    Other parameters may be required depending on the type of MERA. See documentation for
+    the different Layer types. Typical parameters are for instance how many times to iterate
+    optimizing individual tensors.
 """
 function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
                                normalization=identity)
@@ -431,8 +476,8 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
           
     nt = num_translayers(m)
     horig = ascend(h, m; endscale=lowest_depth)
-    energy = Inf
-    energy_change = Inf
+    expectation = Inf
+    expectation_change = Inf
     rhos = nothing
     rhos_maxchange = Inf
     counter = 0
@@ -444,16 +489,17 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
           )
         counter += 1
         old_rhos = rhos
-        old_energy = energy
+        old_expectation = expectation
         rhos = densitymatrices(m, lowest_depth)
+
+        # We only optimize disentanglers starting after half of the compulsory iterations
+        # have been done, to not have a screwed up isometry mislead us.
+        do_disentanglers = (counter >= pars[:miniter]/2)
 
         h = horig
         for l in lowest_depth:nt
             rho = rhos[l-lowest_depth+2]
             layer = get_layer(m, l)
-            # We only optimize u starting after half of the compulsory iterations have been
-            # done, to not have a screwed up w mislead us.
-            do_disentanglers = (counter >= pars[:miniter]/2)
             layer = minimize_expectation_layer(h, layer, rho, pars;
                                                do_disentanglers=do_disentanglers)
             set_layer!(m, layer, l)
@@ -461,22 +507,27 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
         end
 
         # Special case of the translation invariant layer.
+        # The Hamiltonian to use for optimizing the scale invariant layer is
+        # havg = h + A(h)/f + A^2(h)/f^2 + A^3(h)/f^3 + ...
+        # where A is the ascending superoperator and f is the scaling factor, e.g. 2 for a
+        # binary MERA and 3 for ternary.  We truncate this series at a few
+        # (pars[:havg_depth]) terms because they become negligible exponentially quickly.
         havg = h
         hi = h
+        sf = scalefactor(typeof(m))
         for i in 1:pars[:havg_depth]
             hi = ascend(hi, m; startscale=nt+i, endscale=nt+i+1)
-            hi = hi/3
+            hi = hi/sf
             havg = havg + hi
         end
         layer = get_layer(m, Inf)
-        do_disentanglers = (counter >= pars[:miniter]/2)
         layer = minimize_expectation_layer(havg, layer, rhos[end], pars;
                                            do_disentanglers=do_disentanglers)
         set_layer!(m, layer, Inf)
 
-        energy = expect(h, m, opscale=nt+1, evalscale=nt+1)
-        energy = normalization(energy)
-        energy_change = (energy - old_energy)/abs(energy)
+        expectation = expect(h, m, opscale=nt+1, evalscale=nt+1)
+        expectation = normalization(expectation)
+        expectation_change = (expectation - old_expectation)/abs(expectation)
 
         if old_rhos !== nothing
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
@@ -486,8 +537,8 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
         # As the optimization gets further, don't print status updates at every
         # iteration any more.
         if (counter - last_status_print)/counter > 0.02
-            @info(@sprintf("Energy = %.9e,  energy change = %.3e,  max rho change = %.3e,  counter = %d.",
-                           energy, energy_change, rhos_maxchange, counter))
+            @info(@sprintf("Expectation = %.9e,  change = %.3e,  max rho change = %.3e,  counter = %d.",
+                           expectation, expectation_change, rhos_maxchange, counter))
             last_status_print = counter
         end
     end

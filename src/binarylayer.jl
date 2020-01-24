@@ -1,6 +1,23 @@
 # BinaryLayer and BinaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
+# # # The core stuff
+
+# Index numbering convention is as follows, where the physical indices are at the bottom:
+# Disentangler:
+#  3|   4|
+#  +------+
+#  |  u   |
+#  +------+
+#  1|   2|
+#
+# Isometry:
+#    3|
+#  +------+
+#  |  w   |
+#  +------+
+#  1|   2|
+
 # TODO We could parametrise this as BinaryLayer{T1, T2}, disentagler::T1, isometry::T2.
 # Would this be good, because it increased type stability, or bad because it caused
 # unnecessary recompilation?
@@ -13,7 +30,7 @@ BinaryMERA = GenericMERA{BinaryLayer}
 
 Base.convert(::Type{BinaryLayer}, tuple::Tuple) = BinaryLayer(tuple...)
 
-# Implement the iteration and indexing interfaces.
+# Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)
 Base.iterate(layer::BinaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
 Base.eltype(::Type{BinaryLayer}) = TensorMap
@@ -27,6 +44,7 @@ function Base.getindex(layer::BinaryLayer, i)
 end
 
 Base.eltype(layer::BinaryLayer) = reduce(promote_type, map(eltype, layer))
+Base.copy(layer::BinaryLayer) = BinaryLayer(map(deepcopy, layer)...)
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -34,7 +52,6 @@ The ratio by which the number of sites changes when go down through this layer.
 scalefactor(::Type{BinaryMERA}) = 2
 
 get_disentangler(m::BinaryMERA, depth) = get_layer(m, depth).disentangler
-
 get_isometry(m::BinaryMERA, depth) = get_layer(m, depth).isometry
 
 function set_disentangler!(m::BinaryMERA, u, depth; kwargs...)
@@ -48,6 +65,51 @@ function set_isometry!(m::BinaryMERA, w, depth; kwargs...)
 end
 
 causal_cone_width(::Type{BinaryLayer}) = 3
+
+outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
+inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
+
+"""
+Return a new layer where the isometries have been padded with zeros to change the input
+(top) vector space to be V_new.
+"""
+function expand_inputspace(layer::BinaryLayer, V_new)
+    u, w = layer
+    w = pad_with_zeros_to(w, 3 => V_new')
+    return BinaryLayer(u, w)
+end
+
+"""
+Return a new layer where the disentanglers and isometries have been padded with zeros to
+change the output (bottom) vector space to be V_new.
+"""
+function expand_outputspace(layer::BinaryLayer, V_new)
+    u, w = layer
+    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
+    w = pad_with_zeros_to(w, 1 => V_new, 2 => V_new)
+    return BinaryLayer(u, w)
+end
+
+"""Strip a BinaryLayer of its internal symmetries."""
+remove_symmetry(layer::BinaryLayer) = BinaryLayer(map(remove_symmetry, layer)...)
+
+"""
+Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
+If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
+(default), it is the identity.
+"""
+function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false)
+    ufunc = random_disentangler ? randomisometry : identitytensor
+    u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
+    w = randomisometry(Vout ⊗ Vout, Vin)
+    return BinaryLayer(u, w)
+end
+
+pseudoserialize(layer::BinaryLayer) = (repr(BinaryLayer), map(pseudoserialize, layer))
+depseudoserialize(::Type{BinaryLayer}, data) = BinaryLayer([depseudoserialize(d...)
+                                                            for d in data]...)
+
+# # # Invariants
 
 """
 Check the compatibility of the legs connecting the disentanglers and the isometries.
@@ -73,50 +135,6 @@ function space_invar_interlayer(layer::BinaryLayer, next_layer::BinaryLayer)
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end
-
-outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
-inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
-
-"""
-Return a new layer where the isometries have been padded with zeros to change the top vector
-space to be V_new.
-"""
-function expand_inputspace(layer::BinaryLayer, V_new)
-    u, w = layer
-    w = pad_with_zeros_to(w, 3 => V_new')
-    return BinaryLayer(u, w)
-end
-
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the bottom vector space to be V_new.
-"""
-function expand_outputspace(layer::BinaryLayer, V_new)
-    u, w = layer
-    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
-    w = pad_with_zeros_to(w, 1 => V_new, 2 => V_new)
-    return BinaryLayer(u, w)
-end
-
-"""Strip a BinaryLayer of its internal symmetries."""
-remove_symmetry(layer::BinaryLayer) = BinaryLayer(map(remove_symmetry, layer)...)
-
-"""
-Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
-(default), it is the identity.
-"""
-function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false)
-    u = (random_disentangler ?
-         randomisometry(Vout ⊗ Vout, Vout ⊗ Vout)
-         : identitytensor(Vout ⊗ Vout, Vout ⊗ Vout))
-    w = randomisometry(Vout ⊗ Vout, Vin)
-    return BinaryLayer(u, w)
-end
-
-pseudoserialize(layer::BinaryLayer) = (repr(BinaryLayer), map(pseudoserialize, layer))
-depseudoserialize(::Type{BinaryLayer}, data) = BinaryLayer([depseudoserialize(d...)
-                                                              for d in data]...)
 
 # # # Ascending and descending superoperators
 
@@ -158,12 +176,13 @@ end
 
 # TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
 # network contractions? @ncon could do it, but Jutho's testing says it's significantly
-# slower.
+# slower. This is only used for diagonalizing in charge sectors, so having tensors with
+# non-trivial charge would also solve this.
 """
 Ascend a threesite `op` with an extra free leg from the bottom of the given layer to the
 top.
 """
-function ascend(op::TensorMap{S1,3,4,S2,T1,T2,T3}, layer::BinaryLayer, pos=:avg) where {S1, S2, T1, T2, T3}
+function ascend(op::TensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -246,6 +265,11 @@ end
 """
 Loop over the tensors of the layer, optimizing each one in turn to minimize the expecation
 value of `h`. `rho` is the density matrix right above this layer.
+
+Three parameters are expected to be in the dictionary `pars`:
+    :layer_iters, for how many times to loop over the tensors within a layer,
+    :disentangler_iters, for how many times to loop over the disentangler,
+    :isometry_iters, for how many times to loop over the isometry.
 """
 function minimize_expectation_layer(h, layer::BinaryLayer, rho, pars; do_disentanglers=true)
     for i in 1:pars[:layer_iters]

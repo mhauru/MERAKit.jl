@@ -1,3 +1,6 @@
+# A script that optimizes a MERA for either the Ising or XXZ model, and computes some
+# physical quantities from it. The MERAs built are stored on disk.
+
 using ArgParse
 using LinearAlgebra
 using TensorKit
@@ -9,14 +12,14 @@ function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
-                   , "--meratype", arg_type=String, default="binary"
-                   , "--threads", arg_type=Int, default=1
-                   , "--chis", arg_type=Vector{Int}, default=collect(2:4)
+                   , "--meratype", arg_type=String, default="ternary"
+                   , "--threads", arg_type=Int, default=1  # For BLAS parallelization
+                   , "--chis", arg_type=Vector{Int}, default=collect(2:3)  # Bond dimensions
                    , "--layers", arg_type=Int, default=3
-                   , "--symmetry", arg_type=String, default="none"
-                   , "--block_size", arg_type=Int, default=2
-                   , "--h", arg_type=Float64, default=1.0
-                   , "--Delta", arg_type=Float64, default=-0.5
+                   , "--symmetry", arg_type=String, default="none"  # "none" or "group"
+                   , "--block_size", arg_type=Int, default=2  # Block two sites to start
+                   , "--h", arg_type=Float64, default=1.0  # External field of Ising
+                   , "--Delta", arg_type=Float64, default=-0.5  # Isotropicity in XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -37,6 +40,7 @@ function main()
     end
     block_size = pars[:block_size]
 
+    # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
     pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
                                    :maxiter => 10,

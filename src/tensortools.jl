@@ -1,17 +1,17 @@
 # Utilities for creating and modifying vector spaces and TensorMaps.
 # To be `included` in MERA.jl.
 
-# TODO I feel like there's a nicer way of writing this, than the really long where {...}.
 """
 A TensorMap from N indices to N indices.
 """
-SquareTensorMap{N} = TensorMap{S1, N, N, S2, T1, T2, T3} where {S1, S2, T1, T2, T3}
+SquareTensorMap{N} = TensorMap{S1, N, N} where {S1}
 
 """
-Given two vector spaces, create an isometric/unitary TensorMap from one to the other.
+Given two vector spaces, create an isometric/unitary TensorMap from one to the other. This
+is done by creating a random Gaussian tensor and SVDing it.
 """
-function randomisometry(Vout, Vin)
-    temp = TensorMap(randn, ComplexF64, Vout ← Vin)
+function randomisometry(Vout, Vin, T=ComplexF64)
+    temp = TensorMap(randn, T, Vout ← Vin)
     U, S, Vt = svd(temp)
     u = U * Vt
     return u
@@ -21,7 +21,7 @@ end
 Given two vector spaces, create an isometric/unitary TensorMap from one to the other that
 is the identity, with truncations as needed.
 """
-identitytensor(Vout, Vin) = TensorMap(I, ComplexF64, Vout ← Vin)
+identitytensor(Vout, Vin, T=ComplexF64) = TensorMap(I, T, Vout ← Vin)
 
 """
 Return the number of sites/indices `m` that an operator is supported on, assuming it is an
@@ -30,19 +30,19 @@ operator from `m` sites to `m` sites.
 support(op::SquareTensorMap{N}) where {N} = N
 
 """
-Given an operator as TensorMap from a number of indices to the same number of indices,
-expand its support to a larger number of sites `n` by tensoring with the identity. The
-different ways of doing the expansion are averaged over.
+Given a TensorMap from a number of indices to the same number of indices, expand its support
+to a larger number of indices `n` by tensoring with the identity. The different ways of
+doing the expansion, e.g. I ⊗ op and op ⊗ I, are averaged over.
 """
 function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
     V = space(op, 1)
     eye = TensorMap(I, eltype(op), V ← V)
-    m = N
-    while m < n
+    op_support = N
+    while op_support < n
         opeye = op ⊗ eye
         eyeop = eye ⊗ op
         op = (opeye + eyeop)/2
-        m += 1
+        op_support += 1
     end
     return op
 end
@@ -82,9 +82,16 @@ function expand_vectorspace(V::GeneralSpace, newdim)
 end
 
 function expand_vectorspace(V::RepresentationSpace, newdims)
-    sectordict = merge(Dict(s => dim(V, s) for s in sectors(V)), newdims)
+    olddims = Dict(s => dim(V, s) for s in sectors(V))
+    sectordict = merge(olddims, newdims)
     return typeof(V)(sectordict; dual=V.dual)
 end
+
+"""
+If the first argument given to depseudoserialize is a String, we assume its a representation
+of a an object that can `eval`uated. So we evaluate it and call depseudoserialize again.
+"""
+depseudoserialize(str::String, args...) = depseudoserialize(eval(Meta.parse(str)), args...)
 
 """
 Return a tuple of objects that can be used to reconstruct a given TensorMap, and that are
@@ -97,20 +104,19 @@ function pseudoserialize(t::T) where T <: TensorMap
     codomstr = repr(t.codom)
     eltyp = eltype(t)
     if isa(t.data, AbstractArray)
-        data = t.data
+        data = deepcopy(t.data)
     else
         data = Dict(repr(s) => deepcopy(d) for (s, d) in t.data)
     end
-    return repr(T), (domstr, codomstr, eltyp, data)
+    return repr(T), domstr, codomstr, eltyp, data
 end
 
 """
 Reconstruct a TensorMap given the output of `pseudoserialize`.
 """
-function depseudoserialize(::Type{T}, args) where T <: TensorMap
+function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data) where T <: TensorMap
     # We make use of the nice fact that many TensorKit objects return on repr
     # strings that are valid syntax to reconstruct these objects.
-    domstr, codomstr, eltyp, data = args
     dom = eval(Meta.parse(domstr))
     codom = eval(Meta.parse(codomstr))
     t = TensorMap(zeros, eltyp, codom ← dom)
@@ -141,12 +147,15 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     expanders = [TensorMap(I, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict]
     sizedomain = length(domain(t))
     sizecodomain = length(codomain(t))
+    # Prepare the @ncon call that contracts each index of `t` with the corresponding
+    # expander, if one exists.
     numinds = sizedomain + sizecodomain
     inds_t = [ind in keys(spacedict) ? ind : -ind for ind in 1:numinds]
     inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
     tensors = [t, expanders...]
     inds = [inds_t, inds_expanders...]
     t_new_tensor = @ncon(tensors, inds)
+    # Permute inds to have the codomain and domain match with those of the input.
     t_new = permuteind(t_new_tensor, tuple(1:sizecodomain...),
                        tuple(sizecodomain+1:numinds...))
     return t_new

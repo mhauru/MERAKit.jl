@@ -1,6 +1,8 @@
 # TernaryLayer and TernaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
+# # # The core stuff
+
 # TODO We could parametrise this as TernaryLayer{T1, T2}, disentagler::T1, isometry::T2.
 # Would this be good, because it increased type stability, or bad because it caused
 # unnecessary recompilation?
@@ -27,6 +29,7 @@ function Base.getindex(layer::TernaryLayer, i)
 end
 
 Base.eltype(layer::TernaryLayer) = reduce(promote_type, map(eltype, layer))
+Base.copy(layer::TernaryLayer) = TernaryLayer(map(deepcopy, layer)...)
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -34,7 +37,6 @@ The ratio by which the number of sites changes when go down through this layer.
 scalefactor(::Type{TernaryMERA}) = 3
 
 get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
-
 get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry
 
 function set_disentangler!(m::TernaryMERA, u, depth; kwargs...)
@@ -48,31 +50,6 @@ function set_isometry!(m::TernaryMERA, w, depth; kwargs...)
 end
 
 causal_cone_width(::Type{TernaryLayer}) = 2
-
-"""
-Check the compatibility of the legs connecting the disentanglers and the isometries.
-Return true/false.
-"""
-function space_invar_intralayer(layer::TernaryLayer)
-    u, w = layer
-    matching_bonds = [(space(u, 3)', space(w, 3)),
-                      (space(u, 4)', space(w, 1))]
-    allmatch = all([==(pair...) for pair in matching_bonds])
-    return allmatch
-end
-
-"""
-Check the compatibility of the legs connecting the isometries of the first layer to the
-disentanglers of the layer above it. Return true/false.
-"""
-function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
-    u, w = layer.disentangler, layer.isometry
-    unext, wnext = next_layer.disentangler, next_layer.isometry
-    matching_bonds = [(space(w, 4)', space(unext, 1)),
-                      (space(w, 4)', space(unext, 2))]
-    allmatch = all([==(pair...) for pair in matching_bonds])
-    return allmatch
-end
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
@@ -107,9 +84,8 @@ If `random_disentangler=true`, the disentangler is also a random unitary, if `fa
 (default), it is the identity.
 """
 function randomlayer(::Type{TernaryLayer}, Vin, Vout; random_disentangler=false)
-    u = (random_disentangler ?
-         randomisometry(Vout ⊗ Vout, Vout ⊗ Vout)
-         : identitytensor(Vout ⊗ Vout, Vout ⊗ Vout))
+    ufunc = random_disentangler ? randomisometry : identitytensor
+    u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
     w = randomisometry(Vout ⊗ Vout ⊗ Vout, Vin)
     return TernaryLayer(u, w)
 end
@@ -117,6 +93,33 @@ end
 pseudoserialize(layer::TernaryLayer) = (repr(TernaryLayer), map(pseudoserialize, layer))
 depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...)
                                                               for d in data]...)
+
+# # # Invariants
+
+"""
+Check the compatibility of the legs connecting the disentanglers and the isometries.
+Return true/false.
+"""
+function space_invar_intralayer(layer::TernaryLayer)
+    u, w = layer
+    matching_bonds = [(space(u, 3)', space(w, 3)),
+                      (space(u, 4)', space(w, 1))]
+    allmatch = all([==(pair...) for pair in matching_bonds])
+    return allmatch
+end
+
+"""
+Check the compatibility of the legs connecting the isometries of the first layer to the
+disentanglers of the layer above it. Return true/false.
+"""
+function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
+    u, w = layer.disentangler, layer.isometry
+    unext, wnext = next_layer.disentangler, next_layer.isometry
+    matching_bonds = [(space(w, 4)', space(unext, 1)),
+                      (space(w, 4)', space(unext, 2))]
+    allmatch = all([==(pair...) for pair in matching_bonds])
+    return allmatch
+end
 
 # # # Ascending and descending superoperators
 
@@ -184,11 +187,12 @@ end
 
 # TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
 # network contractions? @ncon could do it, but Jutho's testing says it's significantly
-# slower.
+# slower. This is only used for diagonalizing in charge sectors, so having tensors with
+# non-trivial charge would also solve this.
 """
 Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
 """
-function ascend(op::TensorMap{S1,2,3,S2,T1,T2,T3}, layer::TernaryLayer, pos=:avg) where {S1, S2, T1, T2, T3}
+function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
     u, w = layer
     u_dg = u'
     w_dg = w'
@@ -292,6 +296,11 @@ end
 """
 Loop over the tensors of the layer, optimizing each one in turn to minimize the expecation
 value of `h`. `rho` is the density matrix right above this layer.
+
+Three parameters are expected to be in the dictionary `pars`:
+    :layer_iters, for how many times to loop over the tensors within a layer,
+    :disentangler_iters, for how many times to loop over the disentangler,
+    :isometry_iters, for how many times to loop over the isometry.
 """
 function minimize_expectation_layer(h, layer::TernaryLayer, rho, pars;
                                     do_disentanglers=true)

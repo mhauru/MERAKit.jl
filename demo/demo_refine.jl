@@ -1,3 +1,6 @@
+# Script that loads a previously optimized MERA from disk, and optimizes it further
+# ("refines" it).
+
 using ArgParse
 using LinearAlgebra
 using TensorKit
@@ -10,14 +13,14 @@ function parse_pars()
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
                    , "--meratype", arg_type=String, default="binary"
-                   , "--threads", arg_type=Int, default=1
-                   , "--chi", arg_type=Int, default=3
+                   , "--threads", arg_type=Int, default=1  # For BLAS parallelization
+                   , "--chi", arg_type=Int, default=3  # Bond dimension
                    , "--layers", arg_type=Int, default=3
-                   , "--symmetry", arg_type=String, default="none"
-                   , "--block_size", arg_type=Int, default=2
                    , "--reps", arg_type=Int, default=1000
-                   , "--h", arg_type=Float64, default=1.0
-                   , "--Delta", arg_type=Float64, default=-0.5
+                   , "--symmetry", arg_type=String, default="none"  # "none" or "group"
+                   , "--block_size", arg_type=Int, default=2  # Block two sites to start
+                   , "--h", arg_type=Float64, default=1.0  # External field of Ising
+                   , "--Delta", arg_type=Float64, default=-0.5  # Isotropicity in XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
     )
     pars = parse_args(ARGS, settings; as_symbols=true)

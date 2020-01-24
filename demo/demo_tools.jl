@@ -1,3 +1,5 @@
+# Utilities for demo.jl and and demo_refine.jl.
+
 module DemoTools
 
 using LinearAlgebra
@@ -15,7 +17,8 @@ export get_optimized_mera
 """
 Take a two-site operator `op` that defines the local term of a global operator, and block
 sites together to form a new two-site operator for which each site corresponds to
-`num_sites` sites of the original operator. `num_sites` should be a power of 2.
+`num_sites` sites of the original operator, and which sums up to the same global operator.
+`num_sites` should be a power of 2.
 """
 function block_op(op::SquareTensorMap{2}, num_sites)
     while num_sites > 1
@@ -43,7 +46,8 @@ end
 """
 Take a one-site operator `op` that defines the local term of a global operator, and block
 sites together to form a new one-site operator for which each site corresponds to
-`num_sites` sites of the original operator. `num_sites` should be a power of 2.
+`num_sites` sites of the original operator, and which sums up to the same global operator.
+`num_sites` should be a power of 2.
 """
 function block_op(op::SquareTensorMap{1}, num_sites)
     while num_sites > 1
@@ -71,10 +75,10 @@ semidefinite. Return the normalized operator and the constant that was subtracte
 """
 function normalize_H(H)
     # TODO Switch to using an eigendecomposition?
-    D_max = norm(H)
-    bigeye = TensorMap(I, codomain(H) ← domain(H))
-    H = H - bigeye*D_max
-    return H, D_max
+    c = norm(H)
+    eye = TensorMap(I, codomain(H) ← domain(H))
+    H = H - eye*c
+    return H, c
 end
 
 """
@@ -107,8 +111,8 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     end
     H = -(XXplusYY + Delta*ZZ)
     H = block_op(H, block_size)
-    H, D_max = normalize_H(H)
-    return H, D_max
+    H, c = normalize_H(H)
+    return H, c
 end
 
 """
@@ -155,13 +159,12 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
         error("Unknown symmetry $symmetry")
     end
     H = block_op(H, block_size)
-    H, D_max = normalize_H(H)
-    return H, D_max
+    H, c = normalize_H(H)
+    return H, c
 end
 
 """
-Return the magnetization operator for the Ising model, possibly blocked over `block_size`
-sites.
+Return the magnetization operator for the Ising model, blocked over `block_size` sites.
 """
 function build_magop(;block_size=1)
     V = ℂ^2
@@ -176,7 +179,7 @@ end
 Given the normalization and block_size constants used in creating a Hamiltonian, and the
 expectation value of the normalized and blocked Hamiltonian, return the actual energy.
 """
-normalize_energy(energy, D_max, block_size) = (energy + D_max)/block_size
+normalize_energy(energy, c, block_size) = (energy + c)/block_size
 
 # # # Functions for reading and writing to disk.
 
