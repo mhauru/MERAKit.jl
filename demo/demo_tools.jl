@@ -184,14 +184,16 @@ normalize_energy(energy, c, block_size) = (energy + c)/block_size
 # # # Functions for reading and writing to disk.
 
 function store_mera(path, m)
-    # TODO JLD2 still sucks on the workstation. Sigh.
+    # TODO JLD2 still fails to store MERAs properly. Once that's fixed, switch away from
+    # using pseudoserialization.
     #@save path m
     deser = pseudoserialize(m)
     @save path deser
 end
 
 function load_mera(path)
-    # TODO JLD2 still sucks on the workstation. Sigh.
+    # TODO JLD2 still fails to store MERAs properly. Once that's fixed, switch away from
+    # using pseudoserialization.
     #@load path m
     @load path deser
     m = depseudoserialize(deser...)
