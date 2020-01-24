@@ -14,7 +14,7 @@ function parse_pars()
                    , "--model", arg_type=String, default="Ising"
                    , "--meratype", arg_type=String, default="ternary"
                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
-                   , "--chis", arg_type=Vector{Int}, default=collect(2:3)  # Bond dimensions
+                   , "--chis", arg_type=Vector{Int}, default=collect(2:8)  # Bond dimensions
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
                    , "--block_size", arg_type=Int, default=2  # Block two sites to start
@@ -49,8 +49,8 @@ function main()
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
                                    :isometry_iters => 1)
-    # Used when optimizing a MERA that has some layers expanded to desired bond
-    # dimension, but not all.
+    # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
+    # but not all.
     pars[:mid_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
                                :maxiter => 30,
                                :miniter => 10,
@@ -58,10 +58,9 @@ function main()
                                :layer_iters => 1,
                                :disentangler_iters => 1,
                                :isometry_iters => 1)
-    # Used when optimizing a MERA that has all bond dimensions at the full,
-    # desired value.
+    # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
     pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
-                                 :maxiter => 1000,
+                                 :maxiter => 10000,
                                  :miniter => 10,
                                  :havg_depth => 10,
                                  :layer_iters => 1,
