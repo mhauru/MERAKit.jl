@@ -4,6 +4,8 @@ MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Ren
 
 MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
 
+MERA.jl remains in active development as of January 2020. Some further plans include supporting modified binary MERAs, improving performance, and developing the optimization method.
+
 ## Usage
 
 The folder `demo` has a script `demo.jl`, that runs energy minimization on either the Ising or the XXZ model (your choice), and computes scaling dimensions and entanglement entropies from the resulting MERA. The best way to get going is to clone this repo, navigate to its folder, open a Julia prompt and do
