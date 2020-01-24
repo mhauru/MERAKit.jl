@@ -1,7 +1,0 @@
-Memoization of things like rho and h_ascended
-Do we still need pseudoserialization? Can we make it less ugly?
-ModifiedBinaryLayer
-isometric disentanglers
-add a function for evaluating two-point correlators
-implement gradient descent
-implement extrapolation
