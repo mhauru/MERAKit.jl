@@ -3,6 +3,21 @@
 
 # # # The core stuff
 
+# Index numbering convention is as follows, where the physical indices are at the bottom:
+# Disentangler:
+#  3|   4|
+#  +------+
+#  |  u   |
+#  +------+
+#  1|   2|
+#
+# Isometry:
+#     4|
+#  +-------+
+#  |   w   |
+#  +-------+
+#  1| 2| 3|
+
 # TODO We could parametrise this as TernaryLayer{T1, T2}, disentagler::T1, isometry::T2.
 # Would this be good, because it increased type stability, or bad because it caused
 # unnecessary recompilation?
