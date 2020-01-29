@@ -337,6 +337,17 @@ Return a new layer, where the disentangler has been changed to the locally optim
 minimize the expectation of a twosite operator `h`.
 """
 function minimize_expectation_disentangler(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
+    w = layer.isometry
+    env = environment_disentangler(h, layer, rho)
+    U, S, Vt = svd(env, (1,2), (3,4))
+    u = permuteind(Vt' * U', (3,4), (1,2))
+    return TernaryLayer(u, w)
+end
+
+"""
+Return the environment for a disentangler.
+"""
+function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
@@ -370,10 +381,8 @@ function minimize_expectation_disentangler(h::SquareTensorMap{2}, layer::Ternary
             w_dg[21; 12 11 42] * w_dg[31; 41 51 61]
            )
 
-    env = env1 + env2 + env3
-    U, S, Vt = svd(env, (1,2), (3,4))
-    u = permuteind(Vt' * U', (3,4), (1,2))
-    return TernaryLayer(u, w)
+    env = (env1 + env2 + env3)/3
+    return env
 end
 
 """
@@ -381,12 +390,23 @@ Return a new layer, where the isometry has been changed to the locally optimal o
 minimize the expectation of a twosite operator `h`.
 """
 function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
+    u = layer.disentangler
+    env = environment_isometry(h, layer, rho)
+    U, S, Vt = svd(env, (1,2,3), (4,))
+    w = permuteind(Vt' * U', (2,3,4), (1,))
+    return TernaryLayer(u, w)
+end
+
+"""
+Return the environment for an isometry.
+"""
+function environment_isometry(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env1[-1 -2; -3 -4] :=
+            env1[-1 -2 -3; -4] :=
             rho[82 -4; 81 84] *
             w[62 61 63; 82] *
             u[51 52; 63 -1] *
@@ -397,7 +417,7 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
 
     # Cost: 6X^6
     @tensor(
-            env2[-1 -2; -3 -4] :=
+            env2[-1 -2 -3; -4] :=
             rho[42 -4; 41 62] *
             w[11 12 51; 42] *
             u[21 22; 51 -1] *
@@ -408,7 +428,7 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env3[-1 -2; -3 -4] :=
+            env3[-1 -2 -3; -4] :=
             rho[32 -4; 31 33] *
             w[21 11 73; 32] *
             u[72 71; 73 -1] *
@@ -419,7 +439,7 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env4[-1 -2; -3 -4] :=
+            env4[-1 -2 -3; -4] :=
             rho[-4 32; 33 31] *
             w[73 11 21; 32] *
             u[71 72; -3 73] *
@@ -430,7 +450,7 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
 
     # Cost: 6X^6
     @tensor(
-            env5[-1 -2; -3 -4] :=
+            env5[-1 -2 -3; -4] :=
             rho[-4 42; 62 41] *
             w[51 12 11; 42] *
             u[22 21; -3 51] *
@@ -441,7 +461,7 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env6[-1 -2; -3 -4] :=
+            env6[-1 -2 -3; -4] :=
             rho[-4 82; 84 81] *
             w[63 61 62; 82] *
             u[52 51; -3 63] *
@@ -450,9 +470,6 @@ function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLaye
             w_dg[84; -1 -2 83] * w_dg[81; 31 41 62]
            )
 
-    env = env1 + env2 + env3 + env4 + env5 + env6
-    U, S, Vt = svd(env, (1,2,3), (4,))
-    w = permuteind(Vt' * U', (2,3,4), (1,))
-    return TernaryLayer(u, w)
+    env = (env1 + env2 + env3 + env4 + env5 + env6)/3
+    return env
 end
-

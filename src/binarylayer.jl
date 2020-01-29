@@ -290,6 +290,17 @@ Return a new layer, where the disentangler has been changed to the locally optim
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
+    w = layer.isometry
+    env = environment_disentangler(h, layer, rho)
+    U, S, Vt = svd(env, (1,2), (3,4))
+    u = permuteind(Vt' * U', (3,4), (1,2))
+    return BinaryLayer(u, w)
+end
+
+"""
+Return the environment for a disentangler.
+"""
+function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
@@ -333,10 +344,8 @@ function minimize_expectation_disentangler(h::SquareTensorMap{3}, layer::BinaryL
             w_dg[10; 8 19] * w_dg[18; 11 12] * w_dg[17; 7 5]
            )
 
-    env = env1 + env2 + env3
-    U, S, Vt = svd(env, (1,2), (3,4))
-    u = permuteind(Vt' * U', (3,4), (1,2))
-    return BinaryLayer(u, w)
+    env = (env1 + env2 + env3 + env4)/2
+    return env
 end
 
 # TODO Write faster versions that actually do only the necessary contractions.
@@ -355,6 +364,17 @@ Return a new layer, where the isometry has been changed to the locally optimal o
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_isometry(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
+    u = layer.disentangler
+    env = environment_isometry(h, layer, rho)
+    U, S, Vt = svd(env, (1,2), (3,))
+    w = permuteind(Vt' * U', (2,3), (1,))
+    return BinaryLayer(u, w)
+end
+
+"""
+Return the environment for the isometry.
+"""
+function environment_isometry(h::SquareTensorMap{3}, layer, rho)
     u, w = layer
     w_dg = w'
     u_dg = u'
@@ -418,10 +438,8 @@ function minimize_expectation_isometry(h::SquareTensorMap{3}, layer::BinaryLayer
             w_dg[19; -1 20] * w_dg[15; 13 14] * w_dg[16; 7 5]
            )
 
-    env = env1 + env2 + env3 + env4 + env5 + env6
-    U, S, Vt = svd(env, (1,2), (3,))
-    w = permuteind(Vt' * U', (2,3), (1,))
-    return BinaryLayer(u, w)
+    env = (env1 + env2 + env3 + env4 + env5 + env6)/2
+    return env
 end
 
 # TODO Write faster versions that actually do only the necessary contractions.
