@@ -41,7 +41,8 @@ function main()
 
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
-    pars[:initial_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
+    pars[:initial_opt_pars] = Dict(:method => :grad,
+                                   :densitymatrix_delta => 1e-5,
                                    :maxiter => 10,
                                    :miniter => 10,
                                    :havg_depth => 10,
@@ -50,7 +51,8 @@ function main()
                                    :isometry_iters => 1)
     # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
     # but not all.
-    pars[:mid_opt_pars] = Dict(:densitymatrix_delta => 1e-5,
+    pars[:mid_opt_pars] = Dict(:method => :grad,
+                               :densitymatrix_delta => 1e-5,
                                :maxiter => 30,
                                :miniter => 10,
                                :havg_depth => 10,
@@ -58,8 +60,9 @@ function main()
                                :disentangler_iters => 1,
                                :isometry_iters => 1)
     # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
-    pars[:final_opt_pars] = Dict(:densitymatrix_delta => 1e-7,
-                                 :maxiter => 10000,
+    pars[:final_opt_pars] = Dict(:method => :grad,
+                                 :densitymatrix_delta => 1e-7,
+                                 :maxiter => 300,
                                  :miniter => 10,
                                  :havg_depth => 10,
                                  :layer_iters => 1,

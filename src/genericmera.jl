@@ -25,7 +25,7 @@ output space.
 struct GenericMERA{T}
     layers::Vector{T}
     # Prevent the creation of GenericMERA{T} objects when T is not a subtype of Layer.
-    GenericMERA{T}(layers) where T <: Layer = new(layers)
+    GenericMERA{T}(layers) where T <: Layer = new(collect(layers))
 end
 
 # # # Basic utility functions
@@ -436,8 +436,16 @@ end
 
 # # # Optimization
 
+function minimize_expectation!(args...; method=:grad, kwargs...)
+    if method == :grad
+        return minimize_expectation_grad!(args...; kwargs...)
+    elseif method == :trad
+        return minimize_expectation_trad!(args...; kwargs...)
+    end
+end
+
 """
-Optimize the MERA `m` to minimize the expectation value of `h`.
+Optimize the MERA `m` to minimize the expectation value of `h` using the traditional method.
 
 The optimization proceeds by looping over layers and optimizing each in turn, starting from
 the bottom, and repeating this until convergence is reached.
@@ -468,9 +476,9 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
-                               normalization=identity)
-    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers"
+function minimize_expectation_trad!(m::GenericMERA, h, pars; lowest_depth=1,
+                                    normalization=identity)
+    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers the traditional way"
     msg *= lowest_depth > 1 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
     @info(msg)
           
@@ -545,3 +553,148 @@ function minimize_expectation!(m::GenericMERA, h, pars; lowest_depth=1,
     return m
 end
 
+# # # Gradient optimization
+
+function tensorwise_scale(m::T, alpha) where T <: GenericMERA
+    return T([tensorwise_scale(l, alpha) for l in m.layers])
+end
+
+function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
+    n = max(num_translayers(m1), num_translayers(m2)) + 1
+    layers = [tensorwise_sum(get_layer(m1, i), get_layer(m2, i)) for i in 1:n]
+    return T(layers)
+end
+
+function stiefel_inner(m::T, m1::T, m2::T) where T <: GenericMERA
+    n = max(num_translayers(m1), num_translayers(m2)) + 1
+    inner = sum([stiefel_inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i))
+                 for i in 1:n])
+    return inner
+end
+
+function stiefel_gradient(horig, m::T, pars) where T <: GenericMERA
+    nt = num_translayers(m)
+    rhos = densitymatrices(m)
+    h = horig
+    layers = []
+    for l in 1:nt
+        rho = rhos[l+1]
+        layer = get_layer(m, l)
+        grad = stiefel_gradient(h, rho, layer, pars)
+        push!(layers, grad)
+        h = ascend(h, m; startscale=l, endscale=l+1)
+    end
+
+    # Special case of the translation invariant layer.
+    havg = h
+    hi = h
+    sf = scalefactor(T)
+    for i in 1:pars[:havg_depth]
+        hi = ascend(hi, m; startscale=nt+i, endscale=nt+i+1)
+        hi = hi/sf
+        havg = havg + hi
+    end
+    layer = get_layer(m, Inf)
+    grad = stiefel_gradient(havg, rhos[end], layer, pars)
+    push!(layers, grad)
+    g = T(layers)
+    return g
+end
+
+function stiefel_geodesic(m::T, mtan::T, alpha::Number) where T <: GenericMERA
+    layers, layers_tan = zip([stiefel_geodesic(l, ltan, alpha)
+                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
+    return T(layers), T(layers_tan)
+end
+
+function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
+                                    normalization=identity)
+    # TODO Do something with lowest_to_optimize.
+    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers using gradient methods."
+    @info(msg)
+
+    fg(x) = (expect(h, x), stiefel_gradient(h, x, pars))
+    retract = stiefel_geodesic
+    # The inner function is for the linesearch, which needs to take inner products between
+    # tangents and gradients to estimate how the cost function changes along the line. Since
+    # the cost function depends on both a tensor and its conjugate, the right thing to do is
+    # take 2 * real part of the Stiefel manifold inner product.
+    inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
+
+    # TODO The full OptimKit thing. Try replacing the manual CG with this.
+    #scale!(vec, beta) = tensorwise_scale(vec, beta)
+    #add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
+    #transport!(vec1, x, vec2, alpha, endpoint) = vec1
+    #linesearch = HagerZhangLineSearch()
+    #alg = LBFGS(40; linesearch=linesearch, verbosity=2, gradtol=1e-4)
+    #res = optimize(fg, m, alg; scale! = scale!, add! = add!, retract=retract,
+    #               inner=inner, transport! = transport!,
+    #               isometrictransport=true)
+    #m, energy, normgrad, normgradhistory = result
+    #@show energy
+    #@show normgrad
+    #@show normgradhistory
+    #return m
+
+    linesearch = HagerZhangLineSearch(; verbosity=0)
+
+    # g is the gradient. k is the tangent vector in the direction of which the optimization
+    # goes.
+    g = stiefel_gradient(h, m, pars)
+    k = tensorwise_scale(g, -1)
+
+    expectation = Inf
+    expectation_change = Inf
+    rhos = nothing
+    rhos_maxchange = Inf
+    counter = 0
+    last_status_print = -Inf
+    while (
+           counter <= pars[:miniter]
+           || (abs(rhos_maxchange) > pars[:densitymatrix_delta]
+               && counter < pars[:maxiter])
+          )
+        counter += 1
+        old_rhos = rhos
+        old_expectation = expectation
+        rhos = densitymatrices(m)
+
+        # Do a conjugate gradient step.
+        # First line search the optimum along the geodesic generated by k.
+        search_result= linesearch(fg, m, k; retract=retract, inner=inner)
+        mnext, expectation, gnext, k_transport, stepsize, numfg = search_result
+        # k_transport is k parallel transported to mnext, the optimal point along this
+        # geodesic. We should also parallel transport g to mnext, but that's hard, so
+        # instead we just skip this part. See page 26 of
+        # https://www.cis.upenn.edu/~cis515/Stiefel-Grassmann-manifolds-Edelman.pdf
+        g_transport = g
+        # Compute the factor gamma by which the previous k should contribute to the next
+        # direction.
+        gnorm = stiefel_inner(m, g, g)
+        gdiff = tensorwise_sum(gnext, tensorwise_scale(g_transport, -1))
+        gamma = stiefel_inner(mnext, gdiff, gnext) / gnorm
+        knext = tensorwise_sum(tensorwise_scale(gnext, -1),
+                               tensorwise_scale(k_transport, gamma))
+        # TODO reset knext = -gnext at some intervals
+        m = mnext
+        g = gnext
+        k = knext
+
+        expectation = normalization(expectation)
+        expectation_change = (expectation - old_expectation)/abs(expectation)
+
+        if old_rhos !== nothing
+            rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
+            rhos_maxchange = maximum(rho_diffs)
+        end
+
+        # As the optimization gets further, don't print status updates at every
+        # iteration any more.
+        if (counter - last_status_print)/counter > 0.02
+            @info(@sprintf("Expectation = %.9e,  change = %.3e,  max rho change = %.3e,  counter = %d.",
+                           expectation, expectation_change, rhos_maxchange, counter))
+            last_status_print = counter
+        end
+    end
+    return m
+end

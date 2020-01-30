@@ -11,9 +11,9 @@ function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
-                   , "--meratype", arg_type=String, default="binary"
+                   , "--meratype", arg_type=String, default="ternary"
                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
-                   , "--chi", arg_type=Int, default=3  # Bond dimension
+                   , "--chi", arg_type=Int, default=5  # Bond dimension
                    , "--layers", arg_type=Int, default=3
                    , "--reps", arg_type=Int, default=1000
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
@@ -43,7 +43,8 @@ function main()
     end
     block_size = pars[:block_size]
     reps = pars[:reps]
-    opt_pars = Dict(:densitymatrix_delta => 1e-15,
+    opt_pars = Dict(:method => :grad,
+                    :densitymatrix_delta => 1e-15,
                     :maxiter => 1000,
                     :miniter => 10,
                     :havg_depth => 10,
@@ -91,7 +92,7 @@ function main()
     # been done in total.
     for rep in 1:reps
         @info("Starting rep #$(rep).")
-        minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
         store_mera(path_ref, m)
 
         energy = expect(h, m)

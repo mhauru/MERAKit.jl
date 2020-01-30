@@ -109,6 +109,36 @@ pseudoserialize(layer::BinaryLayer) = (repr(BinaryLayer), map(pseudoserialize, l
 depseudoserialize(::Type{BinaryLayer}, data) = BinaryLayer([depseudoserialize(d...)
                                                             for d in data]...)
 
+tensorwise_sum(l1::BinaryLayer, l2::BinaryLayer) = BinaryLayer(map(sum, zip(l1, l2))...)
+
+function tensorwise_scale(layer::BinaryLayer, alpha::Number)
+    return BinaryLayer((t*alpha for t in layer)...)
+end
+
+# # # Stiefel manifold functions
+
+function stiefel_inner(l::BinaryLayer, l1::BinaryLayer, l2::BinaryLayer)
+    inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
+    return inner
+end
+
+function stiefel_gradient(h, rho, layer::BinaryLayer, pars)
+    uenv = environment_disentangler(h, layer, rho)
+    wenv = environment_isometry(h, layer, rho)
+    u, w = layer
+    # The environment is the partial derivative. We need to turn that into a tangent vector
+    # of the Stiefel manifold point u or w.
+    ugrad = uenv - u * (uenv' * u)
+    wgrad = wenv - w * (wenv' * w)
+    return BinaryLayer(ugrad, wgrad)
+end
+
+function stiefel_geodesic(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
+    u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
+    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
+end
+
 # # # Invariants
 
 """

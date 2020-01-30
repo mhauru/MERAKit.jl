@@ -236,6 +236,11 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
     V = inputspace(m, i)
     d = dim(V)
     expanded_meras = Dict()
+    # Parameters for an optimisation the only point of which is to restore isometricity.
+    isometrisation_pars = copy(opt_pars)
+    opt_pars[:method] = :trad
+    opt_pars[:maxiter] = 1
+    opt_pars[:miniter] = 1
     for s in sectors_to_expand(V)
         # Expand the bond dimension of symmetry sector s and try optimizing a bit to see
         # how useful this expansion is.
@@ -243,9 +248,11 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
         ds = dim(V, s)
         chi_s = ds + (chi - d)
         expand_bonddim!(ms, i, Dict(s => chi_s))
+        # Just to make the MERA isometric again, after expanding bond dimensions.
+        ms = minimize_expectation!(ms, h, isometrisation_pars; normalization=normalization)
         msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
         @info(msg)
-        minimize_expectation!(ms, h, opt_pars; normalization=normalization)
+        ms = minimize_expectation!(ms, h, opt_pars; normalization=normalization)
         expanded_meras[s] = ms
     end
     expanded_meras_array = collect(expanded_meras)
@@ -338,7 +345,7 @@ function get_optimized_mera(datafolder, model, pars)
         Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
         m = random_MERA(meratype, Vs)
         opt_pars = pars[:final_opt_pars]
-        minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
     else
         # The bond dimensions requested is larger than the smallest that makes sense to do.
         # Get the MERA with a bond dimension one smaller to use as a starting point, expand
@@ -350,7 +357,7 @@ function get_optimized_mera(datafolder, model, pars)
         for i in 1:num_translayers(m)
             m = expand_best_sector(m, i, chi, h, normalization, pars[:initial_opt_pars])
             opt_pars = i == num_translayers(m) ? pars[:final_opt_pars] : pars[:mid_opt_pars]
-            minimize_expectation!(m, h, opt_pars; normalization=normalization)
+            m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
         end
     end
 

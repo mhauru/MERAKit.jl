@@ -162,3 +162,65 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
 end
 
 pad_with_zeros_to(t::TensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
+
+"""
+Inner product of two tensors as tangents on a Stiefel manifold. The first argument is the
+point on the manifold that we are at, the next two are the tangent vectors. A Stiefel
+manifold is the manifold of isometric tensors, i.e. tensors that fulfill t't == I.
+"""
+function stiefel_inner(t::T, t1::T, t2::T) where T <: TensorMap
+    # TODO Could write a faster version for unitaries, where the two terms are the same.
+    # TODO a1 and a2 are supposed to be skew-symmetric. Should we enforce or assume that?
+    a1 = t'*t1
+    a2 = t'*t2
+    inner = tr(t1'*t2) - 0.5*tr(a1'*a2)
+    return inner
+end
+
+function stiefel_geodesic_unitary(u::TensorMap, utan::TensorMap, alpha::Number)
+    a = u' * utan
+    # In a perfect world, a is already skew-symmetric, but for numerical errors we enforce
+    # that.
+    # TODO Should we instead raise a warning if this does not already hold?
+    a = (a - a')/2
+    m = exp(alpha * a)
+    u_end = u * m
+    utan_end = utan * m
+    # Creeping numerical errors may cause loss of isometricity, so explicitly isometrize.
+    # TODO Maybe check that S is almost all ones, alert the user if it's not.
+    U, S, Vt = svd(u_end)
+    u_end = U*Vt
+    return u_end, utan_end
+end
+
+function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
+    a = w' * wtan
+    # In a perfect world, a is already skew-symmetric, but for numerical errors we enforce
+    # that.
+    # TODO Should we instead raise a warning if this does not already hold?
+    a = (a - a')/2
+    k = wtan - w * a
+    q, r = leftorth(k)
+    # TODO Not implemented for TensorMaps from here down
+    llegs = length(codomain(w))
+    dl = space(w, 1).d
+    dr = space(w, llegs+1).d
+    rarr = convert(Array, r)
+    aarr = convert(Array, a)
+    barr = [aarr -rarr'; rarr zero(aarr)]
+    expbarr = exp(alpha .* barr)
+    marr = expbarr[1:dr, 1:dr]
+    narr = expbarr[1+dr:2*dr, 1:dr]
+    m = TensorMap(zeros, eltype(marr), ℂ^dr ← ℂ^dr)
+    m.data[:] = marr
+    n = TensorMap(zeros, eltype(narr), ℂ^dr ← ℂ^dr)
+    n.data[:] = narr
+    # TODO Not implemented for TensorMaps from here up
+    w_end = w*m + q*n
+    wtan_end = wtan*m - w*r'*n
+    # Creeping numerical errors may cause loss of isometricity, so explicitly isometrize.
+    # TODO Maybe check that S is almost all ones, alert the user if it's not.
+    U, S, Vt = svd(w_end)
+    w_end = U*Vt
+    return w_end, wtan_end
+end

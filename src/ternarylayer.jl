@@ -109,6 +109,36 @@ pseudoserialize(layer::TernaryLayer) = (repr(TernaryLayer), map(pseudoserialize,
 depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...)
                                                               for d in data]...)
 
+tensorwise_sum(l1::TernaryLayer, l2::TernaryLayer) = TernaryLayer(map(sum, zip(l1, l2))...)
+
+function tensorwise_scale(layer::TernaryLayer, alpha::Number)
+    return TernaryLayer((t*alpha for t in layer)...)
+end
+
+# # # Stiefel manifold functions
+
+function stiefel_inner(l::TernaryLayer, l1::TernaryLayer, l2::TernaryLayer)
+    inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
+    return inner
+end
+
+function stiefel_gradient(h, rho, layer::TernaryLayer, pars)
+    uenv = environment_disentangler(h, layer, rho)
+    wenv = environment_isometry(h, layer, rho)
+    u, w = layer
+    # The environment is the partial derivative. We need to turn that into a tangent vector
+    # of the Stiefel manifold point u or w.
+    ugrad = uenv - u * (uenv' * u)
+    wgrad = wenv - w * (wenv' * w)
+    return TernaryLayer(ugrad, wgrad)
+end
+
+function stiefel_geodesic(l::TernaryLayer, ltan::TernaryLayer, alpha::Number)
+    u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
+    return TernaryLayer(u, w), TernaryLayer(utan, wtan)
+end
+
 # # # Invariants
 
 """
