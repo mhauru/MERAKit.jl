@@ -23,6 +23,7 @@ export release_transitionlayer!, expand_bonddim!
 export expect
 export minimize_expectation!
 export pseudoserialize, depseudoserialize
+export tensorwise_sum, tensorwise_scale
 
 include("tensortools.jl")
 include("genericmera.jl")

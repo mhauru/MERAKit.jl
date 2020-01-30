@@ -44,6 +44,7 @@ function main()
     block_size = pars[:block_size]
     reps = pars[:reps]
     opt_pars = Dict(:method => :grad,
+                    :gradient_delta => 1e-15,
                     :densitymatrix_delta => 1e-15,
                     :maxiter => 1000,
                     :miniter => 10,
@@ -54,15 +55,15 @@ function main()
 
     # Build the Hamiltonian.
     if model == "Ising"
-        h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
+        h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
         symmetry == "none" && (magop = build_magop(block_size=block_size))
     elseif model == "XXZ"
-        h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
+        h, normalization = build_H_XXZ(pars[:Delta]; symmetry=symmetry,
+                                       block_size=block_size)
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
     end
-    normalization(x) = normalize_energy(x, dmax, block_size)
 
     # The path where this MERA is located. There are two options, a file for a MERA that has
     # already been previously refined, and one for a MERA that hasn't. We favor the former.
@@ -95,8 +96,7 @@ function main()
         m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
         store_mera(path_ref, m)
 
-        energy = expect(h, m)
-        energy = normalize_energy(energy, dmax, block_size)
+        energy = normalization(expect(h, m))
         rhoees = densitymatrix_entropies(m)
         do_magnetisation && (magnetization = expect(magop, remove_symmetry(m)))
         scaldims = scalingdimensions(m)

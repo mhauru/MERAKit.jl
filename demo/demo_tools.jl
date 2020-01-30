@@ -87,8 +87,9 @@ Return the local Hamiltonian term for the XXZ model: -XX - YY - Delta*ZZ.
 `symmetry` should be "none" or "group", and determmines whether the Hamiltonian should be an
 explicitly U(1) symmetric TensorMap or a dense one. `block_size` determines how many sites
 to block together, and should be a power of 2. The Hamiltonian is normalized with an
-additive constant to be negative semidefinite, and the constant of normalization is also
-returned.
+additive constant to be negative semidefinite. Because of the normalization and blocking, a
+second return value holds a function that, given an expectation value or gradient for the
+Hamiltonian, returns the actual energy or its gradient..
 """
 function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     if symmetry == "U1" || symmetry == "group"
@@ -113,7 +114,9 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     H = -(XXplusYY + Delta*ZZ)
     H = block_op(H, block_size)
     H, c = normalize_H(H)
-    return H, c
+    normalization(x::Number) = normalize_energy(x, c, block_size)
+    normalization(x) = normalize_energygradient(x, block_size)
+    return H, normalization
 end
 
 """
@@ -121,8 +124,10 @@ Return the local Hamiltonian term for the Ising model: -XX - h*Z
 `symmetry` should be "none", "group", or "anyon" and determmines whether the Hamiltonian
 should be an explicitly Z2 symmetric or anyonic TensorMap, or a dense one. `block_size`
 determines how many sites to block together, and should be a power of 2. The Hamiltonian is
-normalized with an additive constant to be negative semidefinite, and the constant of
-normalization is also returned.
+normalized with an additive constant to be negative semidefinite. Because of the
+normalization and blocking, a second return value holds a function that, given an
+expectation value or gradient for the Hamiltonian, returns the actual energy or its
+gradient.
 """
 function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     if symmetry == "Z2"
@@ -161,7 +166,9 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     end
     H = block_op(H, block_size)
     H, c = normalize_H(H)
-    return H, c
+    normalization(x::Number) = normalize_energy(x, c, block_size)
+    normalization(x) = normalize_energygradient(x, block_size)
+    return H, normalization
 end
 
 """
@@ -181,6 +188,15 @@ Given the normalization and block_size constants used in creating a Hamiltonian,
 expectation value of the normalized and blocked Hamiltonian, return the actual energy.
 """
 normalize_energy(energy, c, block_size) = (energy + c)/block_size
+
+"""
+Given the block_size constant used in creating a Hamiltonian, and the gradient-MERA for the
+normalized and blocked Hamiltonian, return the actual gradient.
+"""
+function normalize_energygradient(gradient::GenericMERA, block_size)
+    return tensorwise_scale(gradient, 1/block_size)
+end
+
 
 # # # Functions for reading and writing to disk.
 
@@ -322,14 +338,14 @@ function get_optimized_mera(datafolder, model, pars)
     @info("Did not find $filename on disk, generating it.")
     # Build the Hamiltonian.
     if model == "XXZ"
-        h, dmax = build_H_XXZ(pars[:Delta]; symmetry=symmetry, block_size=block_size)
+        h, normalization = build_H_XXZ(pars[:Delta]; symmetry=symmetry,
+                                       block_size=block_size)
     elseif model == "Ising"
-        h, dmax = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
+        h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
     else
         msg = "Unknown model: $(model)"
         throw(ArgumentError(msg))
     end
-    normalization(x) = normalize_energy(x, dmax, block_size)
 
     # Figure out whether we should start the optimization from a random MERA or a previous
     # MERA.
