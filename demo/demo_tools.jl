@@ -7,6 +7,7 @@ using TensorKit
 using JLD2
 using MERA
 
+export expect, minimize_expectation!, densitymatrix_entropies, scalingdimensions, remove_symmetry
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy

@@ -6,7 +6,6 @@ using LinearAlgebra
 using TensorKit
 include("demo_tools.jl")
 using .DemoTools
-using .DemoTools.MERA
 
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
