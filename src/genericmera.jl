@@ -436,11 +436,11 @@ end
 
 # # # Optimization
 
-function minimize_expectation!(args...; method=:grad, kwargs...)
-    if method == :grad
-        return minimize_expectation_grad!(args...; kwargs...)
-    elseif method == :trad
-        return minimize_expectation_trad!(args...; kwargs...)
+function minimize_expectation!(m, h, pars; kwargs...)
+    if pars[:method] == :grad
+        return minimize_expectation_grad!(m, h, pars; kwargs...)
+    elseif pars[:method] == :trad
+        return minimize_expectation_trad!(m, h, pars; kwargs...)
     end
 end
 
