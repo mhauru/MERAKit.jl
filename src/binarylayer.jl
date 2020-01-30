@@ -289,11 +289,11 @@ end
 Return a new layer, where the disentangler has been changed to the locally optimal one to
 minimize the expectation of a threesite operator `h`.
 """
-function minimize_expectation_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
+function minimize_expectation_disentangler(h, layer::BinaryLayer, rho)
     w = layer.isometry
     env = environment_disentangler(h, layer, rho)
     U, S, Vt = svd(env, (1,2), (3,4))
-    u = permuteind(Vt' * U', (3,4), (1,2))
+    u = U * Vt
     return BinaryLayer(u, w)
 end
 
@@ -345,29 +345,31 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
            )
 
     env = (env1 + env2 + env3 + env4)/2
+    # Complex conjugate.
+    env = permuteind(env', (3,4), (1,2))
     return env
 end
 
 # TODO Write faster versions that actually do only the necessary contractions.
-function minimize_expectation_disentangler(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
+function environment_disentangler(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
-    return minimize_expectation_disentangler(h, layer, rho)
+    return environment_disentangler(h, layer, rho)
 end
 
-function minimize_expectation_disentangler(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
+function environment_disentangler(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
-    return minimize_expectation_disentangler(h, layer, rho)
+    return environment_disentangler(h, layer, rho)
 end
 
 """
 Return a new layer, where the isometry has been changed to the locally optimal one to
 minimize the expectation of a threesite operator `h`.
 """
-function minimize_expectation_isometry(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
+function minimize_expectation_isometry(h, layer::BinaryLayer, rho)
     u = layer.disentangler
     env = environment_isometry(h, layer, rho)
     U, S, Vt = svd(env, (1,2), (3,))
-    w = permuteind(Vt' * U', (2,3), (1,))
+    w = U * Vt
     return BinaryLayer(u, w)
 end
 
@@ -439,17 +441,19 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/2
+    # Complex conjugate.
+    env = permuteind(env', (2,3), (1,))
     return env
 end
 
 # TODO Write faster versions that actually do only the necessary contractions.
-function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
+function environment_isometry(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
-    return minimize_expectation_isometry(h, layer, rho)
+    return environment_isometry(h, layer, rho)
 end
 
-function minimize_expectation_isometry(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
+function environment_isometry(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
-    return minimize_expectation_isometry(h, layer, rho)
+    return environment_isometry(h, layer, rho)
 end
 

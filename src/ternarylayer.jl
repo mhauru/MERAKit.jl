@@ -336,11 +336,11 @@ end
 Return a new layer, where the disentangler has been changed to the locally optimal one to
 minimize the expectation of a twosite operator `h`.
 """
-function minimize_expectation_disentangler(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
+function minimize_expectation_disentangler(h, layer::TernaryLayer, rho)
     w = layer.isometry
     env = environment_disentangler(h, layer, rho)
     U, S, Vt = svd(env, (1,2), (3,4))
-    u = permuteind(Vt' * U', (3,4), (1,2))
+    u = U * Vt
     return TernaryLayer(u, w)
 end
 
@@ -382,6 +382,8 @@ function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
            )
 
     env = (env1 + env2 + env3)/3
+    # Complex conjugate.
+    env = permuteind(env', (3,4), (1,2))
     return env
 end
 
@@ -389,11 +391,11 @@ end
 Return a new layer, where the isometry has been changed to the locally optimal one to
 minimize the expectation of a twosite operator `h`.
 """
-function minimize_expectation_isometry(h::SquareTensorMap{2}, layer::TernaryLayer, rho)
+function minimize_expectation_isometry(h, layer::TernaryLayer, rho)
     u = layer.disentangler
     env = environment_isometry(h, layer, rho)
     U, S, Vt = svd(env, (1,2,3), (4,))
-    w = permuteind(Vt' * U', (2,3,4), (1,))
+    w = U * Vt
     return TernaryLayer(u, w)
 end
 
@@ -471,5 +473,7 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/3
+    # Complex conjugate.
+    env = permuteind(env', (2,3,4), (1,))
     return env
 end
