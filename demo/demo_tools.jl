@@ -245,7 +245,7 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
         expand_bonddim!(ms, i, Dict(s => chi_s))
         msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
         @info(msg)
-        minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        minimize_expectation!(ms, h, opt_pars; normalization=normalization)
         expanded_meras[s] = ms
     end
     expanded_meras_array = collect(expanded_meras)
