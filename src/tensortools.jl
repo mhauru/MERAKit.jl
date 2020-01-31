@@ -201,21 +201,14 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     a = (a - a')/2
     k = wtan - w * a
     q, r = leftorth(k)
-    # TODO Not implemented for TensorMaps from here down
-    llegs = length(codomain(w))
-    dl = space(w, 1).d
-    dr = space(w, llegs+1).d
-    rarr = convert(Array, r)
-    aarr = convert(Array, a)
-    barr = [aarr -rarr'; rarr zero(aarr)]
-    expbarr = exp(alpha .* barr)
-    marr = expbarr[1:dr, 1:dr]
-    narr = expbarr[1+dr:2*dr, 1:dr]
-    m = TensorMap(zeros, eltype(marr), ℂ^dr ← ℂ^dr)
-    m.data[:] = marr
-    n = TensorMap(zeros, eltype(narr), ℂ^dr ← ℂ^dr)
-    n.data[:] = narr
-    # TODO Not implemented for TensorMaps from here up
+    # TODO Remove the TensorKit. part once cats are exported.
+    b = TensorKit.catcodomain(TensorKit.catdomain(a, -r'), TensorKit.catdomain(r, zero(a)))
+    expb = exp(alpha * b)
+    eye = TensorMap(I, eltype(b), codomain(a) ← domain(a))
+    uppertrunc = TensorKit.catcodomain(eye, zero(eye))
+    lowertrunc = TensorKit.catcodomain(zero(eye), eye)
+    m = uppertrunc' * expb * uppertrunc
+    n = lowertrunc' * expb * uppertrunc
     w_end = w*m + q*n
     wtan_end = wtan*m - w*r'*n
     # Creeping numerical errors may cause loss of isometricity, so explicitly isometrize.
