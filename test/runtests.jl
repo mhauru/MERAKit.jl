@@ -116,6 +116,62 @@ function test_expectation_evalscale(meratype, spacetype)
 end
 
 """
+Test that pseudoserializing and depseudoserializing back does not change the expectation
+value of a random Hermitian operator.
+"""
+function test_pseudoserialization(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+    V = outputspace(m, 1)
+    randomop = TensorMap(randn, ComplexF64, V ← V)
+    randomop = (randomop + randomop')/2
+    expectation = expect(randomop, m)
+    ser = pseudoserialize(m)
+    m_reco = depseudoserialize(ser...)
+    new_expectation = expect(randomop, m_reco)
+    @test new_expectation ≈ expectation
+end
+
+"""
+Confirm that expanding bond dimensions does not change the expectation value of a random
+Hermitian operator.
+"""
+function test_expand_bonddim(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+    V = outputspace(m, 1)
+    randomop = TensorMap(randn, ComplexF64, V ← V)
+    randomop = (randomop + randomop')/2
+    expectation = expect(randomop, m)
+    for i in 1:(layers-1)
+        V = inputspace(m, i)
+        newdims = Dict(s => dim(V, s)+1 for s in sectors(V))
+        m = expand_bonddim!(m, i, newdims)
+    end
+    new_expectation = expect(randomop, m)
+    @test new_expectation ≈ expectation
+end
+
+"""
+Confirm that releasing a does not change the expectation value of a random Hermitian
+operator.
+"""
+function test_release_layer(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+    V = outputspace(m, 1)
+    randomop = TensorMap(randn, ComplexF64, V ← V)
+    randomop = (randomop + randomop')/2
+    expectation = expect(randomop, m)
+    m = release_transitionlayer!(m)
+    new_expectation = expect(randomop, m)
+    @test new_expectation ≈ expectation
+end
+
+"""
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
@@ -152,6 +208,9 @@ for meratype in (BinaryMERA, TernaryMERA)
         test_ascend_and_descend(meratype, spacetype)
         test_expectation_of_identity(meratype, spacetype)
         test_expectation_evalscale(meratype, spacetype)
+        test_pseudoserialization(meratype, spacetype)
+        test_expand_bonddim(meratype, spacetype)
+        test_release_layer(meratype, spacetype)
         test_optimization(meratype, spacetype)
     end
 end
