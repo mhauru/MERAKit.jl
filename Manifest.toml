@@ -196,10 +196,10 @@ uuid = "308eb6b3-cc68-5ff3-9e97-c3c4da4fa681"
 version = "0.1.0"
 
 [[Requires]]
-deps = ["Test"]
-git-tree-sha1 = "f6fbf4ba64d295e146e49e021207993b6b48c7d1"
+deps = ["UUIDs"]
+git-tree-sha1 = "d37400976e98018ee840e0ca4f9d20baa231dc6b"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
-version = "0.5.2"
+version = "1.0.1"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -236,9 +236,9 @@ version = "0.2.1"
 
 [[TensorOperations]]
 deps = ["CuArrays", "LRUCache", "LinearAlgebra", "Requires", "Strided", "TupleTools"]
-path = "/home/markus/.julia/dev/TensorOperations"
+git-tree-sha1 = "bafd5918b8e30e1209d376a7e741b432961611cb"
 uuid = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
-version = "2.1.1"
+version = "2.1.2"
 
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
