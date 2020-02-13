@@ -91,7 +91,7 @@ function test_expectation_of_identity(meratype, spacetype)
     spaces = random_layerspaces(spacetype, meratype, layers)
     m = random_MERA(meratype, spaces; random_disentangler=true)
     V = outputspace(m, 1)
-    eye = TensorMap(I, V ← V)
+    eye = id(V)
     for i in 1:(layers+1)
         @test expect(eye, m; evalscale=i) ≈ 1.0
     end

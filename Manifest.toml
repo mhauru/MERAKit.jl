@@ -230,9 +230,9 @@ version = "0.3.3"
 
 [[TensorKit]]
 deps = ["HalfIntegers", "LRUCache", "LinearAlgebra", "Strided", "TensorOperations", "TupleTools", "WignerSymbols"]
-path = "/home/markus/.julia/dev/TensorKit"
+git-tree-sha1 = "c29d3b3fef0748561a2b1f21728cec1712c2246f"
 uuid = "07d1fe3e-3e46-537d-9eac-e9e13d0d4cec"
-version = "0.1.0"
+version = "0.2.1"
 
 [[TensorOperations]]
 deps = ["CuArrays", "LRUCache", "LinearAlgebra", "Requires", "Strided", "TupleTools"]

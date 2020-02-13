@@ -333,7 +333,7 @@ function fixedpoint_densitymatrix(m::T) where T <: GenericMERA
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
     V = inputspace(m, Inf)
     width = causal_cone_width(T)
-    eye = TensorMap(I, Float64, V ← V)
+    eye = id(V)
     x0 = ⊗(repeat([eye], width)...)
     vals, vecs, info = eigsolve(f, x0)
     rho = vecs[1]

@@ -12,16 +12,10 @@ is done by creating a random Gaussian tensor and SVDing it.
 """
 function randomisometry(Vout, Vin, T=ComplexF64)
     temp = TensorMap(randn, T, Vout ← Vin)
-    U, S, Vt = svd(temp)
+    U, S, Vt = tsvd(temp)
     u = U * Vt
     return u
 end
-
-"""
-Given two vector spaces, create an isometric/unitary TensorMap from one to the other that
-is the identity, with truncations as needed.
-"""
-identitytensor(Vout, Vin, T=ComplexF64) = TensorMap(I, T, Vout ← Vin)
 
 """
 Return the number of sites/indices `m` that an operator is supported on, assuming it is an
@@ -36,7 +30,7 @@ doing the expansion, e.g. I ⊗ op and op ⊗ I, are averaged over.
 """
 function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
     V = space(op, 1)
-    eye = TensorMap(I, eltype(op), V ← V)
+    eye = id(V)
     op_support = N
     while op_support < n
         opeye = op ⊗ eye
@@ -144,7 +138,8 @@ truncated away.
 """
 function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     # Expanders are the matrices by which each index will be multiplied to change the space.
-    expanders = [TensorMap(I, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict]
+    idmat(T, shp) = Array{T}(I, shp)
+    expanders = [TensorMap(idmat, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict]
     sizedomain = length(domain(t))
     sizecodomain = length(codomain(t))
     # Prepare the @ncon call that contracts each index of `t` with the corresponding
@@ -156,8 +151,8 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     inds = [inds_t, inds_expanders...]
     t_new_tensor = @ncon(tensors, inds)
     # Permute inds to have the codomain and domain match with those of the input.
-    t_new = permuteind(t_new_tensor, tuple(1:sizecodomain...),
-                       tuple(sizecodomain+1:numinds...))
+    t_new = permute(t_new_tensor, tuple(1:sizecodomain...),
+                    tuple(sizecodomain+1:numinds...))
     return t_new
 end
 
