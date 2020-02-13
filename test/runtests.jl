@@ -123,7 +123,7 @@ function test_optimization(meratype, spacetype)
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
-    eps = 1e-2 
+    eps = 5e-2 
     dlow = 2
     dhigh = 3
     pars = Dict(:densitymatrix_delta => 1e-5,
