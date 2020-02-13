@@ -190,6 +190,9 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
+    elseif depth > num_translayers(m)
+            msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
+            throw(ArgumentError(msg))
     end
     set_layer!(m, next_layer, depth+1; check_invar=true)
 end
