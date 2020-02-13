@@ -2,8 +2,8 @@
 language: julia
 os:
   - linux
-  - osx
 julia:
   - 1
-after_success:
-  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())';
+codecov: true
+script:
+  - julia -e 'using Pkg; Pkg.build(); Pkg.test(coverage=true)';
