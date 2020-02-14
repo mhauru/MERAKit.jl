@@ -728,30 +728,23 @@ function stiefel_inner(m::T, m1::T, m2::T) where T <: GenericMERA
     return inner
 end
 
-function stiefel_gradient(horig, m::T, pars) where T <: GenericMERA
+function stiefel_gradient(h, m::T, pars) where T <: GenericMERA
     nt = num_translayers(m)
-    rhos = densitymatrices(m)
-    h = horig
     layers = []
     for l in 1:nt
-        rho = rhos[l+1]
         layer = get_layer(m, l)
-        grad = stiefel_gradient(h, rho, layer, pars)
+        rho = densitymatrix(m, l+1)
+        hl = ascended_operator(m, h, l)
+        grad = stiefel_gradient(hl, rho, layer, pars)
         push!(layers, grad)
-        h = ascend(h, m; startscale=l, endscale=l+1)
     end
 
     # Special case of the translation invariant layer.
-    havg = h
-    hi = h
-    sf = scalefactor(T)
-    for i in 1:pars[:havg_depth]
-        hi = ascend(hi, m; startscale=nt+i, endscale=nt+i+1)
-        hi = hi/sf
-        havg = havg + hi
-    end
+    sf = scalefactor(typeof(m))
+    havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
     layer = get_layer(m, Inf)
-    grad = stiefel_gradient(havg, rhos[end], layer, pars)
+    rho = densitymatrix(m, Inf)
+    grad = stiefel_gradient(havg, rho, layer, pars)
     push!(layers, grad)
     g = T(layers)
     return g
