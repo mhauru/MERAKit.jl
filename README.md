@@ -1,4 +1,5 @@
 # MERA.jl
+[![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
 
 MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) [algorithms](https://arxiv.org/abs/0707.1454). It only implements infinite, translation invariant MERAs. At the moment it has implementations of both ternary and binary MERAs, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions.
 
@@ -18,3 +19,7 @@ include("demo/demo.jl")
 
 The actual library is obviously in `src`. The type system is based on a an abstract type `GenericMERA{T} where T <: Layer`, and its concrete subtypes `TernaryMERA = GenericMERA{TernaryLayer}` and `BinaryMERA = GenericMERA{BinaryLayer}`. The file `src/genericmera.jl` implements functions that are independent of the exact type of MERA. `src/ternarylayer.jl` and `src/binarylayer.jl` provide the details of things like ascending/descending superoperators, that depend on the specific MERA. `src/tensortools.jl` supplies some functions for TensorKit objects such as `TensorMap`s and vector spaces that the rest of the package needs.
 
+[travis-img]: https://travis-ci.org/mhauru/MERA.jl.svg?branch=master
+[travis-url]: https://travis-ci.org/mhauru/MERA.jl
+[codecov-img]: https://codecov.io/gh/mhauru/MERA.jl/branch/master/graph/badge.svg
+[codecov-url]: https://codecov.io/gh/mhauru/MERA.jl

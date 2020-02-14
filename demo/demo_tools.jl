@@ -25,15 +25,15 @@ function block_op(op::SquareTensorMap{2}, num_sites)
     while num_sites > 1
         VL = space(op, 1)
         VR = space(op, 2)
-        eyeL = TensorMap(I, Float64, VL ← VL)
-        eyeR = TensorMap(I, Float64, VR ← VR)
+        eyeL = id(VL)
+        eyeR = id(VR)
         opcross = eyeR ⊗ op ⊗ eyeL
         opleft = op ⊗ eyeL ⊗ eyeR
         opright = eyeL ⊗ eyeR ⊗ op
         op_new_unfused = opcross + 0.5*(opleft + opright)
         fusionspace = domain(op)
-        fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
-        fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
+        fusetop = isomorphism(fuse(fusionspace), fusionspace)
+        fusebottom = isomorphism(fusionspace, fuse(fusionspace))
         op = (fusetop ⊗ fusetop) * op_new_unfused * (fusebottom ⊗ fusebottom)
         num_sites /= 2
     end
@@ -53,13 +53,13 @@ sites together to form a new one-site operator for which each site corresponds t
 function block_op(op::SquareTensorMap{1}, num_sites)
     while num_sites > 1
         V = space(op, 1)
-        eye = TensorMap(I, Float64, V ← V)
+        eye = id(V)
         opleft = op ⊗ eye
         opright = eye ⊗ op
         op_new_unfused = opleft + opright
         fusionspace = domain(op_new_unfused)
-        fusetop = TensorMap(I, fuse(fusionspace) ← fusionspace)
-        fusebottom = TensorMap(I, fusionspace ← fuse(fusionspace))
+        fusetop = isomorphism(fuse(fusionspace), fusionspace)
+        fusebottom = isomorphism(fusionspace, fuse(fusionspace))
         op = fusetop * op_new_unfused * fusebottom
         num_sites /= 2
     end
@@ -77,7 +77,7 @@ semidefinite. Return the normalized operator and the constant that was subtracte
 function normalize_H(H)
     # TODO Switch to using an eigendecomposition?
     c = norm(H)
-    eye = TensorMap(I, codomain(H) ← domain(H))
+    eye = isomorphism(codomain(H), domain(H))
     H = H - eye*c
     return H, c
 end
@@ -136,7 +136,7 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
         Z = TensorMap(zeros, Float64, V ← V)
         Z.data[ℤ₂(0)] .= 1.0
         Z.data[ℤ₂(1)] .= -1.0
-        eye = TensorMap(I, Float64, V ← V)
+        eye = id(V)
         ZI = Z ⊗ eye
         IZ = eye ⊗ Z
         # Pauli XX
@@ -154,7 +154,7 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
         # Pauli matrices
         X = TensorMap(zeros, Float64, V ← V)
         Z = TensorMap(zeros, Float64, V ← V)
-        eye = TensorMap(I, Float64, V ← V)
+        eye = id(V)
         X.data .= [0.0 1.0; 1.0 0.0]
         Z.data .= [1.0 0.0; 0.0 -1.0]
         XX = X ⊗ X
@@ -177,7 +177,7 @@ Return the magnetization operator for the Ising model, blocked over `block_size`
 function build_magop(;block_size=1)
     V = ℂ^2
     X = TensorMap(zeros, Float64, V ← V)
-    eye = TensorMap(I, Float64, V ← V)
+    eye = id(V)
     X.data .= [0.0 1.0; 1.0 0.0]
     magop = block_op(X, block_size)
     return magop

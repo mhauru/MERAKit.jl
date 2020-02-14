@@ -99,7 +99,7 @@ If `random_disentangler=true`, the disentangler is also a random unitary, if `fa
 (default), it is the identity.
 """
 function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false)
-    ufunc = random_disentangler ? randomisometry : identitytensor
+    ufunc = random_disentangler ? randomisometry : isomorphism
     u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
     w = randomisometry(Vout ⊗ Vout, Vin)
     return BinaryLayer(u, w)
@@ -322,7 +322,7 @@ minimize the expectation of a threesite operator `h`.
 function minimize_expectation_disentangler(h, layer::BinaryLayer, rho)
     w = layer.isometry
     env = environment_disentangler(h, layer, rho)
-    U, S, Vt = svd(env, (1,2), (3,4))
+    U, S, Vt = tsvd(env, (1,2), (3,4))
     u = U * Vt
     return BinaryLayer(u, w)
 end
@@ -376,7 +376,7 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
 
     env = (env1 + env2 + env3 + env4)/2
     # Complex conjugate.
-    env = permuteind(env', (3,4), (1,2))
+    env = permute(env', (3,4), (1,2))
     return env
 end
 
@@ -398,7 +398,7 @@ minimize the expectation of a threesite operator `h`.
 function minimize_expectation_isometry(h, layer::BinaryLayer, rho)
     u = layer.disentangler
     env = environment_isometry(h, layer, rho)
-    U, S, Vt = svd(env, (1,2), (3,))
+    U, S, Vt = tsvd(env, (1,2), (3,))
     w = U * Vt
     return BinaryLayer(u, w)
 end
@@ -472,7 +472,7 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/2
     # Complex conjugate.
-    env = permuteind(env', (2,3), (1,))
+    env = permute(env', (2,3), (1,))
     return env
 end
 

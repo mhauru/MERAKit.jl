@@ -24,8 +24,15 @@ output space.
 """
 struct GenericMERA{T}
     layers::Vector{T}
+    stored_densitymatrices::Vector
+    stored_operators::Dict{Any, Vector}
     # Prevent the creation of GenericMERA{T} objects when T is not a subtype of Layer.
-    GenericMERA{T}(layers) where T <: Layer = new(collect(layers))
+    function GenericMERA{T}(layers) where T <: Layer
+        num_layers = length(layers)
+        stored_densitymatrices = Vector{Any}(repeat([nothing], num_layers))
+        stored_operators = Dict{Any, Vector}()
+        new(collect(layers), stored_densitymatrices, stored_operators)
+    end
 end
 
 # # # Basic utility functions
@@ -68,18 +75,25 @@ check that the indices match afterwards.
 """
 function set_layer!(m::GenericMERA, layer, depth; check_invar=true)
     depth > num_translayers(m) ? (m.layers[end] = layer) : (m.layers[depth] = layer)
+    m = reset_storage!(m, depth)
     check_invar && space_invar(m)
     return m
 end
 
 """
 Add one more transition layer at the top of the MERA, by taking the lowest of the scale
-invariant ones and releasing it to vary independently.
+invariant one and releasing it to vary independently.
 """
 function release_transitionlayer!(m::GenericMERA)
     layer = get_layer(m, Inf)
     layer = copy(layer)
     push!(m.layers, layer)
+    density_matrix = m.stored_densitymatrices[end]
+    push!(m.stored_densitymatrices, density_matrix)
+    for (k, v) in m.stored_operators
+        operator = v[end]
+        push!(v, operator)
+    end
     return m
 end
 
@@ -111,6 +125,124 @@ end
 
 densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatrices(m))
 
+# # # Storage of density matrices and ascended operators
+
+# The storage format for density matrices and operators is a little different:
+# For density matrices we always store a Vector of the same length as there are layers. If
+# a density matrix is not in store, `nothing` is kept as the corresponding element.
+# For operators, m.stored_operators is a dictionary with operators as keys, and each
+# element is a Vector that lists the ascended versions of that operator, starting from the
+# physical one, which is nothing but the original operator. No place-holder `nothing`s are
+# stored, the Vector ends when storage ends.
+# This difference is because density matrices are naturally generated from the top, and
+# there will never be more than the number of layers of them. Operators are generated from
+# the bottom, and they may go arbitrarily high in the MERA (into the scale invariant part).
+
+"""
+Reset stored density matrices and ascended operators, so that they will be recomputed when
+they are needed. By default all are reset. If the optional argument `depth` is given, only
+ones invalidated by changing the layer at `depth` are removed.
+"""
+function reset_storage!(m::GenericMERA, depth)
+    depth = Int(min(num_translayers(m)+1, depth))
+    m.stored_densitymatrices[1:depth] .= nothing
+    for (k, v) in m.stored_operators
+        last_index = min(depth, length(v))
+        m.stored_operators[k] = v[1:last_index]
+    end
+    return m
+end
+
+function reset_storage!(m::GenericMERA)
+    m.stored_densitymatrices = Vector{Any}(repeat([nothing], num_translayers(m)+1))
+    reset_operator_storage!(m)
+    return m
+end
+
+"""
+Return whether the density matrix at given depth is already in store.
+"""
+function has_densitymatrix_stored(m::GenericMERA, depth)
+    depth = Int(min(num_translayers(m)+1, depth))
+    rho = m.stored_densitymatrices[depth]
+    return rho !== nothing
+end
+
+"""
+Return the density matrix at given depth, assuming it's in store.
+"""
+function get_stored_densitymatrix(m::GenericMERA, depth)
+    depth = Int(min(num_translayers(m)+1, depth))
+    rho = m.stored_densitymatrices[depth]
+    if rho === nothing
+        msg = "Density matrix at depth $(depth) not in storage."
+        throw(ArgumentError(msg))
+    end
+    return rho
+end
+
+"""
+Store the density matrix at given depth.
+"""
+function set_stored_densitymatrix!(m::GenericMERA, density_matrix, depth)
+    m.stored_densitymatrices[depth] = density_matrix
+    return m
+end
+
+"""
+Return the stored ascended versions of `op`. Initialize storage for `op` if necessary.
+"""
+function operator_storage(m::GenericMERA, op)
+    if !(op in keys(m.stored_operators))
+        m.stored_operators[op] = Vector{Any}([op])
+    end
+    return m.stored_operators[op]
+end
+
+"""
+Return whether the operator `op` ascended to `depth` is already in store.
+"""
+function has_operator_stored(m::GenericMERA, op, depth)
+    storage = operator_storage(m, op)
+    return length(storage) >= depth
+end
+
+"""
+Return the operator `op` ascended to a given depth, assuming it's in store.
+"""
+function get_stored_operator(m::GenericMERA, op, depth)
+    storage = operator_storage(m, op)
+    return storage[depth]
+end
+
+"""
+Store `opasc`, the operator `op` ascended to a given depth.
+"""
+function set_stored_operator!(m::GenericMERA, opasc, op, depth)
+    storage = operator_storage(m, op)
+    if length(storage) < depth-1
+        msg = "Can't store an ascended operator if the lower versions of it aren't in storage already."
+        throw(ArgumentError(msg))
+    elseif length(storage) == depth-1
+        push!(storage, opasc)
+    else
+        storage[depth] = opasc
+    end
+    return m
+end
+
+"""
+Reset storage for a given operator.
+"""
+reset_operator_storage!(m::GenericMERA, op) = delete!(m.stored_densitymatrices, op)
+
+"""
+Reset storage for all operators.
+"""
+function reset_operator_storage!(m::GenericMERA)
+    m.stored_densitymatrices = Dict{Any, Vector}()
+end
+
 # # # Generating random MERAs
 
 """
@@ -133,7 +265,7 @@ Additional keyword arguments are passed on to the function that generates a sing
 layer.
 """
 function random_MERA(::Type{T}, V, num_layers; kwargs...) where T <: GenericMERA
-    Vs = repeat([V], num_layers+1)
+    Vs = repeat([V], num_layers)
     return random_MERA(T, Vs; kwargs...)
 end
 
@@ -190,6 +322,9 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
+    elseif depth > num_translayers(m)
+            msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
+            throw(ArgumentError(msg))
     end
     set_layer!(m, next_layer, depth+1; check_invar=true)
 end
@@ -218,6 +353,10 @@ remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
 # constructing it back. This can be used for storing MERAs on disk.
 # TODO Once JLD or JLD2 works properly we should be able to get rid of this.
+#
+# Note that pseudoserialization discards stored_densitymatrices and stored_operators, which
+# then need to be recomputed after deserialization.
+
 """
 Return a tuple of objects that can be used to reconstruct a given MERA, and that are all of
 Julia base types.
@@ -333,7 +472,7 @@ function fixedpoint_densitymatrix(m::T) where T <: GenericMERA
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
     V = inputspace(m, Inf)
     width = causal_cone_width(T)
-    eye = TensorMap(I, Float64, V ← V)
+    eye = id(V)
     x0 = ⊗(repeat([eye], width)...)
     vals, vecs, info = eigsolve(f, x0)
     rho = vecs[1]
@@ -344,11 +483,23 @@ end
 
 """
 Return the density matrix right below the layer at `depth`.
+
+This method stores every density matrix in memory as it computes them, and fetches them from
+there if the same one is requested again.
 """
 function densitymatrix(m::GenericMERA, depth)
-    rho = fixedpoint_densitymatrix(m)
-    if depth < num_translayers(m)+1
-        rho = descend(rho, m; endscale=depth, startscale=num_translayers(m)+1)
+    if has_densitymatrix_stored(m, depth)
+        rho = get_stored_densitymatrix(m, depth)
+    else
+        # If we don't find rho in storage, generate it.
+        if depth > num_translayers(m)
+            rho = fixedpoint_densitymatrix(m)
+        else
+            rho_above = densitymatrix(m, depth+1)
+            rho = descend(rho_above, m; endscale=depth, startscale=depth+1)
+        end
+        # Store this density matrix for future use.
+        set_stored_densitymatrix!(m, rho, depth)
     end
     return rho
 end
@@ -358,16 +509,28 @@ Return the density matrices starting for the layers from `lowest_depth` upwards 
 including the scale invariant one.
 """
 function densitymatrices(m::GenericMERA, lowest_depth=1)
-    rho = fixedpoint_densitymatrix(m)
-    rhos = [rho]
-    for l in num_translayers(m):-1:lowest_depth
-        rho = descend(rho, m, endscale=l, startscale=l+1)
-        push!(rhos, rho)
-    end
-    rhos = reverse(rhos)
+    rhos = [densitymatrix(m, depth) for depth in lowest_depth:num_translayers(m)+1]
     return rhos
 end
 
+"""
+Return the operator `op` ascended from the physical level to `depth`. The benefit of using
+this over `ascend(m, op; startscale=1, endscale=depth)` is that this one stores the result
+in memory and fetches it from there if them same operator is requested again.
+"""
+function ascended_operator(m::GenericMERA, op, depth)
+    # Note that if depth=1, has_operator_stored always returns true, as it initializes
+    # storage for this operator.
+    if has_operator_stored(m, op, depth)
+        opasc = get_stored_operator(m, op, depth)
+    else
+        op_below = ascended_operator(m, op, depth-1)
+        opasc = ascend(op_below, m; endscale=depth, startscale=depth-1)
+        # Store this density matrix for future use.
+        set_stored_operator!(m, opasc, op, depth)
+    end
+    return opasc
+end
 
 # # # Extracting CFT data
 
@@ -420,9 +583,9 @@ set by `opscale`, which by default is the physical one (`opscale=1`). `evalscale
 used to set whether the operator is ascended through the network or the density matrix is
 descended.
 """
-function expect(op, m::GenericMERA; opscale=1, evalscale=num_translayers(m)+1)
+function expect(op, m::GenericMERA; opscale=1, evalscale=1)
     rho = densitymatrix(m, evalscale)
-    op = ascend(op, m; startscale=opscale, endscale=evalscale)
+    op = ascended_operator(m, op, evalscale)
     # If the operator is defined on a smaller support (number of sites) than rho, expand it.
     op = expand_support(op, support(rho))
     value = tr(rho * op)
@@ -483,10 +646,9 @@ function minimize_expectation_trad!(m::GenericMERA, h, pars; lowest_depth=1,
     @info(msg)
           
     nt = num_translayers(m)
-    horig = ascend(h, m; endscale=lowest_depth)
     expectation = Inf
     expectation_change = Inf
-    rhos = nothing
+    rhos = densitymatrices(m)
     rhos_maxchange = Inf
     counter = 0
     last_status_print = -Inf
@@ -498,20 +660,18 @@ function minimize_expectation_trad!(m::GenericMERA, h, pars; lowest_depth=1,
         counter += 1
         old_rhos = rhos
         old_expectation = expectation
-        rhos = densitymatrices(m, lowest_depth)
 
         # We only optimize disentanglers starting after half of the compulsory iterations
         # have been done, to not have a screwed up isometry mislead us.
         do_disentanglers = (counter >= pars[:miniter]/2)
 
-        h = horig
         for l in lowest_depth:nt
-            rho = rhos[l-lowest_depth+2]
+            rho = densitymatrix(m, l+1)
+            hl = ascended_operator(m, h, l)
             layer = get_layer(m, l)
-            layer = minimize_expectation_layer(h, layer, rho, pars;
+            layer = minimize_expectation_layer(hl, layer, rho, pars;
                                                do_disentanglers=do_disentanglers)
             set_layer!(m, layer, l)
-            h = ascend(h, m; startscale=l, endscale=l+1)
         end
 
         # Special case of the translation invariant layer.
@@ -520,23 +680,19 @@ function minimize_expectation_trad!(m::GenericMERA, h, pars; lowest_depth=1,
         # where A is the ascending superoperator and f is the scaling factor, e.g. 2 for a
         # binary MERA and 3 for ternary.  We truncate this series at a few
         # (pars[:havg_depth]) terms because they become negligible exponentially quickly.
-        havg = h
-        hi = h
         sf = scalefactor(typeof(m))
-        for i in 1:pars[:havg_depth]
-            hi = ascend(hi, m; startscale=nt+i, endscale=nt+i+1)
-            hi = hi/sf
-            havg = havg + hi
-        end
+        havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
         layer = get_layer(m, Inf)
-        layer = minimize_expectation_layer(havg, layer, rhos[end], pars;
+        rho = densitymatrix(m, Inf)
+        layer = minimize_expectation_layer(havg, layer, rho, pars;
                                            do_disentanglers=do_disentanglers)
         set_layer!(m, layer, Inf)
 
-        expectation = expect(h, m, opscale=nt+1, evalscale=nt+1)
+        expectation = expect(h, m)
         expectation = normalization(expectation)
         expectation_change = (expectation - old_expectation)/abs(expectation)
 
+        rhos = densitymatrices(m)
         if old_rhos !== nothing
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
