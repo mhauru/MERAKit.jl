@@ -133,7 +133,7 @@ Additional keyword arguments are passed on to the function that generates a sing
 layer.
 """
 function random_MERA(::Type{T}, V, num_layers; kwargs...) where T <: GenericMERA
-    Vs = repeat([V], num_layers+1)
+    Vs = repeat([V], num_layers)
     return random_MERA(T, Vs; kwargs...)
 end
 
