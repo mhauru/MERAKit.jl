@@ -24,6 +24,7 @@ export expect
 export minimize_expectation!
 export pseudoserialize, depseudoserialize
 export tensorwise_sum, tensorwise_scale
+export istangent
 export stiefel_geodesic, stiefel_gradient, stiefel_inner, cayley_retract, cayley_transport
 
 include("tensortools.jl")

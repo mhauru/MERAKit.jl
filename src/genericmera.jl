@@ -711,6 +711,11 @@ end
 
 # # # Gradient optimization
 
+function istangent(m::T, mtan::T) where T <: GenericMERA
+    n = max(num_translayers(m), num_translayers(mtan)) + 1
+    return all([istangent(get_layer(m, i), get_layer(mtan, i)) for i in 1:n])
+end
+
 function tensorwise_scale(m::T, alpha) where T <: GenericMERA
     return T([tensorwise_scale(l, alpha) for l in m.layers])
 end

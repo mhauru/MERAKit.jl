@@ -232,6 +232,11 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
     m1, tan1 = retract(morig, tanorig, alpha)
     m2, tan2 = retract(morig, tanorig, alpha+delta)
 
+    # Check that the gradient is a Stiefel tangent vector.
+    @test istangent(morig, tanorig)
+    # Check that the tangents really are tangents
+    @test istangent(m1, tan1)
+    @test istangent(m2, tan2)
     # Check that the points we retracted to are normalized MERAs.
     @test expect(eye, m1) ≈ 1.0
     @test expect(eye, m2) ≈ 1.0

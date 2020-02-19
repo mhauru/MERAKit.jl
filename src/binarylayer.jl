@@ -119,6 +119,12 @@ end
 
 # # # Stiefel manifold functions
 
+function istangent(l::BinaryLayer, ltan::BinaryLayer)
+    ures = istangent_isometry(l.disentangler, ltan.disentangler)
+    wres = istangent_isometry(l.isometry, ltan.isometry)
+    return ures && wres
+end
+
 function stiefel_inner(l::BinaryLayer, l1::BinaryLayer, l2::BinaryLayer)
     inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
     return inner

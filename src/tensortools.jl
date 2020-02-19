@@ -248,3 +248,8 @@ function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::N
     vec_end = vec + alpha * (u * (Minv * (v' * vec)))
     return uvec_end
 end
+
+function istangent_isometry(u, utan)
+    a = u' * utan
+    return all(a ≈ -a')
+end
