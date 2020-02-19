@@ -756,6 +756,19 @@ function stiefel_geodesic(m::T, mtan::T, alpha::Number) where T <: GenericMERA
     return T(layers), T(layers_tan)
 end
 
+function cayley_retract(m::T, mtan::T, alpha::Number) where T <: GenericMERA
+    layers, layers_tan = zip([cayley_retract(l, ltan, alpha)
+                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
+    return T(layers), T(layers_tan)
+end
+
+function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: GenericMERA
+    layers, layers_tan = zip([cayley_transport(l, ltan, alpha)
+                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
+    return T(layers), T(layers_tan)
+end
+
+
 function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
                                     normalization=identity)
     # TODO Do something with lowest_to_optimize.
@@ -767,7 +780,12 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
         g = normalization(stiefel_gradient(h, x, pars))
         return f, g
     end
-    retract = stiefel_geodesic
+    # TODO Compare the Stiefel option
+    #retract = stiefel_geodesic
+    #transport!(vec1, x, vec2, alpha, endpoint) = vec1
+    # and the Cayley option
+    retract = cayley_retract
+    transport!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec1, vec2, alpha)
     # The inner function is for the linesearch, which needs to take inner products between
     # tangents and gradients to estimate how the cost function changes along the line. Since
     # the cost function depends on both a tensor and its conjugate, the right thing to do is
@@ -776,7 +794,6 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
-    transport!(vec1, x, vec2, alpha, endpoint) = vec1
     linesearch = HagerZhangLineSearch()
     alg = ConjugateGradient(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
                             gradtol=pars[:gradient_delta])

@@ -98,8 +98,10 @@ Return a layer with random tensors, with `Vin` and `Vout` as the input and outpu
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
 (default), it is the identity.
 """
-function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false)
-    ufunc = random_disentangler ? randomisometry : isomorphism
+function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false, T=ComplexF64)
+    ufunc(o, i) = (random_disentangler ?
+                   randomisometry(o, i, T) :
+                   T <: Complex ? complex(isomorphism(o, i)) : isomorphism(o, i))
     u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
     w = randomisometry(Vout ⊗ Vout, Vin)
     return BinaryLayer(u, w)
@@ -136,6 +138,19 @@ end
 function stiefel_geodesic(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
     u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
     w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
+    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
+end
+
+function cayley_retract(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
+    u, utan = cayley_retract(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = cayley_retract(l.isometry, ltan.isometry, alpha)
+    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
+end
+
+function cayley_transport(l::BinaryLayer, ltan::BinaryLayer, lvec::BinaryLayer,
+                          alpha::Number)
+    u, utan = cayley_transport(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = cayley_transport(l.isometry, ltan.isometry, alpha)
     return BinaryLayer(u, w), BinaryLayer(utan, wtan)
 end
 

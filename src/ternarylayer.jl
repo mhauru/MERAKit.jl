@@ -139,6 +139,20 @@ function stiefel_geodesic(l::TernaryLayer, ltan::TernaryLayer, alpha::Number)
     return TernaryLayer(u, w), TernaryLayer(utan, wtan)
 end
 
+function cayley_retract(l::TernaryLayer, ltan::TernaryLayer, alpha::Number)
+    u, utan = cayley_retract(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = cayley_retract(l.isometry, ltan.isometry, alpha)
+    return TernaryLayer(u, w), TernaryLayer(utan, wtan)
+end
+
+function cayley_transport(l::TernaryLayer, ltan::TernaryLayer, lvec::TernaryLayer,
+                          alpha::Number)
+    u, utan = cayley_transport(l.disentangler, ltan.disentangler, alpha)
+    w, wtan = cayley_transport(l.isometry, ltan.isometry, alpha)
+    return TernaryLayer(u, w), TernaryLayer(utan, wtan)
+end
+
+
 # # # Invariants
 
 """

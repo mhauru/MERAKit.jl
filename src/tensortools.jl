@@ -163,7 +163,7 @@ Inner product of two tensors as tangents on a Stiefel manifold. The first argume
 point on the manifold that we are at, the next two are the tangent vectors. A Stiefel
 manifold is the manifold of isometric tensors, i.e. tensors that fulfill t't == I.
 """
-function stiefel_inner(t::T, t1::T, t2::T) where T <: TensorMap
+function stiefel_inner(t::TensorMap, t1::TensorMap, t2::TensorMap)
     # TODO Could write a faster version for unitaries, where the two terms are the same.
     # TODO a1 and a2 are supposed to be skew-symmetric. Should we enforce or assume that?
     a1 = t'*t1
@@ -183,7 +183,7 @@ function stiefel_geodesic_unitary(u::TensorMap, utan::TensorMap, alpha::Number)
     utan_end = utan * m
     # Creeping numerical errors may cause loss of isometricity, so explicitly isometrize.
     # TODO Maybe check that S is almost all ones, alert the user if it's not.
-    U, S, Vt = svd(u_end)
+    U, S, Vt = tsvd(u_end)
     u_end = U*Vt
     return u_end, utan_end
 end
@@ -199,7 +199,7 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     # TODO Remove the TensorKit. part once cats are exported.
     b = TensorKit.catcodomain(TensorKit.catdomain(a, -r'), TensorKit.catdomain(r, zero(a)))
     expb = exp(alpha * b)
-    eye = TensorMap(I, eltype(b), codomain(a) ← domain(a))
+    eye = id(domain(a))
     uppertrunc = TensorKit.catcodomain(eye, zero(eye))
     lowertrunc = TensorKit.catcodomain(zero(eye), eye)
     m = uppertrunc' * expb * uppertrunc
@@ -208,7 +208,43 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     wtan_end = wtan*m - w*r'*n
     # Creeping numerical errors may cause loss of isometricity, so explicitly isometrize.
     # TODO Maybe check that S is almost all ones, alert the user if it's not.
-    U, S, Vt = svd(w_end)
+    U, S, Vt = tsvd(w_end)
     w_end = U*Vt
     return w_end, wtan_end
+end
+
+# TODO These can be optimized.
+
+function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
+    dom = domain(x)
+    codom = codomain(x)
+    domfuser = isomorphism(fuse(dom), dom)
+    codomfuser = isomorphism(fuse(codom), codom)
+    x = codomfuser * x * domfuser'
+    tan = codomfuser * tan * domfuser'
+    xtan = x' * tan
+    Ptan = tan - 0.5*(x * xtan)
+    u = TensorKit.catdomain(Ptan, x)
+    v = TensorKit.catdomain(x, -Ptan)
+    eye = id(domain(u))
+    m1 = v' * x
+    m2 = v' * u
+    m3 = inv(eye - (alpha/2) * m2) * m1
+    x_end = x + alpha * u * m3
+    m23 = m2 * m3
+    tan_end = u * (m1 + (alpha/2) * m23 + (alpha/2) * inv(eye - (alpha/2) * m2) * m23)
+    x_end = codomfuser' * x_end * domfuser
+    tan_end = codomfuser' * tan_end * domfuser
+    return x_end, tan_end
+end
+
+function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::Number)
+    xtan = x' * tan
+    Ptan = tan - 0.5*(x * xtan)
+    u = TensorKit.catdomain(Ptan, x)
+    v = TensorKit.catdomain(x, -Ptan)
+    M = id(domain(u)) - (alpha/2) * v' * u
+    Minv = inv(M)
+    vec_end = vec + alpha * (u * (Minv * (v' * vec)))
+    return uvec_end
 end
