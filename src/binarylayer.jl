@@ -155,9 +155,9 @@ end
 
 function cayley_transport(l::BinaryLayer, ltan::BinaryLayer, lvec::BinaryLayer,
                           alpha::Number)
-    u, utan = cayley_transport(l.disentangler, ltan.disentangler, alpha)
-    w, wtan = cayley_transport(l.isometry, ltan.isometry, alpha)
-    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
+    uvec = cayley_transport(l.disentangler, ltan.disentangler, lvec.disentangler, alpha)
+    wvec = cayley_transport(l.isometry, ltan.isometry, lvec.isometry, alpha)
+    return BinaryLayer(uvec, wvec)
 end
 
 # # # Invariants

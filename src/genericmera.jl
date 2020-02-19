@@ -768,11 +768,10 @@ function cayley_retract(m::T, mtan::T, alpha::Number) where T <: GenericMERA
 end
 
 function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: GenericMERA
-    layers, layers_tan = zip([cayley_transport(l, ltan, alpha)
-                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
-    return T(layers), T(layers_tan)
+    layers = [cayley_transport(l, ltan, lvec, alpha)
+              for (l, ltan, lvec) in zip(m.layers, mtan.layers, mvec.layers)]
+    return T(layers)
 end
-
 
 function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
                                     normalization=identity)

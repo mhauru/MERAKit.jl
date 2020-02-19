@@ -153,11 +153,10 @@ end
 
 function cayley_transport(l::TernaryLayer, ltan::TernaryLayer, lvec::TernaryLayer,
                           alpha::Number)
-    u, utan = cayley_transport(l.disentangler, ltan.disentangler, alpha)
-    w, wtan = cayley_transport(l.isometry, ltan.isometry, alpha)
-    return TernaryLayer(u, w), TernaryLayer(utan, wtan)
+    uvec = cayley_transport(l.disentangler, ltan.disentangler, lvec.disentangler, alpha)
+    wvec = cayley_transport(l.isometry, ltan.isometry, lvec.isometry, alpha)
+    return TernaryLayer(uvec, wvec)
 end
-
 
 # # # Invariants
 

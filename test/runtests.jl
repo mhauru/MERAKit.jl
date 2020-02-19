@@ -267,6 +267,41 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
     @test isapprox(reco1, reco3; rtol=10*delta)
 end
 
+"""
+Test the isometric Cayley parallel transport from
+http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf
+"""
+function test_cayley_transport(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+
+    width = causal_cone_width(meratype)
+    V = outputspace(m, 1)
+    hamspace = reduce(⊗, repeat([V], width))
+    # Make three different random Hamiltonians.
+    hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
+    hams = [ham + ham' for ham in hams]
+
+    pars = Dict(:havg_depth => 10)
+
+    g1, g2, g3 = [stiefel_gradient(ham, m, pars) for ham in hams]
+    retract = cayley_retract
+    inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
+
+    # Transport g2 and g3 along the retraction by g1, by distance alpha.
+    alpha = 2.7
+    g2t = cayley_transport(m, g1, g2, alpha)
+    g3t = cayley_transport(m, g1, g3, alpha)
+
+    # Check that the transported vectors are proper tangents.
+    mt = retract(m, g1, alpha)[1]
+    @test istangent(mt, g2t)
+    @test istangent(mt, g3t)
+    # Check that the inner product has been preserved by the transport.
+    @test inner(m, g2, g3) ≈ inner(mt, g2t, g3t)
+end
+
 function test_with_all_types(testfunc, meratypes, spacetypes, args...)
     for meratype in meratypes
         for spacetype in spacetypes
@@ -279,12 +314,6 @@ meratypes = (BinaryMERA, TernaryMERA)
 spacetypes = (ComplexSpace, Z2Space)
 
 # Run the tests on different MERAs and vector spaces.
-@testset "Stiefel gradient and Cayley retraction" begin
-    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes, cayley_retract)
-end
-@testset "Stiefel gradient and Stiefel geodesic retraction" begin
-    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes, stiefel_geodesic)
-end
 @testset "Ascend and descend" begin
     test_with_all_types(test_ascend_and_descend, meratypes, spacetypes)
 end
@@ -302,6 +331,17 @@ end
 end
 @testset "Releasing layers" begin
     test_with_all_types(test_release_layer, meratypes, spacetypes)
+end
+@testset "Stiefel gradient and Cayley retraction" begin
+    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
+                        cayley_retract)
+end
+@testset "Stiefel gradient and Stiefel geodesic retraction" begin
+    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
+                        stiefel_geodesic)
+end
+@testset "Cayley parallel transport" begin
+    test_with_all_types(test_cayley_transport, meratypes, spacetypes)
 end
 @testset "Optimization" begin
     test_with_all_types(test_optimization, meratypes, spacetypes)

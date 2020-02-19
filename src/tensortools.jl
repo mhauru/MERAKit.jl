@@ -239,14 +239,23 @@ function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
 end
 
 function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::Number)
+    dom = domain(x)
+    codom = codomain(x)
+    domfuser = isomorphism(fuse(dom), dom)
+    codomfuser = isomorphism(fuse(codom), codom)
+    x = codomfuser * x * domfuser'
+    tan = codomfuser * tan * domfuser'
+    vec = codomfuser * vec * domfuser'
     xtan = x' * tan
     Ptan = tan - 0.5*(x * xtan)
     u = TensorKit.catdomain(Ptan, x)
     v = TensorKit.catdomain(x, -Ptan)
-    M = id(domain(u)) - (alpha/2) * v' * u
+    eye = id(domain(u))
+    M = eye - (alpha/2) * v' * u
     Minv = inv(M)
     vec_end = vec + alpha * (u * (Minv * (v' * vec)))
-    return uvec_end
+    vec_end = codomfuser' * vec_end * domfuser
+    return vec_end
 end
 
 function istangent_isometry(u, utan)
