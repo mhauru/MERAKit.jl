@@ -600,10 +600,14 @@ end
 # # # Optimization
 
 function minimize_expectation!(m, h, pars; kwargs...)
-    if pars[:method] == :grad
+    method = pars[:method]
+    if method == :cg || method == :lbfgs
         return minimize_expectation_grad!(m, h, pars; kwargs...)
-    elseif pars[:method] == :trad
+    elseif method == :trad
         return minimize_expectation_trad!(m, h, pars; kwargs...)
+    else
+        msg = "Unknown optimization method $(method)."
+        throw(ArgumentError(msg))
     end
 end
 
@@ -784,25 +788,48 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
         g = normalization(stiefel_gradient(h, x, pars))
         return f, g
     end
-    # TODO Compare the Stiefel option
-    #retract = stiefel_geodesic
-    #transport!(vec1, x, vec2, alpha, endpoint) = vec1
-    # and the Cayley option
-    retract = cayley_retract
-    transport!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec1, vec2, alpha)
-    # The inner function is for the linesearch, which needs to take inner products between
-    # tangents and gradients to estimate how the cost function changes along the line. Since
-    # the cost function depends on both a tensor and its conjugate, the right thing to do is
-    # take 2 * real part of the Stiefel manifold inner product.
-    # TODO Doesn't the above make the wrong choice for gamma?
+
+    if pars[:retraction] == :geodesic
+        retract = stiefel_geodesic
+    elseif pars[:retraction] == :cayley
+        retract = cayley_retract
+    else
+        msg = "Unknown retraction $(pars[:retraction])."
+        throw(ArgumentError(msg))
+    end
+
+    # TODO Defining these here instead of within `if` is just a work-around for limitations
+    # of Revise.
+    transport_id!(vec1, x, vec2, alpha, endpoint) = vec1
+    transport_cay!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec1, vec2, alpha)
+    if pars[:transport] == :identity
+        transport! = transport_id!
+        isometric = false
+    elseif pars[:transport] == :cayley
+        transport! = transport_cay!
+        isometric = true
+    else
+        msg = "Unknown parallel transport $(pars[:transport])."
+        throw(ArgumentError(msg))
+    end
+
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
     linesearch = HagerZhangLineSearch()
-    alg = ConjugateGradient(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
-                            gradtol=pars[:gradient_delta])
+
+    if pars[:method] == :cg
+        alg = ConjugateGradient(; maxiter=pars[:maxiter], linesearch=linesearch,
+                                verbosity=2, gradtol=pars[:gradient_delta])
+    elseif pars[:method] == :lbfgs
+        alg = LBFGS(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
+                    gradtol=pars[:gradient_delta])
+    else
+        msg = "Unknown optimization method $(pars[:method])."
+        throw(ArgumentError(msg))
+    end
     res = optimize(fg, m, alg; scale! = scale!, add! = add!, retract=retract,
-                   inner=inner, transport! = transport!, isometrictransport=false)
+                   inner=inner, transport! = transport!, isometrictransport=isometric)
     m, expectation, normgrad, normgradhistory = res
     @info("Gradient optimization done. Expectation = $(expectation).")
     return m
