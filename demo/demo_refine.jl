@@ -6,6 +6,11 @@ using LinearAlgebra
 using TensorKit
 include("demo_tools.jl")
 using .DemoTools
+using Logging
+
+# TODO Hopefully this can be dropped soon. See
+# https://github.com/carlobaldassi/ArgParse.jl/issues/95.
+ArgParse.parse_item(::Type{Symbol}, s::AbstractString) = Symbol(s)
 
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
@@ -21,6 +26,10 @@ function parse_pars()
                    , "--h", arg_type=Float64, default=1.0  # External field of Ising
                    , "--Delta", arg_type=Float64, default=-0.5  # Isotropicity in XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
+                   , "--datasuffix", arg_type=String, default=""
+                   , "--method", arg_type=Symbol, default=:trad
+                   , "--retraction", arg_type=Symbol, default=:geodesic
+                   , "--transport", arg_type=Symbol, default=:cayley
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -43,11 +52,13 @@ function main()
     end
     block_size = pars[:block_size]
     reps = pars[:reps]
-    opt_pars = Dict(:method => :grad,
+    opt_pars = Dict(:method => pars[:method],
+                    :retraction => pars[:retraction],
+                    :transport => pars[:transport],
                     :gradient_delta => 1e-15,
                     :densitymatrix_delta => 1e-15,
-                    :maxiter => 1000,
-                    :miniter => 10,
+                    :maxiter => 500,
+                    :miniter => 1,
                     :havg_depth => 10,
                     :layer_iters => 1,
                     :disentangler_iters => 1,
@@ -68,9 +79,10 @@ function main()
     # The path where this MERA is located. There are two options, a file for a MERA that has
     # already been previously refined, and one for a MERA that hasn't. We favor the former.
     mkpath(datafolder)
+    suffix = pars[:datasuffix]
     filename = "MERA_$(model)_$(meratypestr)_$(chi)_$(block_size)_$(symmetry)_$(layers)"
     path = "$datafolder/$filename.jlm"
-    path_ref = "$datafolder/$(filename)_refined.jlm"
+    path_ref = "$datafolder/$(filename)_refined$(suffix).jlm"
 
     if isfile(path_ref)
         msg = "Found $(path_ref), refining it."
@@ -91,6 +103,7 @@ function main()
     # Keep repeatedly optimizing this MERA by doing maxiter iterations, storing
     # the state, and then starting again, until `reps*maxiter` iterations have
     # been done in total.
+    starttime = time()
     for rep in 1:reps
         @info("Starting rep #$(rep).")
         m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
@@ -109,6 +122,9 @@ function main()
         @info(rhoees)
         @info("Scaling dimensions:")
         @info(scaldims)
+        endtime = time()
+        timetaken = (endtime - starttime) / 60.0
+        @info("Time passed: $(timetaken) mins")
     end
 end
 
