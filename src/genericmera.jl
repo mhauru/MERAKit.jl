@@ -801,7 +801,7 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
     # TODO Defining these here instead of within `if` is just a work-around for limitations
     # of Revise.
     transport_id!(vec1, x, vec2, alpha, endpoint) = vec1
-    transport_cay!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec1, vec2, alpha)
+    transport_cay!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec2, vec1, alpha)
     if pars[:transport] == :identity
         transport! = transport_id!
         isometric = false
