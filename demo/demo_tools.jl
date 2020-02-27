@@ -276,8 +276,12 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
     # the smallest energy.
     minindex = argmin(map(pair -> expect(h, pair[2]), expanded_meras_array))
     s, m = expanded_meras_array[minindex]
-    msg = "Expanding sector $s yielded the lowest energy, keeping that."
+    msg = "Expanding sector $s yielded the lowest energy, keeping that.\nOutput spaces now:"
     @info(msg)
+    for i in 1:num_translayers(m)+1
+        msg = "Layer $(i): $(outputspace(m, i))"
+        @info(msg)
+    end
     return m
 end
 
