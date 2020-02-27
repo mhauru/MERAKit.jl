@@ -24,7 +24,8 @@ function parse_pars()
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
                    , "--block_size", arg_type=Int, default=2  # Block two sites to start
                    , "--h", arg_type=Float64, default=1.0  # External field of Ising
-                   , "--Delta", arg_type=Float64, default=-0.5  # Isotropicity in XXZ
+                   , "--J_z", arg_type=Float64, default=0.5  # ZZ coupling for XXZ
+                   , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
                    , "--datasuffix", arg_type=String, default=""
                    , "--method", arg_type=Symbol, default=:trad
@@ -66,11 +67,12 @@ function main()
 
     # Build the Hamiltonian.
     if model == "Ising"
-        h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
-        symmetry == "none" && (magop = build_magop(block_size=block_size))
+        h, normalization = DemoTools.build_H_Ising(pars[:h]; symmetry=symmetry,
+                                                   block_size=block_size)
+        symmetry == "none" && (magop = DemoTools.build_magop(block_size=block_size))
     elseif model == "XXZ"
-        h, normalization = build_H_XXZ(pars[:Delta]; symmetry=symmetry,
-                                       block_size=block_size)
+        h, normalization = DemoTools.build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
+                                                 block_size=block_size)
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
@@ -87,11 +89,11 @@ function main()
     if isfile(path_ref)
         msg = "Found $(path_ref), refining it."
         @info(msg)
-        m = load_mera(path_ref)
+        m = DemoTools.load_mera(path_ref)
     elseif isfile(path)
         msg = "Found $(path), refining it."
         @info(msg)
-        m = load_mera(path)
+        m = DemoTools.load_mera(path)
     else
         msg = "File not found: $(filename)"
         throw(ArgumentError(msg))
@@ -107,7 +109,7 @@ function main()
     for rep in 1:reps
         @info("Starting rep #$(rep).")
         m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
-        store_mera(path_ref, m)
+        DemoTools.store_mera(path_ref, m)
 
         energy = normalization(expect(h, m))
         rhoees = densitymatrix_entropies(m)

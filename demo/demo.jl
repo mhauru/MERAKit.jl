@@ -22,7 +22,8 @@ function parse_pars()
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
                    , "--block_size", arg_type=Int, default=2  # Block two sites to start
                    , "--h", arg_type=Float64, default=1.0  # External field of Ising
-                   , "--Delta", arg_type=Float64, default=-0.5  # Isotropicity in XXZ
+                   , "--J_z", arg_type=Float64, default=0.5  # ZZ coupling for XXZ
+                   , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
                    , "--method", arg_type=Symbol, default=:trad
                    , "--retraction", arg_type=Symbol, default=:geodesic
@@ -91,11 +92,12 @@ function main()
 
     # Get the Hamiltonian.
     if model == "Ising"
-        h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
-        symmetry == "none" && (magop = build_magop(block_size=block_size))
+        h, normalization = DemoTools.build_H_Ising(pars[:h]; symmetry=symmetry,
+                                                   block_size=block_size)
+        symmetry == "none" && (magop = DemoTools.build_magop(block_size=block_size))
     elseif model == "XXZ"
-        h, normalization = build_H_XXZ(pars[:Delta]; symmetry=symmetry,
-                                       block_size=block_size)
+        h, normalization = DemoTools.build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
+                                                 block_size=block_size)
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
@@ -109,7 +111,7 @@ function main()
         # numbers for it.
         temppars = deepcopy(pars)
         temppars[:chi] = chi
-        m = get_optimized_mera(datafolder, model, temppars)
+        m = DemoTools.get_optimized_mera(datafolder, model, temppars)
 
         energy = normalization(expect(h, m))
         rhoees = densitymatrix_entropies(m)

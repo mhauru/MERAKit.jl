@@ -83,7 +83,7 @@ function normalize_H(H)
 end
 
 """
-Return the local Hamiltonian term for the XXZ model: -XX - YY - Delta*ZZ.
+Return the local Hamiltonian term for the XXZ model: J_xy*XX + J_xy*YY + J_z*ZZ.
 `symmetry` should be "none" or "group", and determmines whether the Hamiltonian should be an
 explicitly U(1) symmetric TensorMap or a dense one. `block_size` determines how many sites
 to block together, and should be a power of 2. The Hamiltonian is normalized with an
@@ -91,7 +91,7 @@ additive constant to be negative semidefinite. Because of the normalization and 
 second return value holds a function that, given an expectation value or gradient for the
 Hamiltonian, returns the actual energy or its gradient..
 """
-function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
+function build_H_XXZ(J_xy, J_z; symmetry="none", block_size=1)
     if symmetry == "U1" || symmetry == "group"
         V = ℂ[U₁](-1=>1, 1=>1)
         Z = TensorMap(zeros, Float64, V ← V)
@@ -111,7 +111,7 @@ function build_H_XXZ(Delta=0.0; symmetry="none", block_size=1)
     else
         error("Unknown symmetry $symmetry")
     end
-    H = -(XXplusYY + Delta*ZZ)
+    H = J_xy*XXplusYY + J_z*ZZ
     H = block_op(H, block_size)
     H, c = normalize_H(H)
     normalization(x::Number) = normalize_energy(x, c, block_size)
@@ -342,7 +342,7 @@ function get_optimized_mera(datafolder, model, pars)
     @info("Did not find $filename on disk, generating it.")
     # Build the Hamiltonian.
     if model == "XXZ"
-        h, normalization = build_H_XXZ(pars[:Delta]; symmetry=symmetry,
+        h, normalization = build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
                                        block_size=block_size)
     elseif model == "Ising"
         h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
