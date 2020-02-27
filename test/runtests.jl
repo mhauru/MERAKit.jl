@@ -285,10 +285,10 @@ function test_cayley_transport(meratype, spacetype)
 
     pars = Dict(:havg_depth => 10)
 
-    g1, g2, g3 = [stiefel_gradient(ham, m, pars) for ham in hams]
     retract = cayley_retract
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
 
+    g1, g2, g3 = [stiefel_gradient(ham, m, pars) for ham in hams]
     # Transport g2 and g3 along the retraction by g1, by distance alpha.
     alpha = 2.7
     g2t = cayley_transport(m, g1, g2, alpha)
