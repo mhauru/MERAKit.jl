@@ -172,6 +172,24 @@ function test_release_layer(meratype, spacetype)
 end
 
 """
+Create a random MERA and operator, evaluate the expectation values, strip both of their
+symmetry structure, and confirm that the expectation value hasn't changed.
+"""
+function test_remove_symmetry(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+    V = outputspace(m, 1)
+    randomop = TensorMap(randn, ComplexF64, V ← V)
+    randomop = (randomop + randomop')/2
+    expectation = expect(randomop, m)
+    m_nosym = remove_symmetry(m)
+    randomop_nosym = remove_symmetry(randomop)
+    expectation_nosym = expect(randomop_nosym, m_nosym)
+    @test expectation ≈ expectation_nosym
+end
+
+"""
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
@@ -331,6 +349,9 @@ end
 end
 @testset "Releasing layers" begin
     test_with_all_types(test_release_layer, meratypes, spacetypes)
+end
+@testset "Removing symmetry" begin
+    test_with_all_types(test_remove_symmetry, meratypes, spacetypes)
 end
 @testset "Stiefel gradient and Cayley retraction" begin
     test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
