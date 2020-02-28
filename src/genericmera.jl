@@ -603,8 +603,8 @@ function minimize_expectation!(m, h, pars; kwargs...)
     method = pars[:method]
     if method == :cg || method == :lbfgs
         return minimize_expectation_grad!(m, h, pars; kwargs...)
-    elseif method == :trad
-        return minimize_expectation_trad!(m, h, pars; kwargs...)
+    elseif method == :ev || method == :evenblyvidal
+        return minimize_expectation_ev!(m, h, pars; kwargs...)
     else
         msg = "Unknown optimization method $(method)."
         throw(ArgumentError(msg))
@@ -612,7 +612,8 @@ function minimize_expectation!(m, h, pars; kwargs...)
 end
 
 """
-Optimize the MERA `m` to minimize the expectation value of `h` using the traditional method.
+Optimize the MERA `m` to minimize the expectation value of `h` using the Evenbly-Vidal
+method.
 
 The optimization proceeds by looping over layers and optimizing each in turn, starting from
 the bottom, and repeating this until convergence is reached.
@@ -643,9 +644,9 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_trad!(m::GenericMERA, h, pars; lowest_depth=1,
+function minimize_expectation_ev!(m::GenericMERA, h, pars; lowest_depth=1,
                                     normalization=identity)
-    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers the traditional way"
+    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers using the Evenbly-Vidal method"
     msg *= lowest_depth > 1 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
     @info(msg)
           

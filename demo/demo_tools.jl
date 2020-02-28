@@ -254,7 +254,7 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
     expanded_meras = Dict()
     # Parameters for an optimisation the only point of which is to restore isometricity.
     isometrisation_pars = copy(opt_pars)
-    isometrisation_pars[:method] = :trad
+    isometrisation_pars[:method] = :ev
     isometrisation_pars[:maxiter] = 1
     isometrisation_pars[:miniter] = 1
     for s in sectors_to_expand(V)

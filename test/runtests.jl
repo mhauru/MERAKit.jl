@@ -200,7 +200,7 @@ function test_optimization(meratype, spacetype)
     eps = 5e-2 
     dlow = 2
     dhigh = 3
-    pars = Dict(:method => :trad,
+    pars = Dict(:method => :ev,
                 :densitymatrix_delta => 1e-5,
                 :maxiter => 100,
                 :miniter => 30,
