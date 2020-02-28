@@ -15,7 +15,7 @@ function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table(settings
                    , "--model", arg_type=String, default="Ising"
-                   , "--meratype", arg_type=String, default="binary"
+                   , "--meratype", arg_type=String, default="ternary"
                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
                    , "--chis", arg_type=Vector{Int}, default=collect(2:8)  # Bond dimensions
                    , "--layers", arg_type=Int, default=3
@@ -25,8 +25,8 @@ function parse_pars()
                    , "--J_z", arg_type=Float64, default=0.5  # ZZ coupling for XXZ
                    , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
-                   , "--method", arg_type=Symbol, default=:trad
-                   , "--retraction", arg_type=Symbol, default=:geodesic
+                   , "--method", arg_type=Symbol, default=:lbfgs
+                   , "--retraction", arg_type=Symbol, default=:cayley
                    , "--transport", arg_type=Symbol, default=:cayley
     )
     pars = parse_args(ARGS, settings; as_symbols=true)

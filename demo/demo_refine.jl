@@ -18,7 +18,7 @@ function parse_pars()
                    , "--model", arg_type=String, default="Ising"
                    , "--meratype", arg_type=String, default="ternary"
                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
-                   , "--chi", arg_type=Int, default=5  # Bond dimension
+                   , "--chi", arg_type=Int, default=8  # Bond dimension
                    , "--layers", arg_type=Int, default=3
                    , "--reps", arg_type=Int, default=1000
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
@@ -28,8 +28,8 @@ function parse_pars()
                    , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                    , "--datafolder", arg_type=String, default="JLMdata"
                    , "--datasuffix", arg_type=String, default=""
-                   , "--method", arg_type=Symbol, default=:trad
-                   , "--retraction", arg_type=Symbol, default=:geodesic
+                   , "--method", arg_type=Symbol, default=:lbfgs
+                   , "--retraction", arg_type=Symbol, default=:cayley
                    , "--transport", arg_type=Symbol, default=:cayley
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
