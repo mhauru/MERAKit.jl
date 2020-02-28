@@ -706,8 +706,8 @@ function minimize_expectation_ev!(m::GenericMERA, h, pars; lowest_depth=1,
         # As the optimization gets further, don't print status updates at every
         # iteration any more.
         if (counter - last_status_print)/counter > 0.02
-            @info(@sprintf("Expectation = %.9e,  change = %.3e,  max rho change = %.3e,  counter = %d.",
-                           expectation, expectation_change, rhos_maxchange, counter))
+            @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e",
+                           counter, expectation, rhos_maxchange))
             last_status_print = counter
         end
     end
