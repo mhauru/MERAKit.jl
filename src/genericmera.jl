@@ -780,6 +780,7 @@ end
 function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
                                     normalization=identity)
     # TODO Do something with lowest_to_optimize.
+    # TODO Add option for not touching the unitaries until miniter/2.
     msg = "Optimizing a MERA with $(num_translayers(m)+1) layers using gradient methods."
     @info(msg)
 
