@@ -259,10 +259,6 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
     @test expect(eye, m1) ≈ 1.0
     @test expect(eye, m2) ≈ 1.0
 
-    # Get the energies and gradients at both points.
-    f1, g1 = fg(m1)
-    f2, g2 = fg(m2)
-
     # We have three ways of computing the different between m1 and m2: Just taking the
     # different, multiplying the tangent at m1 by delta, and multiplying the tangent at m2
     # by delta. These should all give roughly the same answer, to order delta or so.
@@ -278,11 +274,13 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
     @test isapprox(overlap1, norm1; rtol=10*delta)
     @test isapprox(overlap2, norm2; rtol=10*delta)
 
+    # Get the energies and gradients at both points. Check that the energy difference
+    # between them is the inner product of the gradient and the tangent.
+    f1, g1 = fg(m1)
+    f2, g2 = fg(m2)
     reco1 = (f2 - f1)/delta
-    reco2 = inner(m1, tan1, g1)
-    reco3 = inner(m2, tan2, g2)
+    reco2 = (inner(m1, tan1, g1) + inner(m2, tan2, g2)) / 2.0
     @test isapprox(reco1, reco2; rtol=10*delta)
-    @test isapprox(reco1, reco3; rtol=10*delta)
 end
 
 """
