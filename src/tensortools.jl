@@ -8,10 +8,14 @@ SquareTensorMap{N} = TensorMap{S1, N, N} where {S1}
 
 """
 Given two vector spaces, create an isometric/unitary TensorMap from one to the other. This
-is done by creating a random Gaussian tensor and SVDing it.
+is done by creating a random Gaussian tensor and SVDing it. If `symmetry_permutation` is
+given, symmetrise the random tensor over this permutation before doing the SVD.
 """
-function randomisometry(Vout, Vin, T=ComplexF64)
+function randomisometry(Vout, Vin, T=ComplexF64; symmetry_permutation=nothing)
     temp = TensorMap(randn, T, Vout ← Vin)
+    if symmetry_permutation !== nothing
+        temp = temp + permute(temp, symmetry_permutation...)
+    end
     U, S, Vt = tsvd(temp)
     u = U * Vt
     return u
@@ -149,7 +153,9 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
     tensors = [t, expanders...]
     inds = [inds_t, inds_expanders...]
-    t_new_tensor = @ncon(tensors, inds)
+    # TODO Switch to using @ncon once https://github.com/Jutho/TensorOperations.jl/issues/83
+    # has been fixed.
+    t_new_tensor = ncon(tensors, inds)
     # Permute inds to have the codomain and domain match with those of the input.
     t_new = permute(t_new_tensor, tuple(1:sizecodomain...),
                     tuple(sizecodomain+1:numinds...))
