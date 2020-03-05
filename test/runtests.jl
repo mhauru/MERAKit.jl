@@ -326,7 +326,7 @@ function test_with_all_types(testfunc, meratypes, spacetypes, args...)
     end
 end
 
-meratypes = (BinaryMERA, TernaryMERA)
+meratypes = (ModifiedBinaryMERA, BinaryMERA, TernaryMERA)
 spacetypes = (ComplexSpace, Z2Space)
 
 # Run the tests on different MERAs and vector spaces.

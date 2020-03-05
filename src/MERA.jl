@@ -8,8 +8,8 @@ using Printf
 using LinearAlgebra
 using Logging
 
-export GenericMERA, TernaryMERA, BinaryMERA
-export TernaryLayer, BinaryLayer
+export GenericMERA, TernaryMERA, BinaryMERA, ModifiedBinaryMERA
+export TernaryLayer, BinaryLayer, ModifiedBinaryLayer
 export SquareTensorMap
 export ascend, descend
 export remove_symmetry
@@ -23,6 +23,7 @@ export release_transitionlayer!, expand_bonddim!
 export expect
 export minimize_expectation!
 export pseudoserialize, depseudoserialize
+export reset_storage!
 export tensorwise_sum, tensorwise_scale
 export istangent
 export stiefel_geodesic, stiefel_gradient, stiefel_inner, cayley_retract, cayley_transport
@@ -31,5 +32,6 @@ include("tensortools.jl")
 include("genericmera.jl")
 include("ternarylayer.jl")
 include("binarylayer.jl")
+include("modifiedbinarylayer.jl")
 
 end  # module

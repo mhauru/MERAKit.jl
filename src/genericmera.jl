@@ -468,16 +468,25 @@ end
 """
 Find the fixed point density matrix of the scale invariant part of the MERA.
 """
-function fixedpoint_densitymatrix(m::T) where T <: GenericMERA
+function fixedpoint_densitymatrix(m::GenericMERA)
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
-    V = inputspace(m, Inf)
-    width = causal_cone_width(T)
-    eye = id(V)
-    x0 = ⊗(repeat([eye], width)...)
+    x0 = thermal_densitymatrix(m, Inf)
     vals, vecs, info = eigsolve(f, x0)
     rho = vecs[1]
     # rho is Hermitian only up to a phase. Divide out that phase.
     rho /= tr(rho)
+    return rho
+end
+
+"""
+Return the thermal density matrix for the indices right below the layer at `depth`. Used as
+an initial guess for the fixed-point density matrix.
+"""
+function thermal_densitymatrix(m::GenericMERA, depth)
+    V = inputspace(m, Inf)
+    width = causal_cone_width(typeof(m))
+    eye = id(V)
+    rho = ⊗(repeat([eye], width)...)
     return rho
 end
 
