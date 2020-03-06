@@ -66,6 +66,12 @@ function main()
                     :disentangler_iters => 1,
                     :isometry_iters => 1)
 
+    logstr = "Running demo_refine.jl with"
+    for (k, v) in pars
+        logstr = logstr * "\n$k = $v"
+    end
+    @info(logstr)
+
     # Build the Hamiltonian.
     if model == "Ising"
         h, normalization = DemoTools.build_H_Ising(pars[:h]; symmetry=symmetry,

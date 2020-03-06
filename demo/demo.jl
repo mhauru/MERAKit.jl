@@ -47,12 +47,18 @@ function main()
         pars[:symmetry] = symmetry
     end
     block_size = pars[:block_size]
-
-    # Three sets of parameters are used when optimizing the MERA:
-    # Used when determining which sector to give bond dimension to.
     method = pars[:method]
     retraction = pars[:retraction]
     transport = pars[:transport]
+
+    logstr = "Running demo.jl with"
+    for (k, v) in pars
+        logstr = logstr * "\n$k = $v"
+    end
+    @info(logstr)
+
+    # Three sets of parameters are used when optimizing the MERA:
+    # Used when determining which sector to give bond dimension to.
     havg_depth = 10
     pars[:initial_opt_pars] = Dict(:method => method,
                                    :retraction => retraction,
