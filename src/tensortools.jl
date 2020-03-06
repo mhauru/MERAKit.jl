@@ -153,9 +153,7 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
     tensors = [t, expanders...]
     inds = [inds_t, inds_expanders...]
-    # TODO Switch to using @ncon once https://github.com/Jutho/TensorOperations.jl/issues/83
-    # has been fixed.
-    t_new_tensor = ncon(tensors, inds)
+    t_new_tensor = @ncon(tensors, inds)
     # Permute inds to have the codomain and domain match with those of the input.
     t_new = permute(t_new_tensor, tuple(1:sizecodomain...),
                     tuple(sizecodomain+1:numinds...))
