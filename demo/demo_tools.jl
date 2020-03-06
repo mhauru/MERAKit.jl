@@ -21,7 +21,7 @@ export get_optimized_mera
 function metafmt(level, _module, group, id, file, line)
     color = Logging.default_logcolor(level)
     levelstr = (level == Logging.Warn ? "Warning" : string(level))
-    timestr = unix2datetime(time())
+    timestr = round(unix2datetime(time()), Dates.Second)
     prefix = "$(levelstr) $(timestr):"
     suffix = ""
     Logging.Info <= level < Logging.Warn && return color, prefix, suffix
