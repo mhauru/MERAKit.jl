@@ -323,6 +323,8 @@ function get_optimized_mera(datafolder, model, pars)
         meratype = BinaryMERA
     elseif meratypestr == "ternary"
         meratype = TernaryMERA
+    elseif meratypestr == "modifiedbinary"
+        meratype = ModifiedBinaryMERA
     else
         msg = "Unknown MERA type: $(meratypestr)"
         throw(ArgumentError(msg))

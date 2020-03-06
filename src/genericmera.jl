@@ -551,7 +551,6 @@ and values are scaling dimensions in this symmetry sector.
 """
 function scalingdimensions(m::GenericMERA; howmany=20)
     V = inputspace(m, Inf)
-    typ = eltype(m)
     chi = dim(V)
     width = causal_cone_width(typeof(m))
     # Don't even try to get more than half of the eigenvalues. Its too expensive, and they
@@ -568,13 +567,7 @@ function scalingdimensions(m::GenericMERA; howmany=20)
     scaldim_dict = Dict()
     for irrep in sects
         # Diagonalize in each irrep sector.
-        inspace = interlayer_space
-        outspace = interlayer_space
-        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-        irrep !== Trivial() && (inspace = inspace ⊗ typeof(V)(irrep => 1))
-        # The initial guess for the eigenvalue search. Also defines the type for
-        # eigenvectors.
-        x0 = TensorMap(randn, typ, outspace ← inspace)
+        x0 = scalingoperator_initialguess(m, interlayer_space, irrep)
         S, U, info = eigsolve(f, x0, howmany, :LM)
         # sfact is the ratio by which the number of sites changes at each coarse-graining.
         sfact = scalefactor(typeof(m))
@@ -582,6 +575,22 @@ function scalingdimensions(m::GenericMERA; howmany=20)
         scaldim_dict[irrep] = scaldims
     end
     return scaldim_dict
+end
+
+"""
+Return an initial guess to be used in the iterative eigensolver that solves for scaling
+operators.
+"""
+function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
+    typ = eltype(m)
+    inspace = interlayer_space
+    outspace = interlayer_space
+    # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
+    irrep !== Trivial() && (inspace = inspace ⊗ spacetype(inspace)(irrep => 1))
+    # The initial guess for the eigenvalue search. Also defines the type for
+    # eigenvectors.
+    x0 = TensorMap(randn, typ, outspace ← inspace)
+    return x0
 end
 
 # # # Evaluation
