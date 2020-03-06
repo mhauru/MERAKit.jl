@@ -17,7 +17,7 @@ function parse_pars()
                    , "--model", arg_type=String, default="Ising"
                    , "--meratype", arg_type=String, default="ternary"
                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
-                   , "--chis", arg_type=Vector{Int}, default=collect(2:8)  # Bond dimensions
+                   , "--chi", arg_type=Int, default=8  # Max bond dimension
                    , "--layers", arg_type=Int, default=3
                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
                    , "--block_size", arg_type=Int, default=2  # Block two sites to start
@@ -37,7 +37,7 @@ function main()
     DemoTools.setlogger()
     pars = parse_pars()
     model = pars[:model]
-    chis = pars[:chis]
+    chi = pars[:chi]
     layers = pars[:layers]
     symmetry = pars[:symmetry]
     datafolder = pars[:datafolder]
@@ -102,6 +102,13 @@ function main()
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
+    end
+
+    if symmetry == "none"
+        chis = 1:chi
+    else
+        model == "Ising" && (chis = 2:chi)
+        model == "XXZ" && (chis = 3:chi)
     end
 
     # Computing the magnetisation of the Ising model only makes sense if Z2 symmetry isn't
