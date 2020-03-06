@@ -34,6 +34,7 @@ function parse_pars()
 end
 
 function main()
+    DemoTools.setlogger()
     pars = parse_pars()
     model = pars[:model]
     chis = pars[:chis]

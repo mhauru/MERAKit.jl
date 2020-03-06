@@ -2,16 +2,42 @@
 
 module DemoTools
 
+using Logging
+using Dates
 using LinearAlgebra
 using TensorKit
 using JLD2
 using MERA
 
+export setlogger
 export expect, minimize_expectation!, densitymatrix_entropies, scalingdimensions, remove_symmetry
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export normalize_energy
 export get_optimized_mera
+
+# # # Log formatting
+
+function metafmt(level, _module, group, id, file, line)
+    color = Logging.default_logcolor(level)
+    levelstr = (level == Logging.Warn ? "Warning" : string(level))
+    timestr = unix2datetime(time())
+    prefix = "$(levelstr) $(timestr):"
+    suffix = ""
+    Logging.Info <= level < Logging.Warn && return color, prefix, suffix
+    _module !== nothing && (suffix *= "$(_module)")
+    if file !== nothing
+        _module !== nothing && (suffix *= " ")
+        suffix *= Base.contractuser(file)
+        if line !== nothing
+            suffix *= ":$(isa(line, UnitRange) ? "$(first(line))-$(last(line))" : line)"
+        end
+    end
+    !isempty(suffix) && (suffix = "@ " * suffix)
+    return color, prefix, suffix
+end
+
+setlogger() = global_logger(ConsoleLogger(stdout, Logging.Info; meta_formatter=metafmt))
 
 # # # Functions for creating Hamiltonians.
 
