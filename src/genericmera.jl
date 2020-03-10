@@ -619,7 +619,7 @@ end
 
 function minimize_expectation!(m, h, pars; kwargs...)
     method = pars[:method]
-    if method == :cg || method == :lbfgs
+    if method in (:cg, :conjugategradient, :gd, :gradientdescent, :lbfgs)
         return minimize_expectation_grad!(m, h, pars; kwargs...)
     elseif method == :ev || method == :evenblyvidal
         return minimize_expectation_ev!(m, h, pars; kwargs...)
@@ -838,8 +838,11 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
     linesearch = HagerZhangLineSearch(;ϵ=1e-5)
 
-    if pars[:method] == :cg
+    if pars[:method] == :cg || pars[:method] == :conjugategradient
         alg = ConjugateGradient(; maxiter=pars[:maxiter], linesearch=linesearch,
+                                verbosity=2, gradtol=pars[:gradient_delta])
+    elseif pars[:method] == :gd || pars[:method] == :gradientdescent
+        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch,
                                 verbosity=2, gradtol=pars[:gradient_delta])
     elseif pars[:method] == :lbfgs
         alg = LBFGS(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
