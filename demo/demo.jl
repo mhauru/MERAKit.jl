@@ -136,10 +136,8 @@ function main()
         @info("Energy numerical: $energy")
         model == "Ising" && @info("Energy exact:     $(-4/pi)")
         do_magnetisation && @info("Magnetization: $(magnetization)")
-        @info("rho ees:")
-        @info(rhoees)
-        @info("Scaling dimensions:")
-        @info(scaldims)
+        @info("rho ees: $rhoees")
+        @info("Scaling dimensions: $scaldims")
     end
 end
 
