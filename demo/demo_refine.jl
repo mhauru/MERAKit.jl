@@ -31,6 +31,8 @@ function parse_pars()
                    , "--method", arg_type=Symbol, default=:lbfgs
                    , "--retraction", arg_type=Symbol, default=:cayley
                    , "--transport", arg_type=Symbol, default=:cayley
+                   , "--lbfgs-m", arg_type=Int, default=8
+                   , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -64,7 +66,10 @@ function main()
                     :havg_depth => 10,
                     :layer_iters => 1,
                     :disentangler_iters => 1,
-                    :isometry_iters => 1)
+                    :isometry_iters => 1,
+                    :lbfgs_m => pars[:lbfgs_m],
+                    :cg_flavor => pars[:cg_flavor],
+                   )
 
     logstr = "Running demo_refine.jl with"
     for (k, v) in pars

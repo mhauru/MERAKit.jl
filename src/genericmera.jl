@@ -839,14 +839,29 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
     linesearch = HagerZhangLineSearch(;ϵ=1e-5)
 
     if pars[:method] == :cg || pars[:method] == :conjugategradient
-        alg = ConjugateGradient(; maxiter=pars[:maxiter], linesearch=linesearch,
-                                verbosity=2, gradtol=pars[:gradient_delta])
+        if pars[:cg_flavor] == :HagerZhang
+            flavor = HagerZhang()
+        elseif pars[:cg_flavor] == :HestenesStiefel
+            flavor = HestenesStiefel()
+        elseif pars[:cg_flavor] == :PolakRibierePolyak
+            flavor = PolakRibierePolyak()
+        elseif pars[:cg_flavor] == :DaiYuan
+            flavor = DaiYuan()
+        elseif pars[:cg_flavor] == :FletcherReeves
+            flavor = FletcherReeves()
+        else
+            msg = "Unknown conjugate gradient flavor $(pars[:cg_flavor])"
+            throw(ArgumentError(msg))
+        end
+        alg = ConjugateGradient(; flavor=flavor, maxiter=pars[:maxiter],
+                                linesearch=linesearch, verbosity=2,
+                                gradtol=pars[:gradient_delta])
     elseif pars[:method] == :gd || pars[:method] == :gradientdescent
-        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch,
-                                verbosity=2, gradtol=pars[:gradient_delta])
+        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
+                              gradtol=pars[:gradient_delta])
     elseif pars[:method] == :lbfgs
-        alg = LBFGS(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
-                    gradtol=pars[:gradient_delta])
+        alg = LBFGS(pars[:lbfgs_m]; maxiter=pars[:maxiter], linesearch=linesearch,
+                    verbosity=2, gradtol=pars[:gradient_delta])
     else
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))

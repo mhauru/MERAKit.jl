@@ -28,6 +28,8 @@ function parse_pars()
                    , "--method", arg_type=Symbol, default=:lbfgs
                    , "--retraction", arg_type=Symbol, default=:cayley
                    , "--transport", arg_type=Symbol, default=:cayley
+                   , "--lbfgs-m", arg_type=Int, default=8
+                   , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
     )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -70,7 +72,9 @@ function main()
                                    :havg_depth => havg_depth,
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
-                                   :isometry_iters => 1)
+                                   :isometry_iters => 1,
+                                   :lbfgs_m => pars[:lbfgs_m],
+                                   :cg_flavor => pars[:cg_flavor])
     # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
     # but not all.
     pars[:mid_opt_pars] = Dict(:method => method,
@@ -83,7 +87,9 @@ function main()
                                :havg_depth => havg_depth,
                                :layer_iters => 1,
                                :disentangler_iters => 1,
-                               :isometry_iters => 1)
+                               :isometry_iters => 1,
+                               :lbfgs_m => pars[:lbfgs_m],
+                               :cg_flavor => pars[:cg_flavor])
     # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
     pars[:final_opt_pars] = Dict(:method => method,
                                  :retraction => retraction,
@@ -95,7 +101,9 @@ function main()
                                  :havg_depth => havg_depth,
                                  :layer_iters => 1,
                                  :disentangler_iters => 1,
-                                 :isometry_iters => 1)
+                                 :isometry_iters => 1,
+                                 :lbfgs_m => pars[:lbfgs_m],
+                                 :cg_flavor => pars[:cg_flavor])
 
     # Get the Hamiltonian.
     if model == "Ising"
