@@ -90,7 +90,8 @@ Return a layer with random tensors, with `Vin` and `Vout` as the input and outpu
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
 (default), it is the identity.
 """
-function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false, T=ComplexF64)
+function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false,
+                     T=ComplexF64)
     ufunc(o, i) = (random_disentangler ?
                    randomisometry(o, i, T) :
                    T <: Complex ? complex(isomorphism(o, i)) : isomorphism(o, i))
