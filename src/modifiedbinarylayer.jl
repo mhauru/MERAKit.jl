@@ -140,7 +140,6 @@ struct ModifiedBinaryOp{T}
 end
 
 ModifiedBinaryOp(op::TensorMap) = ModifiedBinaryOp(op, op)
-# TODO Is this conversion actually used?
 Base.convert(::Type{ModifiedBinaryOp}, op::TensorMap) = ModifiedBinaryOp(op)
 
 Base.iterate(op::ModifiedBinaryOp) = (op.mid, 1)
@@ -171,23 +170,15 @@ function Base.similar(op::ModifiedBinaryOp, element_type=eltype(op))
     return ModifiedBinaryOp(mid, gap)
 end
 
-# TODO Could automate this. Probably using eval.
-Base.:+(x::ModifiedBinaryOp, y::ModifiedBinaryOp) = ModifiedBinaryOp((xi + yi for (xi, yi)
-                                                                      in zip(x, y))...)
-Base.:+(x::TensorMap, y::ModifiedBinaryOp) = ModifiedBinaryOp(x) + y
-Base.:+(x::ModifiedBinaryOp, y::TensorMap) = x + ModifiedBinaryOp(y)
-Base.:-(x::ModifiedBinaryOp, y::ModifiedBinaryOp) = ModifiedBinaryOp((xi - yi for (xi, yi)
-                                                                      in zip(x, y))...)
-Base.:-(x::TensorMap, y::ModifiedBinaryOp) = ModifiedBinaryOp(x) - y
-Base.:-(x::ModifiedBinaryOp, y::TensorMap) = x - ModifiedBinaryOp(y)
-Base.:/(x::ModifiedBinaryOp, y::ModifiedBinaryOp) = ModifiedBinaryOp((xi / yi for (xi, yi)
-                                                                      in zip(x, y))...)
-Base.:/(x::TensorMap, y::ModifiedBinaryOp) = ModifiedBinaryOp(x) / y
-Base.:/(x::ModifiedBinaryOp, y::TensorMap) = x / ModifiedBinaryOp(y)
-Base.:*(x::ModifiedBinaryOp, y::ModifiedBinaryOp) = ModifiedBinaryOp((xi * yi for (xi, yi)
-                                                                      in zip(x, y))...)
-Base.:*(x::TensorMap, y::ModifiedBinaryOp) = ModifiedBinaryOp(x) * y
-Base.:*(x::ModifiedBinaryOp, y::TensorMap) = x * ModifiedBinaryOp(y)
+# Pass element-wise arithmetic down onto the TensorMaps. Promote TensorMaps to
+# ModifiedBinaryOps if necessary.
+for op in (:+, :-, :/, :*)
+    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::ModifiedBinaryOp)
+           = ModifiedBinaryOp(($(op)(xi, yi) for (xi, yi) in zip(x, y))...)))
+    eval(:(Base.$(op)(x::TensorMap, y::ModifiedBinaryOp) = $(op)(ModifiedBinaryOp(x), y)))
+    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::TensorMap) = $(op)(x, ModifiedBinaryOp(y))))
+end
+
 Base.:*(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid * a, op.gap * a)
 Base.:*(a::Number, op::ModifiedBinaryOp) = op*a
 Base.:/(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid / a, op.gap / a)
