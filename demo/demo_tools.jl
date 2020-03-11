@@ -392,8 +392,15 @@ function get_optimized_mera(datafolder, model, pars)
         V_phys = space(h, 1)
         Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
         m = random_MERA(meratype, Vs)
-        opt_pars = pars[:final_opt_pars]
-        m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        # We run all three stages of the optimization for the initial bond dimensions as
+        # well. This doesn't really make sense by itself, but it ensures that all bond
+        # dimensions go through all the different stages, which is necessary for instance
+        # because pars[:initial_opt_pars] typically involves a starting part where
+        # disentanglers are not optimized, and we want to apply that here too.
+        m = minimize_expectation!(m, h, pars[:initial_opt_pars];
+                                  normalization=normalization)
+        m = minimize_expectation!(m, h, pars[:mid_opt_pars]; normalization=normalization)
+        m = minimize_expectation!(m, h, pars[:final_opt_pars]; normalization=normalization)
     else
         # The bond dimensions requested is larger than the smallest that makes sense to do.
         # Get the MERA with a bond dimension one smaller to use as a starting point, expand
