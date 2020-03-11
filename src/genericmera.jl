@@ -624,6 +624,29 @@ function minimize_expectation!(m, h, pars; kwargs...)
     elseif method == :ev || method == :evenblyvidal
         return minimize_expectation_ev!(m, h, pars; kwargs...)
     else
+        for p in 0:100
+            method_candidate1 = Symbol("ev$(p)lbfgs$(100-p)")
+            method_candidate2 = Symbol("lbfgs$(p)ev$(100-p)")
+            if method == method_candidate1
+                temp_pars1 = deepcopy(pars)
+                temp_pars2 = deepcopy(pars)
+                temp_pars1[:method] = :ev
+                temp_pars1[:maxiter] = Int(round(pars[:maxiter]*p/100))
+                temp_pars2[:method] = :lbfgs
+                temp_pars2[:maxiter] = Int(round(pars[:maxiter]*(100-p)/100))
+                minimize_expectation_ev!(m, h, temp_pars1; kwargs...)
+                return minimize_expectation_grad!(m, h, temp_pars2; kwargs...)
+            elseif method == method_candidate2
+                temp_pars1 = deepcopy(pars)
+                temp_pars2 = deepcopy(pars)
+                temp_pars1[:method] = :lbfgs
+                temp_pars1[:maxiter] = Int(round(pars[:maxiter]*p/100))
+                temp_pars2[:method] = :ev
+                temp_pars2[:maxiter] = Int(round(pars[:maxiter]*(100-p)/100))
+                minimize_expectation_grad!(m, h, temp_pars1; kwargs...)
+                return minimize_expectation_ev!(m, h, temp_pars2; kwargs...)
+            end
+        end
         msg = "Unknown optimization method $(method)."
         throw(ArgumentError(msg))
     end
