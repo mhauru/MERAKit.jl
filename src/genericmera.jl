@@ -692,9 +692,7 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m::GenericMERA, h, pars; lowest_depth=1,
-                                    normalization=identity)
-          
+function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=identity)
     nt = num_translayers(m)
     expectation = normalization(expect(h, m))
     expectation_change = Inf
@@ -818,9 +816,13 @@ function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: Gene
     return T(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
-                                    normalization=identity)
-    # TODO Do something with lowest_to_optimize.
+function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=identity)
+    if lowest_depth != 1
+        # TODO Could implement this. It's not hard, just haven't seen the need.
+        msg = "lowest_depth != 1 has not been implemented for gradient optimization."
+        throw(ArgumentError(msg))
+    end
+
     # TODO Add option for not touching the unitaries until miniter/2.
     function fg(x)
         f = normalization(expect(h, x))
