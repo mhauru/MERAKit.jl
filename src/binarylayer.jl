@@ -220,7 +220,6 @@ function ascend(op::TensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
     return scaled_op
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function ascend(op::SquareTensorMap{2}, layer::BinaryLayer, pos=:avg)
     op = expand_support(op, causal_cone_width(BinaryLayer))
     return ascend(op, layer, pos)
@@ -352,7 +351,6 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
     return env
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function environment_disentangler(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_disentangler(h, layer, rho)
@@ -446,7 +444,6 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
     return env
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function environment_isometry(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_isometry(h, layer, rho)

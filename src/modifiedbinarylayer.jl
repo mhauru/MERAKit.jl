@@ -435,8 +435,6 @@ function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer, pos=:avg
     return scaled_op
 end
 
-
-# TODO Write faster versions that actually do only the necessary contractions.
 function ascend(op::SquareTensorMap{2}, layer::ModifiedBinaryLayer, pos=:avg)
     op = ModifiedBinaryOp(op)
     return ascend(op, layer, pos)
@@ -597,7 +595,6 @@ function environment_disentangler(h::ModifiedBinaryOp, layer::ModifiedBinaryLaye
     return env
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function environment_disentangler(h::SquareTensorMap{2}, layer::ModifiedBinaryLayer, rho)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_disentangler(h, layer, rho)
@@ -676,7 +673,6 @@ function environment_isometry_left(h::ModifiedBinaryOp, layer, rho::ModifiedBina
     return env
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function environment_isometry_left(h::SquareTensorMap{2}, layer::ModifiedBinaryLayer,
                               rho::ModifiedBinaryOp)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
@@ -757,7 +753,6 @@ function environment_isometry_right(h::ModifiedBinaryOp, layer, rho::ModifiedBin
     return env
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function environment_isometry_right(h::SquareTensorMap{2}, layer::ModifiedBinaryLayer,
                               rho::ModifiedBinaryOp)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))

@@ -257,7 +257,6 @@ function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
     return scaled_op
 end
 
-# TODO Write faster versions that actually do only the necessary contractions.
 function ascend(op::SquareTensorMap{1}, layer::TernaryLayer, pos=:avg)
     op = expand_support(op, causal_cone_width(TernaryLayer))
     return ascend(op, layer, pos)
