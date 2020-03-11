@@ -62,7 +62,7 @@ function main()
                     :gradient_delta => 1e-15,
                     :densitymatrix_delta => 1e-15,
                     :maxiter => 500,
-                    :miniter => 1,
+                    :isometries_only_iters => 1,
                     :havg_depth => 10,
                     :layer_iters => 1,
                     :disentangler_iters => 1,

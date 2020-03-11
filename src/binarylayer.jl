@@ -102,8 +102,15 @@ end
 
 # # # Stiefel manifold functions
 
-function stiefel_gradient(h, rho, layer::BinaryLayer, pars)
-    uenv = environment_disentangler(h, layer, rho)
+function stiefel_gradient(h, rho, layer::BinaryLayer, pars; vary_disentanglers=true)
+    if vary_disentanglers
+        uenv = environment_disentangler(h, layer, rho)
+    else
+        # TODO We could save some subleading computations by not running the whole machinery
+        # when uenv .== 0, but this implementation is much simpler.
+        V = outputspace(layer)
+        uenv = TensorMap(zeros, eltype(layer), V ⊗ V ← V ⊗ V)
+    end
     wenv = environment_isometry(h, layer, rho)
     u, w = layer
     # The environment is the partial derivative. We need to turn that into a tangent vector
@@ -274,9 +281,10 @@ Three parameters are expected to be in the dictionary `pars`:
     :disentangler_iters, for how many times to loop over the disentangler,
     :isometry_iters, for how many times to loop over the isometry.
 """
-function minimize_expectation_layer(h, layer::BinaryLayer, rho, pars; do_disentanglers=true)
+function minimize_expectation_layer(h, layer::BinaryLayer, rho, pars;
+                                    vary_disentanglers=true)
     for i in 1:pars[:layer_iters]
-        if do_disentanglers
+        if vary_disentanglers
             for j in 1:pars[:disentangler_iters]
                 layer = minimize_expectation_disentangler(h, layer, rho)
             end

@@ -624,7 +624,21 @@ end
 
 # # # Optimization
 
-function minimize_expectation!(m, h, pars; kwargs...)
+function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
+    # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
+    # to vary_disentanglers too, then first run a pre-optimization without touching the
+    # disentanglers, with pars[:isometries_only_iters] as the maximum iteration count,
+    # before moving on to the main optimization with all tensors varying.
+    if vary_disentanglers && pars[:isometries_only_iters] > 0
+        temp_pars = deepcopy(pars)
+        temp_pars[:maxiter] = pars[:isometries_only_iters]
+        m = minimize_expectation!(m, h, temp_pars; vary_disentanglers=false, kwargs...)
+    end
+    # We'll be calling many functions (;vary_disentanglers=vary_disentanglers, kwargs...),
+    # so make that easier by having :vary_disentanglers in kwargs.
+    kwargs = Dict{Symbol, Any}(kwargs...)
+    kwargs[:vary_disentanglers] = vary_disentanglers
+
     method = pars[:method]
     if method in (:cg, :conjugategradient, :gd, :gradientdescent, :lbfgs)
         return minimize_expectation_grad!(m, h, pars; kwargs...)
@@ -692,33 +706,25 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=identity)
+function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=identity,
+                                  vary_disentanglers=true)
     nt = num_translayers(m)
     expectation = normalization(expect(h, m))
-    expectation_change = Inf
     rhos = densitymatrices(m)
     rhos_maxchange = Inf
     counter = 0
     @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
-    while (
-           counter <= pars[:miniter]
-           || (abs(rhos_maxchange) > pars[:densitymatrix_delta]
-               && counter < pars[:maxiter])
-          )
+    while abs(rhos_maxchange) > pars[:densitymatrix_delta] && counter < pars[:maxiter]
         counter += 1
         old_rhos = rhos
         old_expectation = expectation
-
-        # We only optimize disentanglers starting after half of the compulsory iterations
-        # have been done, to not have a screwed up isometry mislead us.
-        do_disentanglers = (counter >= pars[:miniter]/2)
 
         for l in lowest_depth:nt
             rho = densitymatrix(m, l+1)
             hl = ascended_operator(m, h, l)
             layer = get_layer(m, l)
             layer = minimize_expectation_layer(hl, layer, rho, pars;
-                                               do_disentanglers=do_disentanglers)
+                                               vary_disentanglers=vary_disentanglers)
             set_layer!(m, layer, l)
         end
 
@@ -733,19 +739,16 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf)
         layer = minimize_expectation_layer(havg, layer, rho, pars;
-                                           do_disentanglers=do_disentanglers)
+                                           vary_disentanglers=vary_disentanglers)
         set_layer!(m, layer, Inf)
 
         expectation = expect(h, m)
         expectation = normalization(expectation)
-        expectation_change = (expectation - old_expectation)/abs(expectation)
-
         rhos = densitymatrices(m)
         if old_rhos !== nothing
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
         end
-
         @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e", counter, expectation,
                        rhos_maxchange))
     end
@@ -776,14 +779,14 @@ function stiefel_inner(m::T, m1::T, m2::T) where T <: GenericMERA
     return inner
 end
 
-function stiefel_gradient(h, m::T, pars) where T <: GenericMERA
+function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     nt = num_translayers(m)
     layers = []
     for l in 1:nt
         layer = get_layer(m, l)
         rho = densitymatrix(m, l+1)
         hl = ascended_operator(m, h, l)
-        grad = stiefel_gradient(hl, rho, layer, pars)
+        grad = stiefel_gradient(hl, rho, layer, pars; kwargs...)
         push!(layers, grad)
     end
 
@@ -792,7 +795,7 @@ function stiefel_gradient(h, m::T, pars) where T <: GenericMERA
     havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
     layer = get_layer(m, Inf)
     rho = densitymatrix(m, Inf)
-    grad = stiefel_gradient(havg, rho, layer, pars)
+    grad = stiefel_gradient(havg, rho, layer, pars; kwargs...)
     push!(layers, grad)
     g = T(layers)
     return g
@@ -816,7 +819,8 @@ function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: Gene
     return T(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=identity)
+function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=identity,
+                                    vary_disentanglers=true)
     if lowest_depth != 1
         # TODO Could implement this. It's not hard, just haven't seen the need.
         msg = "lowest_depth != 1 has not been implemented for gradient optimization."
@@ -826,7 +830,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=id
     # TODO Add option for not touching the unitaries until miniter/2.
     function fg(x)
         f = normalization(expect(h, x))
-        g = normalization(stiefel_gradient(h, x, pars))
+        g = normalization(stiefel_gradient(h, x, pars;
+                                           vary_disentanglers=vary_disentanglers))
         return f, g
     end
 

@@ -282,7 +282,7 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
     isometrisation_pars = copy(opt_pars)
     isometrisation_pars[:method] = :ev
     isometrisation_pars[:maxiter] = 1
-    isometrisation_pars[:miniter] = 1
+    isometrisation_pars[:isometries_only_iters] = 0
     for s in sectors_to_expand(V)
         # Expand the bond dimension of symmetry sector s and try optimizing a bit to see
         # how useful this expansion is.
