@@ -26,15 +26,13 @@
 #  |  u  |
 #  | / \ |
 
-struct ModifiedBinaryLayer <: Layer
+struct ModifiedBinaryLayer <: SimpleLayer
     disentangler::TensorMap
     isometry_left::TensorMap
     isometry_right::TensorMap
 end
 
 ModifiedBinaryMERA = GenericMERA{ModifiedBinaryLayer}
-
-Base.convert(::Type{ModifiedBinaryLayer}, tuple::Tuple) = ModifiedBinaryLayer(tuple...)
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, 1)
@@ -53,9 +51,6 @@ function Base.getindex(layer::ModifiedBinaryLayer, i)
     i == 3 && return layer.isometry_right
     throw(BoundsError(layer, i))
 end
-
-Base.eltype(layer::ModifiedBinaryLayer) = reduce(promote_type, map(eltype, layer))
-Base.copy(layer::ModifiedBinaryLayer) = ModifiedBinaryLayer(map(deepcopy, layer)...)
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -112,11 +107,6 @@ function expand_outputspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-"""Strip a ModifiedBinaryLayer of its internal symmetries."""
-function remove_symmetry(layer::ModifiedBinaryLayer)
-    return ModifiedBinaryLayer(map(remove_symmetry, layer)...)
-end
-
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
@@ -133,22 +123,6 @@ function randomlayer(::Type{ModifiedBinaryLayer}, Vin, Vout; random_disentangler
     # desired MERA too.
     wr = deepcopy(permute(wl, (2,1), (3,)))
     return ModifiedBinaryLayer(u, wl, wr)
-end
-
-function pseudoserialize(layer::ModifiedBinaryLayer)
-    return repr(ModifiedBinaryLayer), map(pseudoserialize, layer)
-end
-
-function depseudoserialize(::Type{ModifiedBinaryLayer}, data)
-    return ModifiedBinaryLayer([depseudoserialize(d...) for d in data]...)
-end
-
-function tensorwise_sum(l1::ModifiedBinaryLayer, l2::ModifiedBinaryLayer)
-    return ModifiedBinaryLayer(map(sum, zip(l1, l2))...)
-end
-
-function tensorwise_scale(layer::ModifiedBinaryLayer, alpha::Number)
-    return ModifiedBinaryLayer((t*alpha for t in layer)...)
 end
 
 # # # ModifiedBinaryOp
@@ -296,19 +270,6 @@ end
 
 # # # Stiefel manifold functions
 
-function istangent(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer)
-    ures = istangent_isometry(l.disentangler, ltan.disentangler)
-    wlres = istangent_isometry(l.isometry_left, ltan.isometry_left)
-    wrres = istangent_isometry(l.isometry_right, ltan.isometry_right)
-    return ures && wlres && wrres
-end
-
-function stiefel_inner(l::ModifiedBinaryLayer, l1::ModifiedBinaryLayer,
-                       l2::ModifiedBinaryLayer)
-    inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
-    return inner
-end
-
 function stiefel_gradient(h, rho, layer::ModifiedBinaryLayer, pars)
     uenv = environment_disentangler(h, layer, rho)
     wlenv = environment_isometry_left(h, layer, rho)
@@ -327,22 +288,6 @@ function stiefel_geodesic(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer, alp
     wl, wltan = stiefel_geodesic_isometry(l.isometry_left, ltan.isometry_left, alpha)
     wr, wrtan = stiefel_geodesic_isometry(l.isometry_right, ltan.isometry_right, alpha)
     return ModifiedBinaryLayer(u, wl, wr), ModifiedBinaryLayer(utan, wltan, wrtan)
-end
-
-function cayley_retract(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer, alpha::Number)
-    u, utan = cayley_retract(l.disentangler, ltan.disentangler, alpha)
-    wl, wltan = cayley_retract(l.isometry_left, ltan.isometry_left, alpha)
-    wr, wrtan = cayley_retract(l.isometry_right, ltan.isometry_right, alpha)
-    return ModifiedBinaryLayer(u, wl, wr), ModifiedBinaryLayer(utan, wltan, wrtan)
-end
-
-function cayley_transport(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer,
-                          lvec::ModifiedBinaryLayer, alpha::Number)
-    uvec = cayley_transport(l.disentangler, ltan.disentangler, lvec.disentangler, alpha)
-    wlvec = cayley_transport(l.isometry_left, ltan.isometry_left, lvec.isometry_left, alpha)
-    wrvec = cayley_transport(l.isometry_right, ltan.isometry_right, lvec.isometry_right,
-                             alpha)
-    return ModifiedBinaryLayer(uvec, wlvec, wrvec)
 end
 
 # # # Invariants

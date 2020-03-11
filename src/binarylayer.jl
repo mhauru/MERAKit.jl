@@ -21,14 +21,12 @@
 # TODO We could parametrise this as BinaryLayer{T1, T2}, disentagler::T1, isometry::T2.
 # Would this be good, because it increased type stability, or bad because it caused
 # unnecessary recompilation?
-struct BinaryLayer <: Layer
+struct BinaryLayer <: SimpleLayer
     disentangler::TensorMap
     isometry::TensorMap
 end
 
 BinaryMERA = GenericMERA{BinaryLayer}
-
-Base.convert(::Type{BinaryLayer}, tuple::Tuple) = BinaryLayer(tuple...)
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)
@@ -42,9 +40,6 @@ function Base.getindex(layer::BinaryLayer, i)
     i == 2 && return layer.isometry
     throw(BoundsError(layer, i))
 end
-
-Base.eltype(layer::BinaryLayer) = reduce(promote_type, map(eltype, layer))
-Base.copy(layer::BinaryLayer) = BinaryLayer(map(deepcopy, layer)...)
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -90,9 +85,6 @@ function expand_outputspace(layer::BinaryLayer, V_new)
     return BinaryLayer(u, w)
 end
 
-"""Strip a BinaryLayer of its internal symmetries."""
-remove_symmetry(layer::BinaryLayer) = BinaryLayer(map(remove_symmetry, layer)...)
-
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
@@ -107,28 +99,7 @@ function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false, 
     return BinaryLayer(u, w)
 end
 
-pseudoserialize(layer::BinaryLayer) = (repr(BinaryLayer), map(pseudoserialize, layer))
-depseudoserialize(::Type{BinaryLayer}, data) = BinaryLayer([depseudoserialize(d...)
-                                                            for d in data]...)
-
-tensorwise_sum(l1::BinaryLayer, l2::BinaryLayer) = BinaryLayer(map(sum, zip(l1, l2))...)
-
-function tensorwise_scale(layer::BinaryLayer, alpha::Number)
-    return BinaryLayer((t*alpha for t in layer)...)
-end
-
 # # # Stiefel manifold functions
-
-function istangent(l::BinaryLayer, ltan::BinaryLayer)
-    ures = istangent_isometry(l.disentangler, ltan.disentangler)
-    wres = istangent_isometry(l.isometry, ltan.isometry)
-    return ures && wres
-end
-
-function stiefel_inner(l::BinaryLayer, l1::BinaryLayer, l2::BinaryLayer)
-    inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
-    return inner
-end
 
 function stiefel_gradient(h, rho, layer::BinaryLayer, pars)
     uenv = environment_disentangler(h, layer, rho)
@@ -145,19 +116,6 @@ function stiefel_geodesic(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
     u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
     w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
     return BinaryLayer(u, w), BinaryLayer(utan, wtan)
-end
-
-function cayley_retract(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
-    u, utan = cayley_retract(l.disentangler, ltan.disentangler, alpha)
-    w, wtan = cayley_retract(l.isometry, ltan.isometry, alpha)
-    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
-end
-
-function cayley_transport(l::BinaryLayer, ltan::BinaryLayer, lvec::BinaryLayer,
-                          alpha::Number)
-    uvec = cayley_transport(l.disentangler, ltan.disentangler, lvec.disentangler, alpha)
-    wvec = cayley_transport(l.isometry, ltan.isometry, lvec.isometry, alpha)
-    return BinaryLayer(uvec, wvec)
 end
 
 # # # Invariants

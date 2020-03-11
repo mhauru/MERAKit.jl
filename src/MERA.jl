@@ -30,6 +30,7 @@ export stiefel_geodesic, stiefel_gradient, stiefel_inner, cayley_retract, cayley
 
 include("tensortools.jl")
 include("genericmera.jl")
+include("simplelayer.jl")
 include("ternarylayer.jl")
 include("binarylayer.jl")
 include("modifiedbinarylayer.jl")

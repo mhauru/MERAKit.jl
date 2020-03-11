@@ -21,14 +21,12 @@
 # TODO We could parametrise this as TernaryLayer{T1, T2}, disentagler::T1, isometry::T2.
 # Would this be good, because it increased type stability, or bad because it caused
 # unnecessary recompilation?
-struct TernaryLayer <: Layer
+struct TernaryLayer <: SimpleLayer
     disentangler::TensorMap
     isometry::TensorMap
 end
 
 TernaryMERA = GenericMERA{TernaryLayer}
-
-Base.convert(::Type{TernaryLayer}, tuple::Tuple) = TernaryLayer(tuple...)
 
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
@@ -42,9 +40,6 @@ function Base.getindex(layer::TernaryLayer, i)
     i == 2 && return layer.isometry
     throw(BoundsError(layer, i))
 end
-
-Base.eltype(layer::TernaryLayer) = reduce(promote_type, map(eltype, layer))
-Base.copy(layer::TernaryLayer) = TernaryLayer(map(deepcopy, layer)...)
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -90,9 +85,6 @@ function expand_outputspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-"""Strip a TernaryLayer of its internal symmetries."""
-remove_symmetry(layer::TernaryLayer) = TernaryLayer(map(remove_symmetry, layer)...)
-
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
 If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
@@ -105,28 +97,7 @@ function randomlayer(::Type{TernaryLayer}, Vin, Vout; random_disentangler=false)
     return TernaryLayer(u, w)
 end
 
-pseudoserialize(layer::TernaryLayer) = (repr(TernaryLayer), map(pseudoserialize, layer))
-depseudoserialize(::Type{TernaryLayer}, data) = TernaryLayer([depseudoserialize(d...)
-                                                              for d in data]...)
-
-tensorwise_sum(l1::TernaryLayer, l2::TernaryLayer) = TernaryLayer(map(sum, zip(l1, l2))...)
-
-function tensorwise_scale(layer::TernaryLayer, alpha::Number)
-    return TernaryLayer((t*alpha for t in layer)...)
-end
-
 # # # Stiefel manifold functions
-
-function istangent(l::TernaryLayer, ltan::TernaryLayer)
-    ures = istangent_isometry(l.disentangler, ltan.disentangler)
-    wres = istangent_isometry(l.isometry, ltan.isometry)
-    return ures && wres
-end
-
-function stiefel_inner(l::TernaryLayer, l1::TernaryLayer, l2::TernaryLayer)
-    inner = sum((stiefel_inner(t...) for t in  zip(l, l1, l2)))
-    return inner
-end
 
 function stiefel_gradient(h, rho, layer::TernaryLayer, pars)
     uenv = environment_disentangler(h, layer, rho)
@@ -143,19 +114,6 @@ function stiefel_geodesic(l::TernaryLayer, ltan::TernaryLayer, alpha::Number)
     u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
     w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
     return TernaryLayer(u, w), TernaryLayer(utan, wtan)
-end
-
-function cayley_retract(l::TernaryLayer, ltan::TernaryLayer, alpha::Number)
-    u, utan = cayley_retract(l.disentangler, ltan.disentangler, alpha)
-    w, wtan = cayley_retract(l.isometry, ltan.isometry, alpha)
-    return TernaryLayer(u, w), TernaryLayer(utan, wtan)
-end
-
-function cayley_transport(l::TernaryLayer, ltan::TernaryLayer, lvec::TernaryLayer,
-                          alpha::Number)
-    uvec = cayley_transport(l.disentangler, ltan.disentangler, lvec.disentangler, alpha)
-    wvec = cayley_transport(l.isometry, ltan.isometry, lvec.isometry, alpha)
-    return TernaryLayer(uvec, wvec)
 end
 
 # # # Invariants
