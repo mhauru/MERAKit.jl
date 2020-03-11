@@ -190,6 +190,40 @@ function test_remove_symmetry(meratype, spacetype)
 end
 
 """
+Create a random MERA and operator, evaluate the expectation values, strip both of their
+symmetry structure, and confirm that the expectation value hasn't changed.
+"""
+function test_reset_storage(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    m = random_MERA(meratype, spaces; random_disentangler=true)
+    V = outputspace(m, 1)
+    randomop = TensorMap(randn, ComplexF64, V ← V)
+    randomop = (randomop + randomop')/2
+    expectation_orig = expect(randomop, m)
+
+    reset_storage!(m, 2)
+    expectation_reset = expect(randomop, m)
+    @test expectation_orig ≈ expectation_reset
+
+    reset_storage!(m)
+    expectation_reset = expect(randomop, m)
+    @test expectation_orig ≈ expectation_reset
+
+    reset_operator_storage!(m, randomop)
+    expectation_reset = expect(randomop, m)
+    @test expectation_orig ≈ expectation_reset
+
+    reset_operator_storage!(m)
+    expectation_reset = expect(randomop, m)
+    @test expectation_orig ≈ expectation_reset
+
+    # TODO Consider writing tests that check that a) storage is correctly reset after
+    # assigning new tensors, b) storage isn't needlessly reset when assigning tensors, i.e.
+    # no unnecessary recomputation is done.
+end
+
+"""
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
@@ -350,6 +384,9 @@ end
 end
 @testset "Removing symmetry" begin
     test_with_all_types(test_remove_symmetry, meratypes, spacetypes)
+end
+@testset "Reset storage" begin
+    test_with_all_types(test_reset_storage, meratypes, spacetypes)
 end
 @testset "Stiefel gradient and Cayley retraction" begin
     test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,

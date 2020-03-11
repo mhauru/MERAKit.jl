@@ -154,7 +154,7 @@ function reset_storage!(m::GenericMERA, depth)
 end
 
 function reset_storage!(m::GenericMERA)
-    m.stored_densitymatrices = Vector{Any}(repeat([nothing], num_translayers(m)+1))
+    m.stored_densitymatrices[:] .= nothing
     reset_operator_storage!(m)
     return m
 end
@@ -234,13 +234,17 @@ end
 """
 Reset storage for a given operator.
 """
-reset_operator_storage!(m::GenericMERA, op) = delete!(m.stored_densitymatrices, op)
+reset_operator_storage!(m::GenericMERA, op) = delete!(m.stored_operators, op); return m
 
 """
 Reset storage for all operators.
 """
 function reset_operator_storage!(m::GenericMERA)
-    m.stored_densitymatrices = Dict{Any, Vector}()
+    ops = keys(m.stored_operators)
+    for op in ops
+        reset_operator_storage!(m, op)
+    end
+    return m
 end
 
 # # # Generating random MERAs

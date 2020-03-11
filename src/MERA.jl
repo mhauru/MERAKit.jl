@@ -23,7 +23,7 @@ export release_transitionlayer!, expand_bonddim!
 export expect
 export minimize_expectation!
 export pseudoserialize, depseudoserialize
-export reset_storage!
+export reset_storage!, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
 export istangent
 export stiefel_geodesic, stiefel_gradient, stiefel_inner, cayley_retract, cayley_transport
