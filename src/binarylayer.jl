@@ -194,16 +194,14 @@ Ascend a threesite `op` from the bottom of the given layer to the top.
 """
 function ascend(op::SquareTensorMap{3}, layer::BinaryLayer, pos=:avg)
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         @tensor(
                 scaled_op[-100 -200 -300; -400 -500 -600] :=
                 w[5 6; -400] * w[9 8; -500] * w[16 15; -600] *
                 u[1 2; 6 9] * u[10 12; 8 16] *
                 op[3 4 14; 1 2 10] *
-                u_dg[7 13; 3 4] * u_dg[11 17; 14 12] *
-                w_dg[-100; 5 7] * w_dg[-200; 13 11] * w_dg[-300; 17 15]
+                u'[7 13; 3 4] * u'[11 17; 14 12] *
+                w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15]
                )
     elseif in(pos, (:right, :r, :R))
         @tensor(
@@ -211,8 +209,8 @@ function ascend(op::SquareTensorMap{3}, layer::BinaryLayer, pos=:avg)
                 w[15 16; -400] * w[8 9; -500] * w[6 5; -600] *
                 u[12 10; 16 8] * u[1 2; 9 6] *
                 op[14 3 4; 10 1 2] *
-                u_dg[17 11; 12 14] * u_dg[13 7; 3 4] *
-                w_dg[-100; 15 17] * w_dg[-200; 11 13] * w_dg[-300; 7 5]
+                u'[17 11; 12 14] * u'[13 7; 3 4] *
+                w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5]
                )
     elseif in(pos, (:a, :avg, :average))
         l = ascend(op, layer, :left)
@@ -235,16 +233,14 @@ top.
 """
 function ascend(op::TensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         @tensor(
                 scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
                 w[5 6; -400] * w[9 8; -500] * w[16 15; -600] *
                 u[1 2; 6 9] * u[10 12; 8 16] *
                 op[3 4 14; 1 2 10 -1000] *
-                u_dg[7 13; 3 4] * u_dg[11 17; 14 12] *
-                w_dg[-100; 5 7] * w_dg[-200; 13 11] * w_dg[-300; 17 15]
+                u'[7 13; 3 4] * u'[11 17; 14 12] *
+                w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15]
                )
     elseif in(pos, (:right, :r, :R))
         @tensor(
@@ -252,8 +248,8 @@ function ascend(op::TensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
                 w[15 16; -400] * w[8 9; -500] * w[6 5; -600] *
                 u[12 10; 16 8] * u[1 2; 9 6] *
                 op[14 3 4; 10 1 2 -1000] *
-                u_dg[17 11; 12 14] * u_dg[13 7; 3 4] *
-                w_dg[-100; 15 17] * w_dg[-200; 11 13] * w_dg[-300; 7 5]
+                u'[17 11; 12 14] * u'[13 7; 3 4] *
+                w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5]
                )
     elseif in(pos, (:a, :avg, :average))
         l = ascend(op, layer, :left)
@@ -281,13 +277,11 @@ Decend a threesite `rho` from the top of the given layer to the bottom.
 """
 function descend(rho::SquareTensorMap{3}, layer::BinaryLayer, pos=:avg)
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         @tensor(
                 scaled_rho[-100 -200 -300; -400 -500 -600] :=
-                u_dg[16 17; -400 -500] * u_dg[2 10; -600 11] *
-                w_dg[12; 1 16] * w_dg[9; 17 2] * w_dg[5; 10 4] *
+                u'[16 17; -400 -500] * u'[2 10; -600 11] *
+                w'[12; 1 16] * w'[9; 17 2] * w'[5; 10 4] *
                 rho[13 7 6; 12 9 5] *
                 w[1 14; 13] * w[15 3; 7] * w[8 4; 6] *
                 u[-100 -200; 14 15] * u[-300 11; 3 8]
@@ -295,8 +289,8 @@ function descend(rho::SquareTensorMap{3}, layer::BinaryLayer, pos=:avg)
     elseif in(pos, (:right, :r, :R))
         @tensor(
                 scaled_rho[-100 -200 -300; -400 -500 -600] :=
-                u_dg[10 2; 11 -400] * u_dg[17 16; -500 -600] *
-                w_dg[5; 4 10] * w_dg[9; 2 17] * w_dg[12; 16 1] *
+                u'[10 2; 11 -400] * u'[17 16; -500 -600] *
+                w'[5; 4 10] * w'[9; 2 17] * w'[12; 16 1] *
                 rho[6 7 13; 5 9 12] *
                 w[4 8; 6] * w[3 15; 7] * w[14 1; 13] *
                 u[11 -100; 8 3] * u[-200 -300; 15 14]
@@ -353,16 +347,14 @@ Return the environment for a disentangler.
 """
 function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
     u, w = layer
-    w_dg = w'
-    u_dg = u'
     @tensor(
             env1[-1 -2; -3 -4] :=
             rho[15 14 9; 17 18 10] *
             w[5 6; 15] * w[16 -3; 14] * w[-4 8; 9] *
             u[1 2; 6 16] *
             h[3 4 13; 1 2 -1] *
-            u_dg[7 12; 3 4] * u_dg[11 19; 13 -2] *
-            w_dg[17; 5 7] * w_dg[18; 12 11] * w_dg[10; 19 8]
+            u'[7 12; 3 4] * u'[11 19; 13 -2] *
+            w'[17; 5 7] * w'[18; 12 11] * w'[10; 19 8]
            )
                 
     @tensor(
@@ -371,8 +363,8 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
             w[1 11; 3] * w[9 -3; 10] * w[-4 2; 5] *
             u[12 19; 11 9] *
             h[18 7 8; 19 -1 -2] *
-            u_dg[13 14; 12 18] * u_dg[16 17; 7 8] *
-            w_dg[4; 1 13] * w_dg[15; 14 16] * w_dg[6; 17 2]
+            u'[13 14; 12 18] * u'[16 17; 7 8] *
+            w'[4; 1 13] * w'[15; 14 16] * w'[6; 17 2]
            )
                 
     @tensor(
@@ -381,8 +373,8 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
             w[2 -3; 5] * w[-4 9; 10] * w[11 1; 3] *
             u[19 12; 9 11] *
             h[8 7 18; -1 -2 19] *
-            u_dg[17 16; 8 7] * u_dg[14 13; 18 12] *
-            w_dg[6; 2 17] * w_dg[15; 16 14] * w_dg[4; 13 1]
+            u'[17 16; 8 7] * u'[14 13; 18 12] *
+            w'[6; 2 17] * w'[15; 16 14] * w'[4; 13 1]
            )
 
     @tensor(
@@ -391,8 +383,8 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
             w[8 -3; 9] * w[-4 16; 14] * w[6 5; 15] *
             u[2 1; 16 6] *
             h[13 4 3; -2 2 1] *
-            u_dg[19 11; -1 13] * u_dg[12 7; 4 3] *
-            w_dg[10; 8 19] * w_dg[18; 11 12] * w_dg[17; 7 5]
+            u'[19 11; -1 13] * u'[12 7; 4 3] *
+            w'[10; 8 19] * w'[18; 11 12] * w'[17; 7 5]
            )
 
     env = (env1 + env2 + env3 + env4)/2
@@ -429,16 +421,14 @@ Return the environment for the isometry.
 """
 function environment_isometry(h::SquareTensorMap{3}, layer, rho)
     u, w = layer
-    w_dg = w'
-    u_dg = u'
     @tensor(
             env1[-1 -2; -3] :=
             rho[18 17 -3; 16 15 19] *
             w[5 6; 18] * w[9 8; 17] *
             u[2 1; 6 9] * u[10 11; 8 -1] *
             h[4 3 12; 2 1 10] *
-            u_dg[7 14; 4 3] * u_dg[13 20; 12 11] *
-            w_dg[16; 5 7] * w_dg[15; 14 13] * w_dg[19; 20 -2]
+            u'[7 14; 4 3] * u'[13 20; 12 11] *
+            w'[16; 5 7] * w'[15; 14 13] * w'[19; 20 -2]
            )
                 
     @tensor(
@@ -447,8 +437,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             w[12 13; 16] * w[5 6; 15] *
             u[9 7; 13 5] * u[2 1; 6 -1] *
             h[8 4 3; 7 2 1] *
-            u_dg[14 11; 9 8] * u_dg[10 20; 4 3] *
-            w_dg[18; 12 14] * w_dg[17; 11 10] * w_dg[19; 20 -2]
+            u'[14 11; 9 8] * u'[10 20; 4 3] *
+            w'[18; 12 14] * w'[17; 11 10] * w'[19; 20 -2]
            )
 
     @tensor(
@@ -457,8 +447,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             w[5 6; 18] * w[17 13; 14] *
             u[2 1; 6 -1] * u[12 11; -2 17] *
             h[4 3 9; 2 1 12] *
-            u_dg[7 10; 4 3] * u_dg[8 16; 9 11] *
-            w_dg[19; 5 7] * w_dg[20; 10 8] * w_dg[15; 16 13]
+            u'[7 10; 4 3] * u'[8 16; 9 11] *
+            w'[19; 5 7] * w'[20; 10 8] * w'[15; 16 13]
            )
 
     @tensor(
@@ -467,8 +457,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             w[13 17; 14] * w[6 5; 18] *
             u[11 12; 17 -1] * u[1 2; -2 6] *
             h[9 3 4; 12 1 2] *
-            u_dg[16 8; 11 9] * u_dg[10 7; 3 4] *
-            w_dg[15; 13 16] * w_dg[20; 8 10] * w_dg[19; 7 5]
+            u'[16 8; 11 9] * u'[10 7; 3 4] *
+            w'[15; 13 16] * w'[20; 8 10] * w'[19; 7 5]
            )
 
     @tensor(
@@ -477,8 +467,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             w[6 5; 15] * w[13 12; 16] *
             u[1 2; -2 6] * u[7 9; 5 13] *
             h[3 4 8; 1 2 7] *
-            u_dg[20 10; 3 4] * u_dg[11 14; 8 9] *
-            w_dg[19; -1 20] * w_dg[17; 10 11] * w_dg[18; 14 12]
+            u'[20 10; 3 4] * u'[11 14; 8 9] *
+            w'[19; -1 20] * w'[17; 10 11] * w'[18; 14 12]
            )
 
     @tensor(
@@ -487,8 +477,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             w[8 9; 17] * w[6 5; 18] *
             u[11 10; -2 8] * u[1 2; 9 6] *
             h[12 3 4; 10 1 2] *
-            u_dg[20 13; 11 12] * u_dg[14 7; 3 4] *
-            w_dg[19; -1 20] * w_dg[15; 13 14] * w_dg[16; 7 5]
+            u'[20 13; 11 12] * u'[14 7; 3 4] *
+            w'[19; -1 20] * w'[15; 13 14] * w'[16; 7 5]
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/2

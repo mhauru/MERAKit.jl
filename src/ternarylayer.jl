@@ -196,8 +196,7 @@ ascending_superop_onesite(m::TernaryMERA) = ascending_superop_onesite(get_layer(
 
 function ascending_superop_onesite(layer::TernaryLayer)
     w = layer.isometry
-    w_dg = w'
-    @tensor(superop[-1 -2; -11 -12] := w[1 -2 2; -12] * w_dg[-11; 1 -1 2])
+    @tensor(superop[-1 -2; -11 -12] := w[1 -2 2; -12] * w'[-11; 1 -1 2])
     return superop
 end
 
@@ -206,8 +205,6 @@ Ascend a twosite `op` from the bottom of the given layer to the top.
 """
 function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         # Cost: 2X^8 + 2X^7 + 2X^6
         @tensor(
@@ -215,8 +212,8 @@ function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
                 w[51 52 53; -300 ] * w[54 11 12; -400] *
                 u[41 42; 53 54] *
                 op[31 32; 52 41] *
-                u_dg[21 55; 32 42] *
-                w_dg[-100; 51 31 21] * w_dg[-200; 55 11 12]
+                u'[21 55; 32 42] *
+                w'[-100; 51 31 21] * w'[-200; 55 11 12]
                )
     elseif in(pos, (:right, :r, :R))
         # Cost: 2X^8 + 2X^7 + 2X^6
@@ -225,8 +222,8 @@ function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
                 w[11 12 65; -300] * w[63 61 62; -400] *
                 u[51 52; 65 63] *
                 op[31 41; 52 61] *
-                u_dg[64 21; 51 31] *
-                w_dg[-100; 11 12 64] * w_dg[-200; 21 41 62]
+                u'[64 21; 51 31] *
+                w'[-100; 11 12 64] * w'[-200; 21 41 62]
                )
     elseif in(pos, (:middle, :mid, :m, :M))
         # Cost: 6X^6
@@ -235,8 +232,8 @@ function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
                 w[31 32 41; -300] * w[51 21 22; -400] *
                 u[1 2; 41 51] *
                 op[11 12; 1 2] *
-                u_dg[42 52; 11 12] *
-                w_dg[-100; 31 32 42] * w_dg[-200; 52 21 22]
+                u'[42 52; 11 12] *
+                w'[-100; 31 32 42] * w'[-200; 52 21 22]
                )
     elseif in(pos, (:a, :avg, :average))
         l = ascend(op, layer, :l)
@@ -258,8 +255,6 @@ Ascend a twosite `op` with an extra free leg from the bottom of the given layer 
 """
 function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         # Cost: 2X^8 + 2X^7 + 2X^6
         @tensor(
@@ -267,8 +262,8 @@ function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
                 w[51 52 53; -300] * w[54 11 12; -400] *
                 u[41 42; 53 54] *
                 op[31 32; 52 41 -1000] *
-                u_dg[21 55; 32 42] *
-                w_dg[-100; 51 31 21] * w_dg[-200; 55 11 12]
+                u'[21 55; 32 42] *
+                w'[-100; 51 31 21] * w'[-200; 55 11 12]
                )
     elseif in(pos, (:right, :r, :R))
         # Cost: 2X^8 + 2X^7 + 2X^6
@@ -277,8 +272,8 @@ function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
                 w[11 12 65; -300] * w[63 61 62; -400] *
                 u[51 52; 65 63] *
                 op[31 41; 52 61 -1000] *
-                u_dg[64 21; 51 31] *
-                w_dg[-100; 11 12 64] * w_dg[-200; 21 41 62]
+                u'[64 21; 51 31] *
+                w'[-100; 11 12 64] * w'[-200; 21 41 62]
                )
     elseif in(pos, (:middle, :mid, :m, :M))
         # Cost: 6X^6
@@ -287,8 +282,8 @@ function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
                 w[31 32 41; -300] * w[51 21 22; -400] *
                 u[1 2; 41 51] *
                 op[11 12; 1 2 -1000] *
-                u_dg[42 52; 11 12] *
-                w_dg[-100; 31 32 42] * w_dg[-200; 52 21 22]
+                u'[42 52; 11 12] *
+                w'[-100; 31 32 42] * w'[-200; 52 21 22]
                )
     elseif in(pos, (:a, :avg, :average))
         l = ascend(op, layer, :l)
@@ -312,14 +307,12 @@ Decend a twosite `rho` from the top of the given layer to the bottom.
 """
 function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
     u, w = layer
-    u_dg = u'
-    w_dg = w'
     if in(pos, (:left, :l, :L))
         # Cost: 2X^8 + 2X^7 + 2X^6
         @tensor(
                 scaled_rho[-100 -200; -300 -400] :=
-                u_dg[61 62; -400 63] *
-                w_dg[51; 52 -300 61] * w_dg[21; 62 11 12] *
+                u'[61 62; -400 63] *
+                w'[51; 52 -300 61] * w'[21; 62 11 12] *
                 rho[42 22; 51 21] *
                 w[52 -100 41; 42] * w[31 11 12; 22] *
                 u[-200 63; 41 31]
@@ -328,8 +321,8 @@ function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
         # Cost: 2X^8 + 2X^7 + 2X^6
         @tensor(
                 scaled_rho[-100 -200; -300 -400] :=
-                u_dg[62 61; 63 -300] *
-                w_dg[21; 11 12 62] * w_dg[51; 61 -400 52] *
+                u'[62 61; 63 -300] *
+                w'[21; 11 12 62] * w'[51; 61 -400 52] *
                 rho[22 42; 21 51] *
                 w[11 12 41; 22] * w[31 -200 52; 42] *
                 u[63 -100; 41 31]
@@ -338,8 +331,8 @@ function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
         # Cost: 6X^6
         @tensor(
                 scaled_rho[-100 -200; -300 -400] :=
-                u_dg[61 62; -300 -400] *
-                w_dg[21; 11 12 61] * w_dg[41; 62 31 32] *
+                u'[61 62; -300 -400] *
+                w'[21; 11 12 61] * w'[41; 62 31 32] *
                 rho[22 42; 21 41] *
                 w[11 12 51; 22] * w[52 31 32; 42] *
                 u[-100 -200; 51 52]
@@ -398,16 +391,14 @@ Return the environment for a disentangler.
 """
 function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
-    w_dg = w'
-    u_dg = u'
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env1[-1 -2; -3 -4] :=
             rho[63 22; 31 21] *
             w[61 62 -3; 63] * w[-4 11 12; 22] *
             h[51 52; 62 -1] *
-            u_dg[41 42; 52 -2] *
-            w_dg[31; 61 51 41] * w_dg[21; 42 11 12]
+            u'[41 42; 52 -2] *
+            w'[31; 61 51 41] * w'[21; 42 11 12]
            )
 
     # Cost: 6X^6
@@ -416,8 +407,8 @@ function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
             rho[42 52; 41 51] *
             w[21 22 -3; 42] * w[-4 31 32; 52] *
             h[11 12; -1 -2] *
-            u_dg[61 62; 11 12] *
-            w_dg[41; 21 22 61] * w_dg[51; 62 31 32]
+            u'[61 62; 11 12] *
+            w'[41; 21 22 61] * w'[51; 62 31 32]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -426,8 +417,8 @@ function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
             rho[22 63; 21 31] *
             w[12 11 -3; 22] * w[-4 62 61; 63] *
             h[52 51; -2 62] *
-            u_dg[42 41; -1 52] *
-            w_dg[21; 12 11 42] * w_dg[31; 41 51 61]
+            u'[42 41; -1 52] *
+            w'[21; 12 11 42] * w'[31; 41 51 61]
            )
 
     env = (env1 + env2 + env3)/3
@@ -453,8 +444,6 @@ Return the environment for an isometry.
 """
 function environment_isometry(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
-    w_dg = w'
-    u_dg = u'
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env1[-1 -2 -3; -4] :=
@@ -462,8 +451,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[62 61 63; 82] *
             u[51 52; 63 -1] *
             h[41 42; 61 51] *
-            u_dg[31 83; 42 52] *
-            w_dg[81; 62 41 31] * w_dg[84; 83 -2 -3]
+            u'[31 83; 42 52] *
+            w'[81; 62 41 31] * w'[84; 83 -2 -3]
            )
 
     # Cost: 6X^6
@@ -473,8 +462,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[11 12 51; 42] *
             u[21 22; 51 -1] *
             h[31 32; 21 22] *
-            u_dg[52 61; 31 32] *
-            w_dg[41; 11 12 52] * w_dg[62; 61 -2 -3]
+            u'[52 61; 31 32] *
+            w'[41; 11 12 52] * w'[62; 61 -2 -3]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -484,8 +473,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[21 11 73; 32] *
             u[72 71; 73 -1] *
             h[62 61; 71 -2] *
-            u_dg[51 41; 72 62] *
-            w_dg[31; 21 11 51] * w_dg[33; 41 61 -3]
+            u'[51 41; 72 62] *
+            w'[31; 21 11 51] * w'[33; 41 61 -3]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -495,8 +484,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[73 11 21; 32] *
             u[71 72; -3 73] *
             h[61 62; -2 71] *
-            u_dg[41 51; 62 72] *
-            w_dg[33; -1 61 41] * w_dg[31; 51 11 21]
+            u'[41 51; 62 72] *
+            w'[33; -1 61 41] * w'[31; 51 11 21]
            )
 
     # Cost: 6X^6
@@ -506,8 +495,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[51 12 11; 42] *
             u[22 21; -3 51] *
             h[32 31; 22 21] *
-            u_dg[61 52; 32 31] *
-            w_dg[62; -1 -2 61] * w_dg[41; 52 12 11]
+            u'[61 52; 32 31] *
+            w'[62; -1 -2 61] * w'[41; 52 12 11]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -517,8 +506,8 @@ function environment_isometry(h::SquareTensorMap{2}, layer, rho)
             w[63 61 62; 82] *
             u[52 51; -3 63] *
             h[42 41; 51 61] *
-            u_dg[83 31; 52 42] *
-            w_dg[84; -1 -2 83] * w_dg[81; 31 41 62]
+            u'[83 31; 52 42] *
+            w'[84; -1 -2 83] * w'[81; 31 41 62]
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/3
