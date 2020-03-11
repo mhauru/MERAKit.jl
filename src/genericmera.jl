@@ -691,17 +691,14 @@ have no default values. The different parameters are:
 """
 function minimize_expectation_ev!(m::GenericMERA, h, pars; lowest_depth=1,
                                     normalization=identity)
-    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers using the Evenbly-Vidal method"
-    msg *= lowest_depth > 1 ? ", keeping the lowest $(lowest_depth-1) fixed." : "."
-    @info(msg)
           
     nt = num_translayers(m)
-    expectation = Inf
+    expectation = normalization(expect(h, m))
     expectation_change = Inf
     rhos = densitymatrices(m)
     rhos_maxchange = Inf
     counter = 0
-    last_status_print = -Inf
+    @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
     while (
            counter <= pars[:miniter]
            || (abs(rhos_maxchange) > pars[:densitymatrix_delta]
@@ -748,13 +745,8 @@ function minimize_expectation_ev!(m::GenericMERA, h, pars; lowest_depth=1,
             rhos_maxchange = maximum(rho_diffs)
         end
 
-        # As the optimization gets further, don't print status updates at every
-        # iteration any more.
-        if (counter - last_status_print)/counter > 0.02
-            @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e",
-                           counter, expectation, rhos_maxchange))
-            last_status_print = counter
-        end
+        @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e", counter, expectation,
+                       rhos_maxchange))
     end
     return m
 end
@@ -827,9 +819,6 @@ function minimize_expectation_grad!(m, h, pars; lowest_to_optimize=1,
                                     normalization=identity)
     # TODO Do something with lowest_to_optimize.
     # TODO Add option for not touching the unitaries until miniter/2.
-    msg = "Optimizing a MERA with $(num_translayers(m)+1) layers using gradient methods."
-    @info(msg)
-
     function fg(x)
         f = normalization(expect(h, x))
         g = normalization(stiefel_gradient(h, x, pars))
