@@ -14,26 +14,26 @@ ArgParse.parse_item(::Type{Symbol}, s::AbstractString) = Symbol(s)
 
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
-    @add_arg_table(settings
-                   , "--model", arg_type=String, default="Ising"
-                   , "--meratype", arg_type=String, default="ternary"
-                   , "--threads", arg_type=Int, default=1  # For BLAS parallelization
-                   , "--chi", arg_type=Int, default=8  # Bond dimension
-                   , "--layers", arg_type=Int, default=3
-                   , "--reps", arg_type=Int, default=1000
-                   , "--symmetry", arg_type=String, default="none"  # "none" or "group"
-                   , "--block_size", arg_type=Int, default=2  # Block two sites to start
-                   , "--h", arg_type=Float64, default=1.0  # External field of Ising
-                   , "--J_z", arg_type=Float64, default=0.5  # ZZ coupling for XXZ
-                   , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
-                   , "--datafolder", arg_type=String, default="JLMdata"
-                   , "--datasuffix", arg_type=String, default=""
-                   , "--method", arg_type=Symbol, default=:lbfgs
-                   , "--retraction", arg_type=Symbol, default=:cayley
-                   , "--transport", arg_type=Symbol, default=:cayley
-                   , "--lbfgs-m", arg_type=Int, default=8
-                   , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
-    )
+    @add_arg_table!(settings
+                    , "--model", arg_type=String, default="Ising"
+                    , "--meratype", arg_type=String, default="ternary"
+                    , "--threads", arg_type=Int, default=1  # For BLAS parallelization
+                    , "--chi", arg_type=Int, default=8  # Bond dimension
+                    , "--layers", arg_type=Int, default=3
+                    , "--reps", arg_type=Int, default=1000
+                    , "--symmetry", arg_type=String, default="none"  # "none" or "group"
+                    , "--block_size", arg_type=Int, default=2  # Block two sites to start
+                    , "--h", arg_type=Float64, default=1.0  # External field of Ising
+                    , "--J_z", arg_type=Float64, default=0.5  # ZZ coupling for XXZ
+                    , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
+                    , "--datafolder", arg_type=String, default="JLMdata"
+                    , "--datasuffix", arg_type=String, default=""
+                    , "--method", arg_type=Symbol, default=:lbfgs
+                    , "--retraction", arg_type=Symbol, default=:cayley
+                    , "--transport", arg_type=Symbol, default=:cayley
+                    , "--lbfgs-m", arg_type=Int, default=8
+                    , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
+                   )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
 end
