@@ -234,7 +234,10 @@ end
 """
 Reset storage for a given operator.
 """
-reset_operator_storage!(m::GenericMERA, op) = delete!(m.stored_operators, op); return m
+function reset_operator_storage!(m::GenericMERA, op)
+    delete!(m.stored_operators, op)
+    return m
+end
 
 """
 Reset storage for all operators.
