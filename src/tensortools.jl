@@ -200,12 +200,11 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     a = (a - a')/2
     k = wtan - w * a
     q, r = leftorth(k)
-    # TODO Remove the TensorKit. part once cats are exported.
-    b = TensorKit.catcodomain(TensorKit.catdomain(a, -r'), TensorKit.catdomain(r, zero(a)))
+    b = catcodomain(catdomain(a, -r'), catdomain(r, zero(a)))
     expb = exp(alpha * b)
     eye = id(domain(a))
-    uppertrunc = TensorKit.catcodomain(eye, zero(eye))
-    lowertrunc = TensorKit.catcodomain(zero(eye), eye)
+    uppertrunc = catcodomain(eye, zero(eye))
+    lowertrunc = catcodomain(zero(eye), eye)
     m = uppertrunc' * expb * uppertrunc
     n = lowertrunc' * expb * uppertrunc
     w_end = w*m + q*n
@@ -215,6 +214,11 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     U, S, Vt = tsvd(w_end)
     w_end = U*Vt
     return w_end, wtan_end
+end
+
+function istangent_isometry(u, utan)
+    a = u' * utan
+    return all(a ≈ -a')
 end
 
 # TODO These can be optimized.
@@ -228,8 +232,8 @@ function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
     tan = codomfuser * tan * domfuser'
     xtan = x' * tan
     Ptan = tan - 0.5*(x * xtan)
-    u = TensorKit.catdomain(Ptan, x)
-    v = TensorKit.catdomain(x, -Ptan)
+    u = catdomain(Ptan, x)
+    v = catdomain(x, -Ptan)
     eye = id(domain(u))
     m1 = v' * x
     m2 = v' * u
@@ -252,17 +256,12 @@ function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::N
     vec = codomfuser * vec * domfuser'
     xtan = x' * tan
     Ptan = tan - 0.5*(x * xtan)
-    u = TensorKit.catdomain(Ptan, x)
-    v = TensorKit.catdomain(x, -Ptan)
+    u = catdomain(Ptan, x)
+    v = catdomain(x, -Ptan)
     eye = id(domain(u))
     M = eye - (alpha/2) * v' * u
     Minv = inv(M)
     vec_end = vec + alpha * (u * (Minv * (v' * vec)))
     vec_end = codomfuser' * vec_end * domfuser
     return vec_end
-end
-
-function istangent_isometry(u, utan)
-    a = u' * utan
-    return all(a ≈ -a')
 end
