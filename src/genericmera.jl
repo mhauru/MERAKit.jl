@@ -641,7 +641,7 @@ function minimize_expectation!(m, h, pars; kwargs...)
                 temp_pars1[:maxiter] = Int(round(pars[:maxiter]*p/100))
                 temp_pars2[:method] = :lbfgs
                 temp_pars2[:maxiter] = Int(round(pars[:maxiter]*(100-p)/100))
-                minimize_expectation_ev!(m, h, temp_pars1; kwargs...)
+                m = minimize_expectation_ev!(m, h, temp_pars1; kwargs...)
                 return minimize_expectation_grad!(m, h, temp_pars2; kwargs...)
             elseif method == method_candidate2
                 temp_pars1 = deepcopy(pars)
@@ -650,7 +650,7 @@ function minimize_expectation!(m, h, pars; kwargs...)
                 temp_pars1[:maxiter] = Int(round(pars[:maxiter]*p/100))
                 temp_pars2[:method] = :ev
                 temp_pars2[:maxiter] = Int(round(pars[:maxiter]*(100-p)/100))
-                minimize_expectation_grad!(m, h, temp_pars1; kwargs...)
+                m = minimize_expectation_grad!(m, h, temp_pars1; kwargs...)
                 return minimize_expectation_ev!(m, h, temp_pars2; kwargs...)
             end
         end
