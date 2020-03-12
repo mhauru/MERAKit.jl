@@ -8,10 +8,6 @@ include("demo_tools.jl")
 using .DemoTools
 using Logging
 
-# TODO Hopefully this can be dropped soon. See
-# https://github.com/carlobaldassi/ArgParse.jl/issues/95.
-ArgParse.parse_item(::Type{Symbol}, s::AbstractString) = Symbol(s)
-
 function parse_pars()
     settings = ArgParseSettings(autofix_names=true)
     @add_arg_table!(settings
