@@ -18,12 +18,9 @@
 #  +-------+
 #  1| 2| 3|
 
-# TODO We could parametrise this as TernaryLayer{T1, T2}, disentagler::T1, isometry::T2.
-# Would this be good, because it increased type stability, or bad because it caused
-# unnecessary recompilation?
-struct TernaryLayer <: SimpleLayer
-    disentangler::TensorMap
-    isometry::TensorMap
+struct TernaryLayer{T1, T2} <: SimpleLayer
+    disentangler::T1
+    isometry::T2
 end
 
 TernaryMERA = GenericMERA{TernaryLayer}

@@ -26,10 +26,10 @@
 #  |  u  |
 #  | / \ |
 
-struct ModifiedBinaryLayer <: SimpleLayer
-    disentangler::TensorMap
-    isometry_left::TensorMap
-    isometry_right::TensorMap
+struct ModifiedBinaryLayer{T1, T2, T3} <: SimpleLayer
+    disentangler::T1
+    isometry_left::T2
+    isometry_right::T3
 end
 
 ModifiedBinaryMERA = GenericMERA{ModifiedBinaryLayer}
