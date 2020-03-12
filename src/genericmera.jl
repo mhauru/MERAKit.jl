@@ -827,7 +827,6 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=id
         throw(ArgumentError(msg))
     end
 
-    # TODO Add option for not touching the unitaries until miniter/2.
     function fg(x)
         f = normalization(expect(h, x))
         g = normalization(stiefel_gradient(h, x, pars;
