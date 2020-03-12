@@ -18,9 +18,9 @@
 #  +------+
 #  1|   2|
 
-struct BinaryLayer{T1, T2} <: SimpleLayer
-    disentangler::T1
-    isometry::T2
+struct BinaryLayer <: SimpleLayer
+    disentangler
+    isometry
 end
 
 BinaryMERA = GenericMERA{BinaryLayer}

@@ -18,9 +18,9 @@
 #  +-------+
 #  1| 2| 3|
 
-struct TernaryLayer{T1, T2} <: SimpleLayer
-    disentangler::T1
-    isometry::T2
+struct TernaryLayer <: SimpleLayer
+    disentangler
+    isometry
 end
 
 TernaryMERA = GenericMERA{TernaryLayer}
