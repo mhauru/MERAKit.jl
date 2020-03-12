@@ -237,7 +237,7 @@ function test_optimization(meratype, spacetype)
     pars = Dict(:method => :ev,
                 :densitymatrix_delta => 1e-5,
                 :maxiter => 100,
-                :miniter => 30,
+                :isometries_only_iters => 30,
                 :havg_depth => 10,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
