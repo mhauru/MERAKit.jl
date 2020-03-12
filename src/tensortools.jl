@@ -245,6 +245,54 @@ end
 # TODO These can be optimized.
 
 """
+For a given point `x` on a Stiefel manifold and a tangent `tan` at this point, compute
+various precursor-matrices that will be needed for doing Cayley transformations for
+retraction and transport. See `cayley_retract` and `cayley_transport` for more.
+
+The name has a ! at the end because some methods of this function modify an existing set of
+precursors.
+"""
+function cayley_precursors!(x::TensorMap, tan::TensorMap)
+    dom = domain(x)
+    domfuser = isomorphism(fuse(dom), dom)
+    xf = x * domfuser'
+    tanf = tan * domfuser'
+    xtanf = xf' * tanf
+    Ptanf = tanf - 0.5*(xf * xtanf)
+    u = catdomain(Ptanf, xf)
+    v = catdomain(xf, -Ptanf)
+    m1 = v' * x
+    m2 = v' * u
+    precursors = Dict{Symbol, Any}()
+    precursors[:u] = u
+    precursors[:v] = v
+    precursors[:m1] = m1
+    precursors[:m2] = m2
+    precursors[:Minvs] = Dict{Float64, Any}()
+    return precursors
+end
+
+"""
+For a given point `x` on a Stiefel manifold and a tangent `tan` at this point, compute
+various precursor-matrices that will be needed for doing Cayley transformations for
+retraction and transport, and specifically matrices required for doing them by a distance
+alpha. See `cayley_retract` and `cayley_transport` for more.
+"""
+function cayley_precursors!(x::TensorMap, tan::TensorMap, alpha::Number)
+    precursors = cayley_precursors!(x, tan)
+    return cayley_precursors!(x, tan, alpha, precursors)
+end
+
+function cayley_precursors!(x::TensorMap, tan::TensorMap, alpha::Number, precursors::Dict)
+    Minvs = precursors[:Minvs]
+    if !(alpha in keys(Minvs))
+        eye = id(domain(precursors[:u]))
+        Minvs[alpha] = inv(eye - (alpha/2) * precursors[:m2])
+    end
+    return precursors
+end
+
+"""
 For a point `x` on a Stiefel manifold and a tangent `tan` at this point, generate a curve in
 the direction of `tan` using a Cayley transform, travel along that curve for distance
 `alpha`, and return the end-point and the tangent at the end-point. Both `x` and `tan` maybe
@@ -255,25 +303,13 @@ See Section 3.1 of http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf f
 works.
 """
 function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
-    dom = domain(x)
-    codom = codomain(x)
-    domfuser = isomorphism(fuse(dom), dom)
-    codomfuser = isomorphism(fuse(codom), codom)
-    x = codomfuser * x * domfuser'
-    tan = codomfuser * tan * domfuser'
-    xtan = x' * tan
-    Ptan = tan - 0.5*(x * xtan)
-    u = catdomain(Ptan, x)
-    v = catdomain(x, -Ptan)
-    eye = id(domain(u))
-    m1 = v' * x
-    m2 = v' * u
-    m3 = inv(eye - (alpha/2) * m2) * m1
-    x_end = x + alpha * u * m3
+    p = cayley_precursors!(x, tan, alpha)
+    u, m1, m2 = p[:u], p[:m1], p[:m2]
+    Minv = p[:Minvs][alpha]
+    m3 = Minv * m1
     m23 = m2 * m3
-    tan_end = u * (m1 + (alpha/2) * m23 + (alpha/2) * inv(eye - (alpha/2) * m2) * m23)
-    x_end = codomfuser' * x_end * domfuser
-    tan_end = codomfuser' * tan_end * domfuser
+    x_end = x + alpha * u * m3
+    tan_end = u * (m1 + (alpha/2) * m23 + (alpha/2) * Minv * m23)
     return x_end, tan_end
 end
 
@@ -294,21 +330,9 @@ http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf. See there for the m
 details.
 """
 function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::Number)
-    dom = domain(x)
-    codom = codomain(x)
-    domfuser = isomorphism(fuse(dom), dom)
-    codomfuser = isomorphism(fuse(codom), codom)
-    x = codomfuser * x * domfuser'
-    tan = codomfuser * tan * domfuser'
-    vec = codomfuser * vec * domfuser'
-    xtan = x' * tan
-    Ptan = tan - 0.5*(x * xtan)
-    u = catdomain(Ptan, x)
-    v = catdomain(x, -Ptan)
-    eye = id(domain(u))
-    M = eye - (alpha/2) * v' * u
-    Minv = inv(M)
+    p = cayley_precursors!(x, tan, alpha)
+    u, v = p[:u], p[:v]
+    Minv = p[:Minvs][alpha]
     vec_end = vec + alpha * (u * (Minv * (v' * vec)))
-    vec_end = codomfuser' * vec_end * domfuser
     return vec_end
 end
