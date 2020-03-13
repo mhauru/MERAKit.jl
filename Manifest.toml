@@ -58,9 +58,9 @@ version = "0.6.0"
 
 [[CuArrays]]
 deps = ["AbstractFFTs", "Adapt", "CEnum", "CUDAapi", "CUDAdrv", "CUDAnative", "DataStructures", "GPUArrays", "Libdl", "LinearAlgebra", "MacroTools", "NNlib", "Printf", "Random", "Requires", "SparseArrays", "TimerOutputs"]
-git-tree-sha1 = "7c20c5a45bb245cf248f454d26966ea70255b271"
+git-tree-sha1 = "7fa1331a0e0cd10e43b94b280027bda45990cb63"
 uuid = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
-version = "1.7.2"
+version = "1.7.3"
 
 [[DataStructures]]
 deps = ["InteractiveUtils", "OrderedCollections"]
@@ -78,9 +78,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[FileIO]]
 deps = ["Pkg"]
-git-tree-sha1 = "2c84c57aced468fa21763c66d3bef33adcd09ec7"
+git-tree-sha1 = "250ac7dfd54b5ce47372505b392756633d4e9732"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.2.2"
+version = "1.2.3"
 
 [[GPUArrays]]
 deps = ["AbstractFFTs", "Adapt", "LinearAlgebra", "Printf", "Random", "Serialization"]
