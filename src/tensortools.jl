@@ -242,7 +242,38 @@ function istangent_isometry(u, utan)
     return all(a ≈ -a')
 end
 
-# TODO These can be optimized.
+# The Cayley transformations need the same kind of things computed for both retractions and
+# transport, and we don't want to compute them again repeatedly. Nor do we want to recompute
+# everything when we for instance do retractions along the same curve by different amounts.
+# So here's a global Least-Recent-Use (LRU) cache that keeps track of the precursors that
+# would otherwise be repeteadly recomputed.
+g_cachesize = 40
+g_cayleycache = LRU{Tuple{TensorMap, TensorMap}, Dict}(; maxsize=g_cachesize)
+
+"""
+Get the precursors for doing a Cayley retraction or parallel transport from a Stiefel
+manifold point `x` along the tangent `tan`. The results are cached in a global cache.
+"""
+function get_cayley_precursors(x::TensorMap, tan::TensorMap)
+    if (x, tan) in keys(g_cayleycache)
+        precursors = g_cayleycache[(x, tan)]
+    else
+        precursors = cayley_precursors!(x, tan)
+        g_cayleycache[(x, tan)] = precursors
+    end
+    return precursors
+end
+
+"""
+Get the precursors for doing a Cayley retraction or parallel transport from a Stiefel
+manifold point `x` along the tangent `tan` by distance `alpha`. The results are cached in a
+global cache.
+"""
+function get_cayley_precursors(x::TensorMap, tan::TensorMap, alpha::Number)
+    precursors = get_cayley_precursors(x, tan)
+    precursors = cayley_precursors!(x, tan, alpha, precursors)
+    return precursors
+end
 
 """
 For a given point `x` on a Stiefel manifold and a tangent `tan` at this point, compute
@@ -268,7 +299,7 @@ function cayley_precursors!(x::TensorMap, tan::TensorMap)
     precursors[:v] = v
     precursors[:m1] = m1
     precursors[:m2] = m2
-    precursors[:Minvs] = Dict{Float64, Any}()
+    precursors[:Minvs] = Dict{Float64, TensorMap}()
     return precursors
 end
 
@@ -303,9 +334,9 @@ See Section 3.1 of http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf f
 works.
 """
 function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
-    p = cayley_precursors!(x, tan, alpha)
-    u, m1, m2 = p[:u], p[:m1], p[:m2]
-    Minv = p[:Minvs][alpha]
+    precursors = get_cayley_precursors(x, tan, alpha)
+    u, m1, m2 = precursors[:u], precursors[:m1], precursors[:m2]
+    Minv = precursors[:Minvs][alpha]
     m3 = Minv * m1
     m23 = m2 * m3
     x_end = x + alpha * u * m3
@@ -330,9 +361,9 @@ http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf. See there for the m
 details.
 """
 function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::Number)
-    p = cayley_precursors!(x, tan, alpha)
-    u, v = p[:u], p[:v]
-    Minv = p[:Minvs][alpha]
+    precursors = get_cayley_precursors(x, tan, alpha)
+    u, v = precursors[:u], precursors[:v]
+    Minv = precursors[:Minvs][alpha]
     vec_end = vec + alpha * (u * (Minv * (v' * vec)))
     return vec_end
 end

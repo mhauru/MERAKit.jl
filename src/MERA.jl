@@ -7,6 +7,7 @@ using OptimKit
 using Printf
 using LinearAlgebra
 using Logging
+using LRUCache
 
 export GenericMERA, TernaryMERA, BinaryMERA, ModifiedBinaryMERA
 export TernaryLayer, BinaryLayer, ModifiedBinaryLayer
