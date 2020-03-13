@@ -299,7 +299,7 @@ function cayley_precursors!(x::TensorMap, tan::TensorMap)
     precursors[:v] = v
     precursors[:m1] = m1
     precursors[:m2] = m2
-    precursors[:Minvs] = Dict{Float64, TensorMap}()
+    precursors[:alphadict] = Dict{Float64, Any}()
     return precursors
 end
 
@@ -315,10 +315,13 @@ function cayley_precursors!(x::TensorMap, tan::TensorMap, alpha::Number)
 end
 
 function cayley_precursors!(x::TensorMap, tan::TensorMap, alpha::Number, precursors::Dict)
-    Minvs = precursors[:Minvs]
-    if !(alpha in keys(Minvs))
-        eye = id(domain(precursors[:u]))
-        Minvs[alpha] = inv(eye - (alpha/2) * precursors[:m2])
+    alphadict = precursors[:alphadict]
+    if !(alpha in keys(alphadict))
+        u, m2 = precursors[:u], precursors[:m2]
+        eye = id(domain(u))
+        Minv = inv(eye - (alpha/2) * m2)
+        uMinv = u * Minv
+        alphadict[alpha] = (Minv, uMinv)
     end
     return precursors
 end
@@ -336,7 +339,7 @@ works.
 function cayley_retract(x::TensorMap, tan::TensorMap, alpha::Number)
     precursors = get_cayley_precursors(x, tan, alpha)
     u, m1, m2 = precursors[:u], precursors[:m1], precursors[:m2]
-    Minv = precursors[:Minvs][alpha]
+    Minv, uMinv = precursors[:alphadict][alpha]
     m3 = Minv * m1
     m23 = m2 * m3
     x_end = x + alpha * u * m3
@@ -363,7 +366,7 @@ details.
 function cayley_transport(x::TensorMap, tan::TensorMap, vec::TensorMap, alpha::Number)
     precursors = get_cayley_precursors(x, tan, alpha)
     u, v = precursors[:u], precursors[:v]
-    Minv = precursors[:Minvs][alpha]
-    vec_end = vec + alpha * (u * (Minv * (v' * vec)))
+    Minv, uMinv = precursors[:alphadict][alpha]
+    vec_end = vec + alpha * uMinv * (v' * vec)
     return vec_end
 end
