@@ -29,6 +29,7 @@ function parse_pars()
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
+                    , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
     return pars
@@ -65,6 +66,7 @@ function main()
                     :isometry_iters => 1,
                     :lbfgs_m => pars[:lbfgs_m],
                     :cg_flavor => pars[:cg_flavor],
+                    :verbosity => pars[:verbosity],
                    )
 
     logstr = "Running demo_refine.jl with"

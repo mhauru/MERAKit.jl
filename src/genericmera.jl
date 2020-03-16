@@ -713,7 +713,9 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
     rhos = densitymatrices(m)
     rhos_maxchange = Inf
     counter = 0
-    @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
+    if pars[:verbosity] >= 2
+        @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
+    end
     while abs(rhos_maxchange) > pars[:densitymatrix_delta] && counter < pars[:maxiter]
         counter += 1
         old_rhos = rhos
@@ -749,8 +751,19 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
         end
-        @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e", counter, expectation,
-                       rhos_maxchange))
+        if pars[:verbosity] >= 2
+            @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e", counter, expectation,
+                           rhos_maxchange))
+        end
+    end
+    if pars[:verbosity] > 0
+        if abs(rhos_maxchange) <= pars[:densitymatrix_delta]
+            @info(@sprintf("E-V: converged after %d iterations: f = %.12f, max‖Δρ‖ = %.4e",
+                           counter, expectation, rhos_maxchange))
+        else
+            @warn(@sprintf("E-V: not converged to requested tol: f = %.12f, max‖Δρ‖ = %.4e",
+                           expectation, rhos_maxchange))
+        end
     end
     return m
 end
@@ -879,14 +892,14 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=id
             throw(ArgumentError(msg))
         end
         alg = ConjugateGradient(; flavor=flavor, maxiter=pars[:maxiter],
-                                linesearch=linesearch, verbosity=2,
+                                linesearch=linesearch, verbosity=pars[:verbosity],
                                 gradtol=pars[:gradient_delta])
     elseif pars[:method] == :gd || pars[:method] == :gradientdescent
-        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch, verbosity=2,
-                              gradtol=pars[:gradient_delta])
+        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch,
+                              verbosity=pars[:verbosity], gradtol=pars[:gradient_delta])
     elseif pars[:method] == :lbfgs
         alg = LBFGS(pars[:lbfgs_m]; maxiter=pars[:maxiter], linesearch=linesearch,
-                    verbosity=2, gradtol=pars[:gradient_delta])
+                    verbosity=pars[:verbosity], gradtol=pars[:gradient_delta])
     else
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))

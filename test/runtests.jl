@@ -241,7 +241,8 @@ function test_optimization(meratype, spacetype)
                 :havg_depth => 10,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
-                :isometry_iters => 1)
+                :isometry_iters => 1,
+                :verbosity => 1)
 
     op = particle_number_operator(spacetype)
     width = causal_cone_width(meratype)
