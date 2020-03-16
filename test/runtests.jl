@@ -235,7 +235,7 @@ function test_optimization(meratype, spacetype)
     dlow = 2
     dhigh = 3
     pars = Dict(:method => :ev,
-                :densitymatrix_delta => 1e-5,
+                :gradient_delta => 1e-5,
                 :maxiter => 100,
                 :isometries_only_iters => 30,
                 :havg_depth => 10,

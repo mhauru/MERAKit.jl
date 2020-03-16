@@ -57,7 +57,6 @@ function main()
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
                     :gradient_delta => 1e-15,
-                    :densitymatrix_delta => 1e-15,
                     :maxiter => 500,
                     :isometries_only_iters => 0,
                     :havg_depth => 10,

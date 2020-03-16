@@ -721,7 +721,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
     if pars[:verbosity] >= 2
         @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
     end
-    while abs(rhos_maxchange) > pars[:densitymatrix_delta] && counter < pars[:maxiter]
+    while gradnorm > pars[:gradient_delta] && counter < pars[:maxiter]
         counter += 1
         old_rhos = rhos
         old_expectation = expectation
@@ -766,7 +766,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         end
     end
     if pars[:verbosity] > 0
-        if abs(rhos_maxchange) <= pars[:densitymatrix_delta]
+        if gradnorm <= pars[:gradient_delta]
             @info(@sprintf("E-V: converged after %d iterations: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
                            counter, expectation, gradnorm, rhos_maxchange))
         else
