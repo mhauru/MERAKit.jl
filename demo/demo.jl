@@ -69,6 +69,7 @@ function main()
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
                                    :isometry_iters => 1,
+                                   :ls_epsilon => 1e-4,
                                    :lbfgs_m => pars[:lbfgs_m],
                                    :cg_flavor => pars[:cg_flavor],
                                    :verbosity => pars[:verbosity])
@@ -84,6 +85,7 @@ function main()
                                :layer_iters => 1,
                                :disentangler_iters => 1,
                                :isometry_iters => 1,
+                               :ls_epsilon => 1e-4,
                                :lbfgs_m => pars[:lbfgs_m],
                                :cg_flavor => pars[:cg_flavor],
                                :verbosity => pars[:verbosity])
@@ -98,6 +100,7 @@ function main()
                                  :layer_iters => 1,
                                  :disentangler_iters => 1,
                                  :isometry_iters => 1,
+                                 :ls_epsilon => 1e-4,
                                  :lbfgs_m => pars[:lbfgs_m],
                                  :cg_flavor => pars[:cg_flavor],
                                  :verbosity => pars[:verbosity])

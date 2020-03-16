@@ -883,7 +883,7 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
-    linesearch = HagerZhangLineSearch(;ϵ=1e-5)
+    linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])
 
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang

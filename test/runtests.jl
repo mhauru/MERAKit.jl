@@ -227,21 +227,25 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-function test_optimization(meratype, spacetype)
+function test_optimization(meratype, spacetype, method)
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
-    eps = 5e-2 
+    eps = 1e-2
     dlow = 2
     dhigh = 3
-    pars = Dict(:method => :ev,
-                :gradient_delta => 1e-5,
-                :maxiter => 100,
+    pars = Dict(:method => method,
+                :gradient_delta => 1e-4,
+                :maxiter => 500,
                 :isometries_only_iters => 30,
                 :havg_depth => 10,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
                 :isometry_iters => 1,
+                :retraction => :cayley,
+                :transport => :cayley,
+                :lbfgs_m => 8,
+                :ls_epsilon => 1e-2,
                 :verbosity => 1)
 
     op = particle_number_operator(spacetype)
@@ -250,7 +254,7 @@ function test_optimization(meratype, spacetype)
     ham = -reduce(⊗, repeat([op], width))
     spaces = random_layerspaces(spacetype, meratype, layers-1, dlow, dhigh)
     m = random_MERA(meratype, (V, spaces...))
-    minimize_expectation!(m, ham, pars)
+    m = minimize_expectation!(m, ham, pars)
     expectation = expect(ham, m)
     @test abs(expectation + 1.0) < eps
 end
@@ -400,6 +404,9 @@ end
 @testset "Cayley parallel transport" begin
     test_with_all_types(test_cayley_transport, meratypes, spacetypes)
 end
-@testset "Optimization" begin
-    test_with_all_types(test_optimization, meratypes, spacetypes)
+@testset "Optimization E-V" begin
+    test_with_all_types((mt, st) -> test_optimization(mt, st, :ev), meratypes, spacetypes)
+end
+@testset "Optimization LBFGS" begin
+    test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs), meratypes, spacetypes)
 end
