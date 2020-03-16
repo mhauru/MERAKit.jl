@@ -13,7 +13,6 @@ export setlogger
 export expect, minimize_expectation!, densitymatrix_entropies, scalingdimensions, remove_symmetry
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
-export normalize_energy
 export get_optimized_mera
 
 # # # Log formatting
@@ -140,8 +139,7 @@ function build_H_XXZ(J_xy, J_z; symmetry="none", block_size=1)
     H = J_xy*XXplusYY + J_z*ZZ
     H = block_op(H, block_size)
     H, c = normalize_H(H)
-    normalization(x::Number) = normalize_energy(x, c, block_size)
-    normalization(x) = normalize_energygradient(x, block_size)
+    normalization = make_normalization_function(c, block_size)
     return H, normalization
 end
 
@@ -192,8 +190,7 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     end
     H = block_op(H, block_size)
     H, c = normalize_H(H)
-    normalization(x::Number) = normalize_energy(x, c, block_size)
-    normalization(x) = normalize_energygradient(x, block_size)
+    normalization = make_normalization_function(c, block_size)
     return H, normalization
 end
 
@@ -210,19 +207,17 @@ function build_magop(;block_size=1)
 end
 
 """
-Given the normalization and block_size constants used in creating a Hamiltonian, and the
-expectation value of the normalized and blocked Hamiltonian, return the actual energy.
+Given the normalization and block_size constants used in creating a Hamiltonian, make a
+function that takes in either energies or energy gradients for the normalized Hamiltonian,
+and returns the actual energy or gradient.
 """
-normalize_energy(energy, c, block_size) = (energy + c)/block_size
-
-"""
-Given the block_size constant used in creating a Hamiltonian, and the gradient-MERA for the
-normalized and blocked Hamiltonian, return the actual gradient.
-"""
-function normalize_energygradient(gradient::GenericMERA, block_size)
-    return tensorwise_scale(gradient, 1/block_size)
+function make_normalization_function(c, block_size)
+    normalization(x::Number, ::Val{:energy}) = (x + c) / block_size
+    normalization(x::Number, ::Val{:gradient}) = x / block_size
+    normalization(x::Number) = normalization(x, Val(:energy))
+    normalization(x::GenericMERA) = tensorwise_scale(x, 1 / block_size)
+    return normalization
 end
-
 
 # # # Functions for reading and writing to disk.
 
