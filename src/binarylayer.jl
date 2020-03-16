@@ -279,17 +279,21 @@ Three parameters are expected to be in the dictionary `pars`:
     :isometry_iters, for how many times to loop over the isometry.
 """
 function minimize_expectation_ev(h, layer::BinaryLayer, rho, pars; vary_disentanglers=true)
+    gradnorm_u, gradnorm_w = 0.0, 0.0
     for i in 1:pars[:layer_iters]
         if vary_disentanglers
             for j in 1:pars[:disentangler_iters]
-                layer = minimize_expectation_ev_disentangler(h, layer, rho)
+                layer, gradnorm_u = minimize_expectation_ev_disentangler(h, layer, rho)
             end
         end
         for j in 1:pars[:isometry_iters]
-            layer = minimize_expectation_ev_isometry(h, layer, rho)
+            layer, gradnorm_w = minimize_expectation_ev_isometry(h, layer, rho)
         end
     end
-    return layer
+    # We use the last values of gradnorms for u and w to compute this. That's the closest
+    # thing to having the gradient norm at the endpoint.
+    gradnorm = sqrt(gradnorm_u^2 + gradnorm_w^2)
+    return layer, gradnorm
 end
 
 """
@@ -297,11 +301,15 @@ Return a new layer, where the disentangler has been changed to the locally optim
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_ev_disentangler(h, layer::BinaryLayer, rho)
-    w = layer.isometry
+    uold, wold = layer
     env = environment_disentangler(h, layer, rho)
     U, S, Vt = tsvd(env, (1,2), (3,4))
     u = U * Vt
-    return BinaryLayer(u, w)
+    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
+    uoldenv = uold' * env
+    @tensor crossterm[] := uoldenv[1 2; 3 4] * uoldenv[3 4; 1 2]
+    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
+    return BinaryLayer(u, wold), gradnorm
 end
 
 """
@@ -370,11 +378,15 @@ Return a new layer, where the isometry has been changed to the locally optimal o
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_ev_isometry(h, layer::BinaryLayer, rho)
-    u = layer.disentangler
+    uold, wold = layer
     env = environment_isometry(h, layer, rho)
     U, S, Vt = tsvd(env, (1,2), (3,))
     w = U * Vt
-    return BinaryLayer(u, w)
+    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
+    woldenv = wold' * env
+    @tensor crossterm[] := woldenv[1; 2] * woldenv[2; 1]
+    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
+    return BinaryLayer(uold, w), gradnorm
 end
 
 """

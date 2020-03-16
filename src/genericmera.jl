@@ -125,6 +125,10 @@ end
 
 densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatrices(m))
 
+# Function that returns its first argument. Used as a default value for the energy
+# normalization function.
+noop_firstarg(args...) = args[1]
+
 # # # Storage of density matrices and ascended operators
 
 # The storage format for density matrices and operators is a little different:
@@ -706,12 +710,13 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=identity,
+function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop_firstarg,
                                   vary_disentanglers=true)
     nt = num_translayers(m)
     expectation = normalization(expect(h, m))
     rhos = densitymatrices(m)
     rhos_maxchange = Inf
+    gradnorm = Inf
     counter = 0
     if pars[:verbosity] >= 2
         @info(@sprintf("E-V: initializing with f = %.12f,", expectation))
@@ -720,13 +725,15 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
         counter += 1
         old_rhos = rhos
         old_expectation = expectation
+        gradnorm_sq = 0
 
         for l in lowest_depth:nt
             rho = densitymatrix(m, l+1)
             hl = ascended_operator(m, h, l)
             layer = get_layer(m, l)
-            layer = minimize_expectation_ev(hl, layer, rho, pars;
-                                            vary_disentanglers=vary_disentanglers)
+            layer, gradnorm_layer = minimize_expectation_ev(hl, layer, rho, pars;
+                                                            vary_disentanglers=vary_disentanglers)
+            gradnorm_sq += gradnorm_layer^2
             set_layer!(m, layer, l)
         end
 
@@ -740,10 +747,12 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
         havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf)
-        layer = minimize_expectation_ev(havg, layer, rho, pars;
-                                        vary_disentanglers=vary_disentanglers)
+        layer, gradnorm_layer = minimize_expectation_ev(havg, layer, rho, pars;
+                                                        vary_disentanglers=vary_disentanglers)
+        gradnorm_sq += gradnorm_layer^2
         set_layer!(m, layer, Inf)
 
+        gradnorm = normalization(sqrt(gradnorm_sq), Val(:gradient))
         expectation = expect(h, m)
         expectation = normalization(expectation)
         rhos = densitymatrices(m)
@@ -752,17 +761,17 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
             rhos_maxchange = maximum(rho_diffs)
         end
         if pars[:verbosity] >= 2
-            @info(@sprintf("E-V: iter %4d: f = %.12f, max‖Δρ‖ = %.4e", counter, expectation,
-                           rhos_maxchange))
+            @info(@sprintf("E-V: iter %4d: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                           counter, expectation, gradnorm, rhos_maxchange))
         end
     end
     if pars[:verbosity] > 0
         if abs(rhos_maxchange) <= pars[:densitymatrix_delta]
-            @info(@sprintf("E-V: converged after %d iterations: f = %.12f, max‖Δρ‖ = %.4e",
-                           counter, expectation, rhos_maxchange))
+            @info(@sprintf("E-V: converged after %d iterations: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                           counter, expectation, gradnorm, rhos_maxchange))
         else
-            @warn(@sprintf("E-V: not converged to requested tol: f = %.12f, max‖Δρ‖ = %.4e",
-                           expectation, rhos_maxchange))
+            @warn(@sprintf("E-V: not converged to requested tol: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                           expectation, gradnorm, rhos_maxchange))
         end
     end
     return m
@@ -832,7 +841,7 @@ function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: Gene
     return T(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=identity,
+function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=noop_firstarg,
                                     vary_disentanglers=true)
     if lowest_depth != 1
         # TODO Could implement this. It's not hard, just haven't seen the need.

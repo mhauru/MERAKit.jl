@@ -532,18 +532,20 @@ Three parameters are expected to be in the dictionary `pars`:
 """
 function minimize_expectation_ev(h, layer::ModifiedBinaryLayer, rho, pars;
                                  vary_disentanglers=true)
+    gradnorm_u, gradnorm_wl, gradnorm_wr = 0.0, 0.0, 0.0
     for i in 1:pars[:layer_iters]
         if vary_disentanglers
             for j in 1:pars[:disentangler_iters]
-                layer = minimize_expectation_ev_disentangler(h, layer, rho)
+                layer, gradnorm_u = minimize_expectation_ev_disentangler(h, layer, rho)
             end
         end
         for j in 1:pars[:isometry_iters]
-            layer = minimize_expectation_ev_isometry_left(h, layer, rho)
-            layer = minimize_expectation_ev_isometry_right(h, layer, rho)
+            layer, gradnorm_wl = minimize_expectation_ev_isometry_left(h, layer, rho)
+            layer, gradnorm_wr = minimize_expectation_ev_isometry_right(h, layer, rho)
         end
     end
-    return layer
+    gradnorm = sqrt(gradnorm_u^2 + gradnorm_wl^2 + gradnorm_wr^2)
+    return layer, gradnorm
 end
 
 """
@@ -551,12 +553,15 @@ Return a new layer, where the disentangler has been changed to the locally optim
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_ev_disentangler(h, layer::ModifiedBinaryLayer, rho)
-    wl = layer.isometry_left
-    wr = layer.isometry_right
+    uold, wlold, wrold = layer
     env = environment_disentangler(h, layer, rho)
     U, S, Vt = tsvd(env, (1,2), (3,4))
     u = U * Vt
-    return ModifiedBinaryLayer(u, wl, wr)
+    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
+    uoldenv = uold' * env
+    @tensor crossterm[] := uoldenv[1 2; 3 4] * uoldenv[3 4; 1 2]
+    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
+    return ModifiedBinaryLayer(u, wlold, wrold), gradnorm
 end
 
 """
@@ -618,12 +623,15 @@ Return a new layer, where the left isometry has been changed to the locally opti
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_ev_isometry_left(h, layer::ModifiedBinaryLayer, rho)
-    u = layer.disentangler
-    wr = layer.isometry_right
+    uold, wlold, wrold = layer
     env = environment_isometry_left(h, layer, rho)
     U, S, Vt = tsvd(env, (1,2), (3,))
     wl = U * Vt
-    return ModifiedBinaryLayer(u, wl, wr)
+    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
+    wloldenv = wlold' * env
+    @tensor crossterm[] := wloldenv[1; 2] * wloldenv[2; 1]
+    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
+    return ModifiedBinaryLayer(uold, wl, wrold), gradnorm
 end
 
 """
@@ -698,12 +706,15 @@ Return a new layer, where the right isometry has been changed to the locally opt
 minimize the expectation of a threesite operator `h`.
 """
 function minimize_expectation_ev_isometry_right(h, layer::ModifiedBinaryLayer, rho)
-    u = layer.disentangler
-    wl = layer.isometry_left
+    uold, wlold, wrold = layer
     env = environment_isometry_right(h, layer, rho)
     U, S, Vt = tsvd(env, (1,2), (3,))
     wr = U * Vt
-    return ModifiedBinaryLayer(u, wl, wr)
+    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
+    wroldenv = wrold' * env
+    @tensor crossterm[] := wroldenv[1; 2] * wroldenv[2; 1]
+    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
+    return ModifiedBinaryLayer(uold, wlold, wr), gradnorm
 end
 
 """
