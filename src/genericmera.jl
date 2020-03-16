@@ -723,8 +723,8 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
             rho = densitymatrix(m, l+1)
             hl = ascended_operator(m, h, l)
             layer = get_layer(m, l)
-            layer = minimize_expectation_layer(hl, layer, rho, pars;
-                                               vary_disentanglers=vary_disentanglers)
+            layer = minimize_expectation_ev(hl, layer, rho, pars;
+                                            vary_disentanglers=vary_disentanglers)
             set_layer!(m, layer, l)
         end
 
@@ -738,8 +738,8 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=iden
         havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf)
-        layer = minimize_expectation_layer(havg, layer, rho, pars;
-                                           vary_disentanglers=vary_disentanglers)
+        layer = minimize_expectation_ev(havg, layer, rho, pars;
+                                        vary_disentanglers=vary_disentanglers)
         set_layer!(m, layer, Inf)
 
         expectation = expect(h, m)

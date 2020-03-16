@@ -530,17 +530,17 @@ Three parameters are expected to be in the dictionary `pars`:
     :disentangler_iters, for how many times to loop over the disentangler,
     :isometry_iters, for how many times to loop over the isometry.
 """
-function minimize_expectation_layer(h, layer::ModifiedBinaryLayer, rho, pars;
-                                    vary_disentanglers=true)
+function minimize_expectation_ev(h, layer::ModifiedBinaryLayer, rho, pars;
+                                 vary_disentanglers=true)
     for i in 1:pars[:layer_iters]
         if vary_disentanglers
             for j in 1:pars[:disentangler_iters]
-                layer = minimize_expectation_disentangler(h, layer, rho)
+                layer = minimize_expectation_ev_disentangler(h, layer, rho)
             end
         end
         for j in 1:pars[:isometry_iters]
-            layer = minimize_expectation_isometry_left(h, layer, rho)
-            layer = minimize_expectation_isometry_right(h, layer, rho)
+            layer = minimize_expectation_ev_isometry_left(h, layer, rho)
+            layer = minimize_expectation_ev_isometry_right(h, layer, rho)
         end
     end
     return layer
@@ -550,7 +550,7 @@ end
 Return a new layer, where the disentangler has been changed to the locally optimal one to
 minimize the expectation of a threesite operator `h`.
 """
-function minimize_expectation_disentangler(h, layer::ModifiedBinaryLayer, rho)
+function minimize_expectation_ev_disentangler(h, layer::ModifiedBinaryLayer, rho)
     wl = layer.isometry_left
     wr = layer.isometry_right
     env = environment_disentangler(h, layer, rho)
@@ -617,7 +617,7 @@ end
 Return a new layer, where the left isometry has been changed to the locally optimal one to
 minimize the expectation of a threesite operator `h`.
 """
-function minimize_expectation_isometry_left(h, layer::ModifiedBinaryLayer, rho)
+function minimize_expectation_ev_isometry_left(h, layer::ModifiedBinaryLayer, rho)
     u = layer.disentangler
     wr = layer.isometry_right
     env = environment_isometry_left(h, layer, rho)
@@ -697,7 +697,7 @@ end
 Return a new layer, where the right isometry has been changed to the locally optimal one to
 minimize the expectation of a threesite operator `h`.
 """
-function minimize_expectation_isometry_right(h, layer::ModifiedBinaryLayer, rho)
+function minimize_expectation_ev_isometry_right(h, layer::ModifiedBinaryLayer, rho)
     u = layer.disentangler
     wl = layer.isometry_left
     env = environment_isometry_right(h, layer, rho)
