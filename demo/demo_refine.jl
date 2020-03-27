@@ -29,6 +29,8 @@ function parse_pars()
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
+                    , "--havg_depth", arg_type=Int, default=10
+                    , "--havg_eps", arg_type=Float64, default=1e-12
                     , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -53,13 +55,16 @@ function main()
     end
     block_size = pars[:block_size]
     reps = pars[:reps]
+    havg_depth = pars[:havg_depth]
+    havg_eps = pars[:havg_eps]
     opt_pars = Dict(:method => pars[:method],
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
                     :gradient_delta => 1e-15,
                     :maxiter => 500,
                     :isometries_only_iters => 0,
-                    :havg_depth => 10,
+                    :havg_depth => havg_depth,
+                    :havg_eps => havg_eps,
                     :layer_iters => 1,
                     :disentangler_iters => 1,
                     :isometry_iters => 1,

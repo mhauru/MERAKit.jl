@@ -552,6 +552,53 @@ function ascended_operator(m::GenericMERA, op, depth)
     return opasc
 end
 
+# TODO Understand better the issue of exponential weights vs no weights. As I see it now, no
+# weights is the correct thing when evaluating a gradient. Because the ascended h soon
+# becomes the dominant eigenvector of the ascending superoperator, the contributions after a
+# few layers are orthogonal to the optimization manifold, and thus the gradient vector is
+# unchanged by them. The exponential weights are just an ad hoc trick for E-V. If this
+# understanding is correct, change the structure of how this is computed, so that for
+# instance pars[:havg_eps] actually has an effect when evaluating a gradient. Probably also
+# change the arguments that this function takes, and update the docstring.
+"""
+TODO This docstring is out-of-date.
+Return the sum of the ascended versions of `op` in the scale invariant part of the MERA,
+normalized by the number of tensors in each layer. That is
+``sum_{i=1}^Inf ascended_operator(m, op, num_translayers + i) / scalefactor^(i-1).``
+This infinite sum is of course not summed in total. Instead, we approximate by assuming that
+from some depth `l` onwards all the ascended operators are the same. The tolerance for error
+in this approximation is set by the argument eps.  This function uses `ascended_operator` to
+get the operators at each layer, which means that it makes use of the cache.
+"""
+function ascended_operator_avg(m::GenericMERA, op, pars, weight=:none)
+    ops = Any[]
+    opavg = nothing
+    nt = num_translayers(m)
+    sf = scalefactor(typeof(m))
+    series_sum = sf/(sf-1)  # This is the value of the series sum_{i=0}^Inf 1/sf^i.
+    # TODO This could be optimized to avoid resumming all the terms every time. Hardly
+    # urgent though, given how subleading this whole thing is in bond dimension.
+    for l in 1:pars[:havg_depth]
+        old_opavg = opavg
+        push!(ops, ascended_operator(m, op, nt+l))
+        if weight === :exponential
+            # Normalization factors for each term. The last one gets multiplied by
+            # series_sum, since the assumption is that from l onwards all the ascended
+            # operators are the same.
+            normalizations = [one(eltype(m))/sf^(j-1) for j in 1:l]
+            normalizations[end] *= series_sum
+        elseif weight === :none
+            normalizations = [one(eltype(m)) for j in 1:l]
+        else
+            throw(ArgumentError("Unknown value for weight: $weight"))
+        end
+        opavg = sum(op*n for (op, n) in zip(ops, normalizations))
+        change = old_opavg === nothing ? 1 : norm(opavg - old_opavg)/norm(opavg)
+        change < pars[:havg_eps] && break
+    end
+    return opavg
+end
+
 # # # Extracting CFT data
 
 """
@@ -738,13 +785,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         end
 
         # Special case of the translation invariant layer.
-        # The Hamiltonian to use for optimizing the scale invariant layer is
-        # havg = h + A(h)/f + A^2(h)/f^2 + A^3(h)/f^3 + ...
-        # where A is the ascending superoperator and f is the scaling factor, e.g. 2 for a
-        # binary MERA and 3 for ternary.  We truncate this series at a few
-        # (pars[:havg_depth]) terms because they become negligible exponentially quickly.
-        sf = scalefactor(typeof(m))
-        havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
+        havg = ascended_operator_avg(m, h, pars, :exponential)
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf)
         layer, gradnorm_layer = minimize_expectation_ev(havg, layer, rho, pars;
@@ -813,8 +854,7 @@ function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     end
 
     # Special case of the translation invariant layer.
-    sf = scalefactor(typeof(m))
-    havg = sum(ascended_operator(m, h, nt+l) / sf^(l-1) for l in 1:pars[:havg_depth])
+    havg = ascended_operator_avg(m, h, pars, :none)
     layer = get_layer(m, Inf)
     rho = densitymatrix(m, Inf)
     grad = stiefel_gradient(havg, rho, layer, pars; kwargs...)

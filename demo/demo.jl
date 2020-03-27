@@ -26,6 +26,8 @@ function parse_pars()
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
+                    , "--havg_depth", arg_type=Int, default=10
+                    , "--havg_eps", arg_type=Float64, default=1e-12
                     , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -58,7 +60,8 @@ function main()
 
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
-    havg_depth = 10
+    havg_depth = pars[:havg_depth]
+    havg_eps = pars[:havg_eps]
     pars[:initial_opt_pars] = Dict(:method => method,
                                    :retraction => retraction,
                                    :transport => transport,
@@ -66,6 +69,7 @@ function main()
                                    :maxiter => 30,
                                    :isometries_only_iters => 10,
                                    :havg_depth => havg_depth,
+                                   :havg_eps => havg_eps,
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
                                    :isometry_iters => 1,
@@ -82,6 +86,7 @@ function main()
                                :maxiter => 50,
                                :isometries_only_iters => 0,
                                :havg_depth => havg_depth,
+                               :havg_eps => havg_eps,
                                :layer_iters => 1,
                                :disentangler_iters => 1,
                                :isometry_iters => 1,
@@ -97,6 +102,7 @@ function main()
                                  :maxiter => 300,
                                  :isometries_only_iters => 0,
                                  :havg_depth => havg_depth,
+                                 :havg_eps => havg_eps,
                                  :layer_iters => 1,
                                  :disentangler_iters => 1,
                                  :isometry_iters => 1,
