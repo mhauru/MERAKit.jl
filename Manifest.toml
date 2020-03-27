@@ -78,9 +78,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[FileIO]]
 deps = ["Pkg"]
-git-tree-sha1 = "250ac7dfd54b5ce47372505b392756633d4e9732"
+git-tree-sha1 = "3d7cb2c4c850439f19c4d6d3fbe1dce6481cddb1"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.2.3"
+version = "1.2.4"
 
 [[GPUArrays]]
 deps = ["AbstractFFTs", "Adapt", "LinearAlgebra", "Printf", "Random", "Serialization"]
@@ -105,9 +105,9 @@ version = "0.1.12"
 
 [[KrylovKit]]
 deps = ["LinearAlgebra", "Printf"]
-git-tree-sha1 = "e600ea547c07d3b2c42d72da8ae808cb7d833714"
+git-tree-sha1 = "8889c47e308f49184fabb0efdfaa105067e74074"
 uuid = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
-version = "0.4.1"
+version = "0.4.2"
 
 [[LLVM]]
 deps = ["CEnum", "Libdl", "Printf", "Unicode"]
@@ -134,10 +134,10 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[MacroTools]]
-deps = ["DataStructures", "Markdown", "Random"]
-git-tree-sha1 = "07ee65e03e28ca88bc9a338a3726ae0c3efaa94b"
+deps = ["Markdown", "Random"]
+git-tree-sha1 = "f7d2e3f654af75f01ec49be82c231c382214223a"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.5.4"
+version = "0.5.5"
 
 [[Markdown]]
 deps = ["Base64"]
@@ -154,7 +154,7 @@ version = "0.6.6"
 
 [[OptimKit]]
 deps = ["LinearAlgebra", "Printf"]
-git-tree-sha1 = "7beb52fade671c207185251d72ee4017e68639dd"
+git-tree-sha1 = "383bb795b30b58b55d5612a1e79c994e4441b13b"
 repo-rev = "master"
 repo-url = "https://github.com/Jutho/OptimKit.jl"
 uuid = "77e91f04-9b3b-57a6-a776-40b61faaebe0"
