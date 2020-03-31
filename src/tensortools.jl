@@ -163,8 +163,9 @@ end
 pad_with_zeros_to(t::TensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
 
 """
-Inner product of two tensors as tangents on a Stiefel manifold. The first argument is the
-point on the manifold that we are at, the next two are the tangent vectors.
+Inner product of two tensors as tangents on a Stiefel manifold, using the canonical metric
+of the manifold. The first argument is the point on the manifold that we are at, the next
+two are the tangent vectors.
 """
 function stiefel_inner(t::TensorMap, t1::TensorMap, t2::TensorMap)
     # TODO Could write a faster version for unitaries, where the two terms are the same.
@@ -174,6 +175,28 @@ function stiefel_inner(t::TensorMap, t1::TensorMap, t2::TensorMap)
     inner = tr(t1'*t2) - 0.5*tr(a1'*a2)
     return inner
 end
+
+"""
+The Euclidean inner product, aka Hilbert-Schmidt inner product, of two tensors. The first
+argument is the point on the Stiefel manifold that we are at, and is simply ignored.
+"""
+euclidean_inner(t::TensorMap, t1::TensorMap, t2::TensorMap) = tr(t1'*t2)
+
+"""
+Project the tensor `t1` onto the Stiefel tangent space at point `t`, with an orthogonal
+projection according to the Euclidean metric.
+"""
+function stiefel_projection_euclidean(t::AbstractTensorMap, t1::AbstractTensorMap)
+    tt1 = t'*t1
+    sym = 0.5*(tt1 + tt1')
+    return t1 - t*sym
+end
+
+"""
+Project the tensor `t1` onto the Stiefel tangent space at point `t`, with an orthogonal
+projection according to the canonical metric.
+"""
+stiefel_projection_canonical(t::AbstractTensorMap, t1::AbstractTensorMap) = t1 - t*(t1'*t)
 
 """
 Starting from the point `u` on a Stiefel manifold of unitary matrices, travel along the

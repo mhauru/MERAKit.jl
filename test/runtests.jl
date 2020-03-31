@@ -245,6 +245,7 @@ function test_optimization(meratype, spacetype, method)
                 :isometry_iters => 1,
                 :retraction => :cayley,
                 :transport => :cayley,
+                :metric => :canonical,
                 :lbfgs_m => 8,
                 :ls_epsilon => 1e-2,
                 :verbosity => 1)
@@ -263,7 +264,7 @@ end
 """
 Test gradients and retraction.
 """
-function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
+function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     morig = random_MERA(meratype, spaces; random_disentangler=true)
@@ -275,10 +276,19 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract)
     ham = ham + ham'
     eye = id(V)
 
-    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10)
+    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10, :metric => metric)
 
+    can_inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
+    euc_inner(m, x, y) = 2*real(euclidean_inner(m, x, y))
+    if pars[:metric] === :canonical
+        inner = can_inner
+    elseif pars[:metric] === :euclidean
+        inner = euc_inner
+    else
+        msg = "Unknown metric $(pars[:metric])."
+        throw(ArgumentError(msg))
+    end
     fg(x) = (expect(ham, x), stiefel_gradient(ham, x, pars))
-    inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
 
@@ -327,7 +337,7 @@ end
 Test the isometric Cayley parallel transport from
 http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf
 """
-function test_cayley_transport(meratype, spacetype)
+function test_cayley_transport(meratype, spacetype, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     m = random_MERA(meratype, spaces; random_disentangler=true)
@@ -339,7 +349,7 @@ function test_cayley_transport(meratype, spacetype)
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
 
-    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10)
+    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10, :metric => metric)
 
     retract = cayley_retract
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
@@ -394,16 +404,23 @@ end
 @testset "Reset storage" begin
     test_with_all_types(test_reset_storage, meratypes, spacetypes)
 end
-@testset "Stiefel gradient and Cayley retraction" begin
+@testset "Stiefel gradient and Cayley retraction, canonical metric" begin
     test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
-                        cayley_retract)
+                        cayley_retract, :canonical)
+end
+@testset "Stiefel gradient and Cayley retraction, Euclidean metric" begin
+    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
+                        cayley_retract, :euclidean)
 end
 @testset "Stiefel gradient and Stiefel geodesic retraction" begin
     test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
-                        stiefel_geodesic)
+                        stiefel_geodesic, :canonical)
 end
-@testset "Cayley parallel transport" begin
-    test_with_all_types(test_cayley_transport, meratypes, spacetypes)
+@testset "Cayley parallel transport, canonical metric" begin
+    test_with_all_types(test_cayley_transport, meratypes, spacetypes, :canonical)
+end
+@testset "Cayley parallel transport, Euclidean metric" begin
+    test_with_all_types(test_cayley_transport, meratypes, spacetypes, :euclidean)
 end
 @testset "Optimization E-V" begin
     test_with_all_types((mt, st) -> test_optimization(mt, st, :ev), meratypes, spacetypes)

@@ -275,9 +275,14 @@ function stiefel_gradient(h, rho, layer::ModifiedBinaryLayer, pars; vary_disenta
     u, wl, wr = layer
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    ugrad = uenv - u * (uenv' * u)
-    wlgrad = wlenv - wl * (wlenv' * wl)
-    wrgrad = wrenv - wr * (wrenv' * wr)
+    if pars[:metric] === :canonical
+        projection = stiefel_projection_canonical
+    elseif pars[:metric] === :euclidean
+        projection = stiefel_projection_euclidean
+    end
+    ugrad = projection(u, uenv)
+    wlgrad = projection(wl, wlenv)
+    wrgrad = projection(wr, wrenv)
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
 end
 

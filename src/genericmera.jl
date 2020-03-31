@@ -554,12 +554,12 @@ end
 
 # TODO Understand better the issue of exponential weights vs no weights. As I see it now, no
 # weights is the correct thing when evaluating a gradient. Because the ascended h soon
-# becomes the dominant eigenvector of the ascending superoperator, the contributions after a
-# few layers are orthogonal to the optimization manifold, and thus the gradient vector is
-# unchanged by them. The exponential weights are just an ad hoc trick for E-V. If this
-# understanding is correct, change the structure of how this is computed, so that for
-# instance pars[:havg_eps] actually has an effect when evaluating a gradient. Probably also
-# change the arguments that this function takes, and update the docstring.
+# becomes the dominant eigenvector of the ascending superoperator (the identity), the
+# contributions after a few layers are orthogonal to the optimization manifold, and thus the
+# gradient vector is unchanged by them. The exponential weights are just an ad hoc trick for
+# E-V. If this understanding is correct, change the structure of how this is computed, so
+# that for instance pars[:havg_eps] actually has an effect when evaluating a gradient.
+# Probably also change the arguments that this function takes, and update the docstring.
 """
 TODO This docstring is out-of-date.
 Return the sum of the ascended versions of `op` in the scale invariant part of the MERA,
@@ -580,7 +580,8 @@ function ascended_operator_avg(m::GenericMERA, op, pars, weight=:none)
     # urgent though, given how subleading this whole thing is in bond dimension.
     for l in 1:pars[:havg_depth]
         old_opavg = opavg
-        push!(ops, ascended_operator(m, op, nt+l))
+        op_l = ascended_operator(m, op, nt+l)
+        push!(ops, op_l)
         if weight === :exponential
             # Normalization factors for each term. The last one gets multiplied by
             # series_sum, since the assumption is that from l onwards all the ascended
@@ -842,6 +843,13 @@ function stiefel_inner(m::T, m1::T, m2::T) where T <: GenericMERA
     return inner
 end
 
+function euclidean_inner(m::T, m1::T, m2::T) where T <: GenericMERA
+    n = max(num_translayers(m1), num_translayers(m2)) + 1
+    inner = sum([euclidean_inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i))
+                 for i in 1:n])
+    return inner
+end
+
 function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     nt = num_translayers(m)
     layers = []
@@ -920,7 +928,16 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
         throw(ArgumentError(msg))
     end
 
-    inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
+    can_inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
+    euc_inner(m, x, y) = 2*real(euclidean_inner(m, x, y))
+    if pars[:metric] === :canonical
+        inner = can_inner
+    elseif pars[:metric] === :euclidean
+        inner = euc_inner
+    else
+        msg = "Unknown metric $(pars[:metric])."
+        throw(ArgumentError(msg))
+    end
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
     linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])

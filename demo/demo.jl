@@ -24,6 +24,7 @@ function parse_pars()
                     , "--method", arg_type=Symbol, default=:lbfgs
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
+                    , "--metric", arg_type=Symbol, default=:canonical
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
                     , "--havg_depth", arg_type=Int, default=10
@@ -51,6 +52,7 @@ function main()
     method = pars[:method]
     retraction = pars[:retraction]
     transport = pars[:transport]
+    metric = pars[:metric]
 
     logstr = "Running demo.jl with"
     for (k, v) in pars
@@ -65,6 +67,7 @@ function main()
     pars[:initial_opt_pars] = Dict(:method => method,
                                    :retraction => retraction,
                                    :transport => transport,
+                                   :metric => metric,
                                    :gradient_delta => 1e-5,
                                    :maxiter => 30,
                                    :isometries_only_iters => 10,
@@ -82,6 +85,7 @@ function main()
     pars[:mid_opt_pars] = Dict(:method => method,
                                :retraction => retraction,
                                :transport => transport,
+                               :metric => metric,
                                :gradient_delta => 1e-5,
                                :maxiter => 50,
                                :isometries_only_iters => 0,
@@ -98,6 +102,7 @@ function main()
     pars[:final_opt_pars] = Dict(:method => method,
                                  :retraction => retraction,
                                  :transport => transport,
+                                 :metric => metric,
                                  :gradient_delta => 1e-7,
                                  :maxiter => 300,
                                  :isometries_only_iters => 0,

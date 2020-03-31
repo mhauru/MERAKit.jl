@@ -27,6 +27,7 @@ function parse_pars()
                     , "--method", arg_type=Symbol, default=:lbfgs
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
+                    , "--metric", arg_type=Symbol, default=:canonical
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
                     , "--havg_depth", arg_type=Int, default=10
@@ -60,6 +61,7 @@ function main()
     opt_pars = Dict(:method => pars[:method],
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
+                    :metric => pars[:metric],
                     :gradient_delta => 1e-15,
                     :maxiter => 500,
                     :isometries_only_iters => 0,

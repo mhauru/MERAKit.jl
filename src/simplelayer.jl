@@ -44,6 +44,10 @@ function stiefel_inner(l::T, l1::T, l2::T) where T <: SimpleLayer
     return sum((stiefel_inner(t...) for t in zip(l, l1, l2)))
 end
 
+function euclidean_inner(l::T, l1::T, l2::T) where T <: SimpleLayer
+    return sum((euclidean_inner(t...) for t in zip(l, l1, l2)))
+end
+
 function cayley_retract(l::T, ltan::T, alpha::Number) where T <: SimpleLayer
     ts_and_ttans = [cayley_retract(t..., alpha) for t in zip(l, ltan)]
     ts, ttans = zip(ts_and_ttans...)

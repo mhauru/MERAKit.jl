@@ -112,8 +112,13 @@ function stiefel_gradient(h, rho, layer::TernaryLayer, pars; vary_disentanglers=
     u, w = layer
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    ugrad = uenv - u * (uenv' * u)
-    wgrad = wenv - w * (wenv' * w)
+    if pars[:metric] === :canonical
+        projection = stiefel_projection_canonical
+    elseif pars[:metric] === :euclidean
+        projection = stiefel_projection_euclidean
+    end
+    ugrad = projection(u, uenv)
+    wgrad = projection(w, wenv)
     return TernaryLayer(ugrad, wgrad)
 end
 

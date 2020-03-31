@@ -27,7 +27,8 @@ export pseudoserialize, depseudoserialize
 export reset_storage!, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
 export istangent
-export stiefel_geodesic, stiefel_gradient, stiefel_inner, cayley_retract, cayley_transport
+export stiefel_geodesic, stiefel_gradient, stiefel_inner, euclidean_inner
+export cayley_retract, cayley_transport
 
 include("tensortools.jl")
 include("genericmera.jl")
