@@ -312,7 +312,7 @@ Expand the bond dimension of the MERA at the given depth. `depth=1` is the first
 level, just above the first layer of the MERA, and the numbering grows from there. The new
 bond dimension is given by `newdims`, which for a non-symmetric MERA is just a number, and
 for a symmetric MERA is a dictionary of {irrep => block dimension}. Not all irreps for a
-bond need to be listed, the once left out are left untouched.
+bond need to be listed, the ones left out are left untouched.
 
 The expansion is done by padding tensors with zeros. Note that this breaks isometricity of
 the individual tensors. This is however of no consequence, since the MERA as a state remains
