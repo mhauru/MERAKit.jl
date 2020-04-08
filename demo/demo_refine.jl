@@ -24,7 +24,7 @@ function parse_pars()
                     , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--datasuffix", arg_type=String, default=""
-                    , "--method", arg_type=Symbol, default=:lbfgs
+                    , "--method", arg_type=Symbol, default=:ev
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--metric", arg_type=Symbol, default=:canonical
