@@ -84,16 +84,16 @@ end
 
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
-(default), it is the identity.
+The optionalargument `Vint` is the output bond dimension of the disentangler. If
+`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
+it is the identity or the product of two single-site isometries, depending on if `u` is
+supposed to be unitary or isometric. `T` is the data type for the tensors, by default
+`ComplexF64`.
 """
-function randomlayer(::Type{BinaryLayer}, Vin, Vout; random_disentangler=false,
+function randomlayer(::Type{BinaryLayer}, Vin, Vout, Vint=Vout; random_disentangler=false,
                      T=ComplexF64)
-    ufunc(o, i) = (random_disentangler ?
-                   randomisometry(o, i, T) :
-                   T <: Complex ? complex(isomorphism(o, i)) : isomorphism(o, i))
-    u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
-    w = randomisometry(Vout ⊗ Vout, Vin)
+    w = randomisometry(Vint ⊗ Vint, Vin, T)
+    u = initialize_disentangler(Vout, Vint, random_disentangler, T)
     return BinaryLayer(u, w)
 end
 
@@ -105,8 +105,8 @@ function stiefel_gradient(h, rho, layer::BinaryLayer, pars; vary_disentanglers=t
     else
         # TODO We could save some subleading computations by not running the whole machinery
         # when uenv .== 0, but this implementation is much simpler.
-        V = outputspace(layer)
-        uenv = TensorMap(zeros, eltype(layer), V ⊗ V ← V ⊗ V)
+        u = layer.disentangler
+        uenv = TensorMap(zeros, eltype(layer), codomain(u) ← domain(u))
     end
     wenv = environment_isometry(h, layer, rho)
     u, w = layer
@@ -123,7 +123,7 @@ function stiefel_gradient(h, rho, layer::BinaryLayer, pars; vary_disentanglers=t
 end
 
 function stiefel_geodesic(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
-    u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
+    u, utan = stiefel_geodesic_isometry(l.disentangler, ltan.disentangler, alpha)
     w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
     return BinaryLayer(u, w), BinaryLayer(utan, wtan)
 end

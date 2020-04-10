@@ -35,7 +35,7 @@ function random_space(::Type{ComplexSpace}, dlow=1, dhigh=8)
 end
 
 """
-Generate layers for a MERA of `meratype`, with `n` layers, and `T` vector space type.
+Generate vector spaces for a MERA of `meratype`, with `n` layers, and `T` vector space type.
 """
 function random_layerspaces(T, meratype, n, dlow=3, dhigh=6)
     width = causal_cone_width(meratype)
@@ -57,6 +57,33 @@ function random_layerspaces(T, meratype, n, dlow=3, dhigh=6)
 end
 
 """
+Generate vector spaces for the layer-internal indices of a MERA of `meratype`, that has
+`extspaces` as its interlayer spaces.
+"""
+function random_internalspaces(extspaces, meratype)
+    width = (meratype == TernaryMERA ? 3 :
+             meratype in (BinaryMERA, ModifiedBinaryMERA) ? 2 : nothing)
+    intspaces = []
+    for i in 1:length(extspaces)
+        Vext = fuse(extspaces[i])  # The fuse just removes nested product state structure.
+        Vnext = i == length(extspaces) ? Vext : extspaces[i+1]
+        sects = Dict()
+        for s in sectors(Vext)
+            d = dim(Vext, s)
+            rand(Bool) && d > 1 && (d = d - 1)
+            sects[s] = d
+        end
+        Vint = spacetype(Vext)(sects...)
+        # Check that we didn't accidentally make the isometric part non-isometric. If we
+        # did, just make Vint = Vext.
+        Vint_fusion = fuse(reduce(⊗, repeat([Vint], width)))
+        min(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
+        push!(intspaces, Vint)
+    end
+    return intspaces
+end
+
+"""
 For each layer, generate a random operator above and below it (not necessarily Hermitian),
 and confirm that ascending the lower or descending the upper one both lead to the same
 expectation value (trace of product).
@@ -64,7 +91,8 @@ expectation value (trace of product).
 function test_ascend_and_descend(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     width = causal_cone_width(meratype)
 
     for i in 1:layers
@@ -89,7 +117,8 @@ evaluate it at.
 function test_expectation_of_identity(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     eye = id(V)
     for i in 1:(layers+1)
@@ -104,7 +133,8 @@ that we evaluate it at.
 function test_expectation_evalscale(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -122,7 +152,8 @@ value of a random Hermitian operator.
 function test_pseudoserialization(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -140,7 +171,8 @@ Hermitian operator.
 function test_expand_bonddim(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -161,7 +193,8 @@ operator.
 function test_release_layer(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -178,7 +211,8 @@ symmetry structure, and confirm that the expectation value hasn't changed.
 function test_remove_symmetry(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -196,7 +230,8 @@ symmetry structure, and confirm that the expectation value hasn't changed.
 function test_reset_storage(meratype, spacetype)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
@@ -255,7 +290,9 @@ function test_optimization(meratype, spacetype, method)
     V = domain(op)
     ham = -reduce(⊗, repeat([op], width))
     spaces = random_layerspaces(spacetype, meratype, layers-1, dlow, dhigh)
-    m = random_MERA(meratype, (V, spaces...))
+    spaces = (V, spaces...)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces)
     m = minimize_expectation!(m, ham, pars)
     expectation = expect(ham, m)
     @test abs(expectation + 1.0) < eps
@@ -267,7 +304,8 @@ Test gradients and retraction.
 function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    morig = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    morig = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
 
     width = causal_cone_width(meratype)
     V = outputspace(morig, 1)
@@ -340,7 +378,8 @@ http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf
 function test_cayley_transport(meratype, spacetype, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
-    m = random_MERA(meratype, spaces; random_disentangler=true)
+    intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
 
     width = causal_cone_width(meratype)
     V = outputspace(m, 1)

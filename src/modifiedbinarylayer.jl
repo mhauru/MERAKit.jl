@@ -109,19 +109,20 @@ end
 
 """
 Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-If `random_disentangler=true`, the disentangler is also a random unitary, if `false`
-(default), it is the identity.
+The optionalargument `Vint` is the output bond dimension of the disentangler. If
+`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
+it is the identity or the product of two single-site isometries, depending on if `u` is
+supposed to be unitary or isometric. `T` is the data type for the tensors, by default
+`ComplexF64`.
 """
-function randomlayer(::Type{ModifiedBinaryLayer}, Vin, Vout; random_disentangler=false,
-                     T=ComplexF64)
-    ufunc(o, i) = (random_disentangler ?
-                   randomisometry(o, i, T) :
-                   T <: Complex ? complex(isomorphism(o, i)) : isomorphism(o, i))
-    u = ufunc(Vout ⊗ Vout, Vout ⊗ Vout)
-    wl = randomisometry(Vout ⊗ Vout, Vin)
+function randomlayer(::Type{ModifiedBinaryLayer}, Vin, Vout, Vint=Vout;
+                     random_disentangler=false, T=ComplexF64)
+    wl = randomisometry(Vout ⊗ Vint, Vin, T)
     # We make the initial guess be reflection symmetric, since that's often true of the
-    # desired MERA too.
+    # desired MERA too (at least if random_disentangler is false, but we do it every time
+    # any way).
     wr = deepcopy(permute(wl, (2,1), (3,)))
+    u = initialize_disentangler(Vout, Vint, random_disentangler, T)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
@@ -267,8 +268,8 @@ function stiefel_gradient(h, rho, layer::ModifiedBinaryLayer, pars; vary_disenta
     else
         # TODO We could save some subleading computations by not running the whole machinery
         # when uenv .== 0, but this implementation is much simpler.
-        V = outputspace(layer)
-        uenv = TensorMap(zeros, eltype(layer), V ⊗ V ← V ⊗ V)
+        u = layer.disentangler
+        uenv = TensorMap(zeros, eltype(layer), codomain(u) ← domain(u))
     end
     wlenv = environment_isometry_left(h, layer, rho)
     wrenv = environment_isometry_right(h, layer, rho)
@@ -287,7 +288,7 @@ function stiefel_gradient(h, rho, layer::ModifiedBinaryLayer, pars; vary_disenta
 end
 
 function stiefel_geodesic(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer, alpha::Number)
-    u, utan = stiefel_geodesic_unitary(l.disentangler, ltan.disentangler, alpha)
+    u, utan = stiefel_geodesic_isometry(l.disentangler, ltan.disentangler, alpha)
     wl, wltan = stiefel_geodesic_isometry(l.isometry_left, ltan.isometry_left, alpha)
     wr, wrtan = stiefel_geodesic_isometry(l.isometry_right, ltan.isometry_right, alpha)
     return ModifiedBinaryLayer(u, wl, wr), ModifiedBinaryLayer(utan, wltan, wrtan)
@@ -317,11 +318,7 @@ function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::Modified
     matching_bonds = [(space(wl, 3)', space(unext, 1)),
                       (space(wl, 3)', space(unext, 2)),
                       (space(wr, 3)', space(unext, 1)),
-                      (space(wr, 3)', space(unext, 2)),
-                      (space(wr, 3)', space(wlnext, 1)),
-                      (space(wr, 3)', space(wrnext, 2)),
-                      (space(wl, 3)', space(wlnext, 1)),
-                      (space(wl, 3)', space(wrnext, 2))]
+                      (space(wr, 3)', space(unext, 2))]
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end

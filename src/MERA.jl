@@ -18,7 +18,7 @@ export get_layer, get_disentangler, get_isometry, num_translayers
 export outputspace, inputspace
 export causal_cone_width, scalefactor
 export densitymatrix, densitymatrices, densitymatrix_entropies
-export random_MERA, randomlayer!, randomizelayer!
+export random_MERA
 export scalingdimensions
 export release_transitionlayer!, expand_bonddim!
 export expect

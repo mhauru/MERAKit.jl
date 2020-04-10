@@ -257,42 +257,25 @@ end
 # # # Generating random MERAs
 
 """
-Replace the layer at the given depth with a random one. Additional keyword arguments are
-passed to the function that generates the random layer, the details of which depend on the
-specific layer type (binary, ternary, ...).
-"""
-function randomizelayer!(m::GenericMERA{T}, depth; kwargs...) where T
-    Vin = inputspace(m, depth)
-    Vout = outputspace(m, depth)
-    layer = randomlayer(T, Vin, Vout; kwargs...)
-    set_layer!(m, layer, depth)
-    return m
-end
-
-"""
-Generate a random MERA of type `T`, with `V` as the vector space of all layers, and with
-`num_layers` as the number of different layers (including the scale invariant one).
-Additional keyword arguments are passed on to the function that generates a single random
-layer.
-"""
-function random_MERA(::Type{T}, V, num_layers; kwargs...) where T <: GenericMERA
-    Vs = repeat([V], num_layers)
-    return random_MERA(T, Vs; kwargs...)
-end
-
-"""
 Generate a random MERA of type `T`, with `Vs` as the vector spaces of the various layers.
 Number of layers will be the length of `Vs`, the `Vs[1]` will be the physical index space,
-and `Vs[end]` will be the one at the scale invariant layer.  Additional keyword arguments
-are passed on to the function that generates a single random layer.
+and `Vs[end]` will be the one at the scale invariant layer. An additional positional
+argument `Ws` can be a vector/tuple of the same length as `Vs`, and contain additional
+parameters passed to the constructor for each layer, e.g. additional intralayer bond
+dimension. Also passed to the constructor for individual layers will be any additional
+keyword arguments, but these will all be the same for each layer.
 """
-function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
+function random_MERA(::Type{T}, Vs, Ws=nothing; kwargs...) where T <: GenericMERA
     num_layers = length(Vs)
     layers = []
     for i in 1:num_layers
         V = Vs[i]
         Vnext = (i < num_layers ? Vs[i+1] : V)
-        layer = randomlayer(layertype(T), Vnext, V; kwargs...)
+        if Ws === nothing
+            layer = randomlayer(layertype(T), Vnext, V; kwargs...)
+        else
+            layer = randomlayer(layertype(T), Vnext, V, Ws[i]; kwargs...)
+        end
         push!(layers, layer)
     end
     m = T(layers)
@@ -300,10 +283,11 @@ function random_MERA(::Type{T}, Vs; kwargs...) where T <: GenericMERA
 end
 
 """
-Return a MERA layer with random tensors. The first argument is the Layer type, and the
-second and third are the input and output spaces. May take further keyword arguments
-depending on the Layer type. Each subtype of Layer should have its own method for this
-function.
+Return a MERA layer with random tensors. The signature looks like this:
+randomlayer(::Type{T}, Vin, Vout, W=nothing; kwargs...) where T <: Layer The first argument
+is the `Layer` type, and the second and third are the input and output spaces. `W` and
+`kwargs...` may contain any extra data needed, that depends on which layer type this is for.
+Each subtype of `Layer` should have its own method for this function.
 """
 function randomlayer end
 

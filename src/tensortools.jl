@@ -22,6 +22,26 @@ function randomisometry(Vout, Vin, T=ComplexF64; symmetry_permutation=nothing)
 end
 
 """
+Create a 2-to-2 disentangler, from `Vin ⊗ Vin` to `Vout ⊗ Vout`. The arguments `random` and
+`T` set whether the disentangler should be a random isometry or the identity, and what its
+element type should be.
+"""
+function initialize_disentangler(Vout, Vin, random, T)
+    if random
+        u = randomisometry(Vout ⊗ Vout, Vin ⊗ Vin, T)
+    else
+        if Vin == Vout
+            u = isomorphism(Vout ⊗ Vout, Vin ⊗ Vin)
+            T <: Complex && (u = complex(u))
+        else
+            uhalf = randomisometry(Vout, Vin, T)
+            u = uhalf ⊗ uhalf
+        end
+    end
+    return u
+end
+
+"""
 Return the number of sites/indices `m` that an operator is supported on, assuming it is an
 operator from `m` sites to `m` sites.
 """
@@ -233,6 +253,11 @@ See page 14 of https://www.cis.upenn.edu/~cis515/Stiefel-Grassmann-manifolds-Ede
 how this is done.
 """
 function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
+    # TODO This probably isn't the fastest way of doing things, but for the time being, to
+    # deal with disentanglers as isometries:
+    domain_fuser = isomorphism(domain(w), fuse(domain(w)))
+    w = w * domain_fuser
+    wtan = wtan * domain_fuser
     a = w' * wtan
     # In a perfect world, a is already skew-symmetric, but for numerical errors we enforce
     # that.
@@ -253,6 +278,8 @@ function stiefel_geodesic_isometry(w::TensorMap, wtan::TensorMap, alpha::Number)
     # TODO Maybe check that S is almost all ones, alert the user if it's not.
     U, S, Vt = tsvd(w_end)
     w_end = U*Vt
+    w_end = w_end * domain_fuser'
+    wtan_end = wtan_end * domain_fuser'
     return w_end, wtan_end
 end
 
