@@ -60,6 +60,8 @@ causal_cone_width(::Type{TernaryLayer}) = 2
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
+internalspace(layer::TernaryLayer) = space(layer.isometry, 1)
+internalspace(m::TernaryMERA, depth) = internalspace(get_layer(m, depth))
 
 """
 Return a new layer where the isometries have been padded with zeros to change the top vector
@@ -77,8 +79,19 @@ change the bottom vector space to be V_new.
 """
 function expand_outputspace(layer::TernaryLayer, V_new)
     u, w = layer
-    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
-    w = pad_with_zeros_to(w, 1 => V_new, 2 => V_new, 3 => V_new)
+    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
+    w = pad_with_zeros_to(w, 2 => V_new)
+    return TernaryLayer(u, w)
+end
+
+"""
+Return a new layer where the disentanglers and isometries have been padded with zeros to
+change the internal vector space to be V_new.
+"""
+function expand_internalspace(layer::TernaryLayer, V_new)
+    u, w = layer
+    u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
+    w = pad_with_zeros_to(w, 1 => V_new, 3 => V_new)
     return TernaryLayer(u, w)
 end
 

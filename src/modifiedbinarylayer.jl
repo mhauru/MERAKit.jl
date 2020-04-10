@@ -83,6 +83,8 @@ causal_cone_width(::Type{ModifiedBinaryLayer}) = 2
 
 outputspace(layer::ModifiedBinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::ModifiedBinaryLayer) = space(layer.isometry_left, 3)'
+internalspace(layer::ModifiedBinaryLayer) = space(layer.isometry_right, 1)
+internalspace(m::ModifiedBinaryMERA, depth) = internalspace(get_layer(m, depth))
 
 """
 Return a new layer where the isometries have been padded with zeros to change the input
@@ -101,9 +103,21 @@ change the output (bottom) vector space to be V_new.
 """
 function expand_outputspace(layer::ModifiedBinaryLayer, V_new)
     u, wl, wr = layer
-    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
-    wl = pad_with_zeros_to(wl, 1 => V_new, 2 => V_new)
-    wr = pad_with_zeros_to(wr, 1 => V_new, 2 => V_new)
+    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
+    wl = pad_with_zeros_to(wl, 1 => V_new)
+    wr = pad_with_zeros_to(wr, 2 => V_new)
+    return ModifiedBinaryLayer(u, wl, wr)
+end
+
+"""
+Return a new layer where the disentanglers and isometries have been padded with zeros to
+change the internal vector space to be V_new.
+"""
+function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
+    u, wl, wr = layer
+    u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
+    wl = pad_with_zeros_to(wl, 2 => V_new)
+    wr = pad_with_zeros_to(wr, 1 => V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 

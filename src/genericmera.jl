@@ -325,6 +325,28 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
 end
 
 """
+Expand the bond dimension of the layer-internal indices of the MERA at the given depth. The
+new bond dimension is given by `newdims`, which for a non-symmetric MERA is just a number,
+and for a symmetric MERA is a dictionary of {irrep => block dimension}. Not all irreps for a
+bond need to be listed, the ones left out are left untouched.
+
+The expansion is done by padding tensors with zeros. Note that this breaks isometricity of
+the individual tensors. This is however of no consequence, since the MERA as a state remains
+exactly the same. A round of optimization on the MERA will restore isometricity of each
+tensor.
+
+Note that not all MERAs have an internal bond dimension, and some may have several, so this
+function will not make sense for all MERA types.
+"""
+function expand_internal_bonddim!(m::GenericMERA, depth, newdims)
+    V = internalspace(m, depth)
+    V = expand_vectorspace(V, newdims)
+    layer = get_layer(m, depth)
+    layer = expand_internalspace(layer, V)
+    set_layer!(m, layer, depth)
+end
+
+"""
 Return a new layer where the tensors have been padded with zeros as necessary to change the
 input space. The first argument is the layer, the second one is the new input space. Each
 subtype of Layer should have its own method for this function.

@@ -177,10 +177,21 @@ function test_expand_bonddim(meratype, spacetype)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
     expectation = expect(randomop, m)
+
+    # Expand the interlayer spaces, check that expectation value is preserved.
     for i in 1:(layers-1)
         V = inputspace(m, i)
         newdims = Dict(s => dim(V, s)+1 for s in sectors(V))
         m = expand_bonddim!(m, i, newdims)
+    end
+    new_expectation = expect(randomop, m)
+    @test new_expectation ≈ expectation
+
+    # Expand the intralayer spaces, check that expectation value is preserved.
+    for i in 1:(layers-1)
+        V = internalspace(m, i)
+        newdims = Dict(s => dim(V, s)+1 for s in sectors(V))
+        m = expand_internal_bonddim!(m, i, newdims)
     end
     new_expectation = expect(randomop, m)
     @test new_expectation ≈ expectation

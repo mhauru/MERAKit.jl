@@ -60,6 +60,8 @@ causal_cone_width(::Type{BinaryLayer}) = 3
 
 outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
+internalspace(layer::BinaryLayer) = space(layer.isometry, 1)
+internalspace(m::BinaryMERA, depth) = internalspace(get_layer(m, depth))
 
 """
 Return a new layer where the isometries have been padded with zeros to change the input
@@ -77,7 +79,17 @@ change the output (bottom) vector space to be V_new.
 """
 function expand_outputspace(layer::BinaryLayer, V_new)
     u, w = layer
-    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new, 3 => V_new', 4 => V_new')
+    u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
+    return BinaryLayer(u, w)
+end
+
+"""
+Return a new layer where the disentanglers and isometries have been padded with zeros to
+change the internal vector space to be V_new.
+"""
+function expand_internalspace(layer::BinaryLayer, V_new)
+    u, w = layer
+    u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
     w = pad_with_zeros_to(w, 1 => V_new, 2 => V_new)
     return BinaryLayer(u, w)
 end
