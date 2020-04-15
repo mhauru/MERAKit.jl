@@ -171,6 +171,9 @@ end
 
 Base.eltype(op::ModifiedBinaryOp) = reduce(promote_type, map(eltype, op))
 Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(deepcopy, op)...)
+Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(adjoint, op)...)
+Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(imag, op)...)
+Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(real, op)...)
 
 support(op::ModifiedBinaryOp) = support(op.mid)  # Could equally well be op.gap.
 function expand_support(op::ModifiedBinaryOp, n::Integer)
@@ -184,6 +187,10 @@ function Base.similar(op::ModifiedBinaryOp, element_type=eltype(op))
     gap = similar(op.gap, element_type)
     return ModifiedBinaryOp(mid, gap)
 end
+
+TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
+TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
+TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
 
 # Pass element-wise arithmetic down onto the TensorMaps. Promote TensorMaps to
 # ModifiedBinaryOps if necessary.
