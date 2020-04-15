@@ -26,12 +26,18 @@ struct GenericMERA{T}
     layers::Vector{T}
     stored_densitymatrices::Vector
     stored_operators::Dict{Any, Vector}
+    # previous_fixedpoint_densitymatrix will only ever store one value, but we store it in a
+    # Vector, since that matches with the rest of the storage format and keeps GenericMERA
+    # immutable.
+    previous_fixedpoint_densitymatrix::Vector
     # Prevent the creation of GenericMERA{T} objects when T is not a subtype of Layer.
     function GenericMERA{T}(layers) where T <: Layer
         num_layers = length(layers)
         stored_densitymatrices = Vector{Any}(repeat([nothing], num_layers))
         stored_operators = Dict{Any, Vector}()
-        new(collect(layers), stored_densitymatrices, stored_operators)
+        previous_fixedpoint_densitymatrix = Any[nothing]
+        new(collect(layers), stored_densitymatrices, stored_operators,
+            previous_fixedpoint_densitymatrix)
     end
 end
 
@@ -485,13 +491,21 @@ end
 """
 Find the fixed point density matrix of the scale invariant part of the MERA.
 """
-function fixedpoint_densitymatrix(m::GenericMERA)
+function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
+    # If we have stored the previous fixed point density matrix, and it has the right
+    # dimensions, use that as the initial guess. Else, use a thermal density matrix.
     x0 = thermal_densitymatrix(m, Inf)
-    vals, vecs, info = eigsolve(f, x0)
+    old_rho = m.previous_fixedpoint_densitymatrix[1]
+    if old_rho !== nothing && space(x0) == space(old_rho)
+        x0 = old_rho
+    end
+    eigsolve_pars = get(pars, :densitymatrix_eigsolve_pars, Dict())
+    vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
     rho = vecs[1]
-    # rho is Hermitian only up to a phase. Divide out that phase.
     rho /= tr(rho)
+    norm(imag(rho)) ≈ 0 && (rho = real(rho))
+    m.previous_fixedpoint_densitymatrix[1] = rho
     return rho
 end
 
@@ -502,6 +516,7 @@ an initial guess for the fixed-point density matrix.
 function thermal_densitymatrix(m::GenericMERA, depth)
     V = inputspace(m, Inf)
     width = causal_cone_width(typeof(m))
+    # TODO Specify eltype
     eye = id(V)
     rho = ⊗(repeat([eye], width)...)
     return rho
@@ -513,15 +528,15 @@ Return the density matrix right below the layer at `depth`.
 This method stores every density matrix in memory as it computes them, and fetches them from
 there if the same one is requested again.
 """
-function densitymatrix(m::GenericMERA, depth)
+function densitymatrix(m::GenericMERA, depth, pars=Dict())
     if has_densitymatrix_stored(m, depth)
         rho = get_stored_densitymatrix(m, depth)
     else
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
-            rho = fixedpoint_densitymatrix(m)
+            rho = fixedpoint_densitymatrix(m, pars)
         else
-            rho_above = densitymatrix(m, depth+1)
+            rho_above = densitymatrix(m, depth+1, pars)
             rho = descend(rho_above, m; endscale=depth, startscale=depth+1)
         end
         # Store this density matrix for future use.
@@ -534,8 +549,8 @@ end
 Return the density matrices starting for the layers from `lowest_depth` upwards up to and
 including the scale invariant one.
 """
-function densitymatrices(m::GenericMERA, lowest_depth=1)
-    rhos = [densitymatrix(m, depth) for depth in lowest_depth:num_translayers(m)+1]
+function densitymatrices(m::GenericMERA, pars=Dict())
+    rhos = [densitymatrix(m, depth, pars) for depth in 1:num_translayers(m)+1]
     return rhos
 end
 
@@ -666,8 +681,8 @@ set by `opscale`, which by default is the physical one (`opscale=1`). `evalscale
 used to set whether the operator is ascended through the network or the density matrix is
 descended.
 """
-function expect(op, m::GenericMERA; opscale=1, evalscale=1)
-    rho = densitymatrix(m, evalscale)
+function expect(op, m::GenericMERA, pars=Dict(); opscale=1, evalscale=1)
+    rho = densitymatrix(m, evalscale, pars)
     op = ascended_operator(m, op, evalscale)
     # If the operator is defined on a smaller support (number of sites) than rho, expand it.
     op = expand_support(op, support(rho))
@@ -767,8 +782,8 @@ have no default values. The different parameters are:
 function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop_firstarg,
                                   vary_disentanglers=true)
     nt = num_translayers(m)
-    expectation = normalization(expect(h, m))
-    rhos = densitymatrices(m)
+    rhos = densitymatrices(m, pars)
+    expectation = normalization(expect(h, m, pars))
     rhos_maxchange = Inf
     gradnorm = Inf
     counter = 0
@@ -782,7 +797,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         gradnorm_sq = 0
 
         for l in lowest_depth:nt
-            rho = densitymatrix(m, l+1)
+            rho = densitymatrix(m, l+1, pars)
             hl = ascended_operator(m, h, l)
             layer = get_layer(m, l)
             layer, gradnorm_layer = minimize_expectation_ev(hl, layer, rho, pars;
@@ -794,16 +809,16 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         # Special case of the translation invariant layer.
         havg = ascended_operator_avg(m, h, pars, :exponential)
         layer = get_layer(m, Inf)
-        rho = densitymatrix(m, Inf)
+        rho = densitymatrix(m, Inf, pars)
         layer, gradnorm_layer = minimize_expectation_ev(havg, layer, rho, pars;
                                                         vary_disentanglers=vary_disentanglers)
         gradnorm_sq += gradnorm_layer^2
         set_layer!(m, layer, Inf)
 
         gradnorm = normalization(sqrt(gradnorm_sq), Val(:gradient))
-        expectation = expect(h, m)
+        rhos = densitymatrices(m, pars)
+        expectation = expect(h, m, pars)
         expectation = normalization(expectation)
-        rhos = densitymatrices(m)
         if old_rhos !== nothing
             rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
@@ -861,7 +876,7 @@ function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     layers = []
     for l in 1:nt
         layer = get_layer(m, l)
-        rho = densitymatrix(m, l+1)
+        rho = densitymatrix(m, l+1, pars)
         hl = ascended_operator(m, h, l)
         grad = stiefel_gradient(hl, rho, layer, pars; kwargs...)
         push!(layers, grad)
@@ -870,7 +885,7 @@ function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     # Special case of the translation invariant layer.
     havg = ascended_operator_avg(m, h, pars, :none)
     layer = get_layer(m, Inf)
-    rho = densitymatrix(m, Inf)
+    rho = densitymatrix(m, Inf, pars)
     grad = stiefel_gradient(havg, rho, layer, pars; kwargs...)
     push!(layers, grad)
     g = T(layers)
@@ -904,7 +919,7 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
     end
 
     function fg(x)
-        f = normalization(expect(h, x))
+        f = normalization(expect(h, x, pars))
         g = normalization(stiefel_gradient(h, x, pars;
                                            vary_disentanglers=vary_disentanglers))
         return f, g
