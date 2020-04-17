@@ -809,8 +809,9 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         for l in lowest_depth:nt
             rho = densitymatrix(m, l+1, pars)
             hl = ascended_operator(m, h, l)
+            hl_normalised = normalise_ev_hamiltonian(hl)
             layer = get_layer(m, l)
-            layer, gradnorm_layer = minimize_expectation_ev(hl, layer, rho, pars;
+            layer, gradnorm_layer = minimize_expectation_ev(hl_normalised, layer, rho, pars;
                                                             vary_disentanglers=vary_disentanglers)
             gradnorm_sq += gradnorm_layer^2
             set_layer!(m, layer, l)
@@ -818,9 +819,10 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
 
         # Special case of the translation invariant layer.
         havg = ascended_operator_avg(m, h, pars, :exponential)
+        havg_normalised = normalise_ev_hamiltonian(havg)
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf, pars)
-        layer, gradnorm_layer = minimize_expectation_ev(havg, layer, rho, pars;
+        layer, gradnorm_layer = minimize_expectation_ev(havg_normalised, layer, rho, pars;
                                                         vary_disentanglers=vary_disentanglers)
         gradnorm_sq += gradnorm_layer^2
         set_layer!(m, layer, Inf)
@@ -830,7 +832,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         expectation = expect(h, m, pars)
         expectation = normalization(expectation)
         if old_rhos !== nothing
-            rho_diffs = [norm(r - ro) for (r, ro) in zip(rhos, old_rhos)]
+            rho_diffs = [norm(r - or) for (r, or) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
         end
         if pars[:verbosity] >= 2
@@ -848,6 +850,16 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         end
     end
     return m
+end
+
+"""
+Change the additive normalisation of a local Hamiltonian term to make it suitable for
+computing an E-V update environment.
+"""
+function normalise_ev_hamiltonian(h)
+    lb, ub = gershgorin_bounds(h)
+    eye = id(domain(h))
+    return h - ub*eye
 end
 
 # # # Gradient optimization

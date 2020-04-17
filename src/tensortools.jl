@@ -183,6 +183,58 @@ end
 pad_with_zeros_to(t::TensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
 
 """
+Fuse the domain and codomain of a TensorMap, and return the resulting matrix (as a
+TensorMap).
+"""
+function convert_to_matrix(t::TensorMap)
+    dom, codom = domain(t), codomain(t)
+    domainfuser = isomorphism(dom, fuse(dom))
+    codomainfuser = isomorphism(codom, fuse(codom))
+    mt = codomainfuser' * t * domainfuser
+    return mt
+end
+
+"""
+For a Hermitian square tensor (fusing the domain and codomain into single indices), return a
+lower and upper bound between which all its eigenvalues lie. This costs O(D^2) where D is
+the matrix dimension.
+"""
+function gershgorin_bounds(t::TensorMap{S, N, N}) where {S, N}
+    return gershgorin_bounds(convert(Array, convert_to_matrix(t)))
+end
+
+"""
+For a square tensor (fusing the domain and codomain into single indices), return a list of
+its Gershgorin discs, as pairs (c, r) where c is the centre and r is the radius. This costs
+O(D^2) where D is the matrix dimension.
+"""
+function gershgorin_discs(t::TensorMap{S, N, N}) where {S, N}
+    return gershgorin_discs(convert(Array, convert_to_matrix(t)))
+end
+
+function gershgorin_bounds(a::Array{S, 2}) where {S}
+    discs = gershgorin_discs(a)
+    lb = minimum(c - r for (c, r) in discs)
+    ub = maximum(c + r for (c, r) in discs)
+    return lb, ub
+end
+
+function gershgorin_discs(a::Array{S, 2}) where {S}
+    d = size(a, 1)
+    if size(a, 2) != d
+        msg = "Can't apply Gershgorin disc theorem to a non-square matrix."
+        throw(ArgumentError(msg))
+    end
+    centres = diag(a)
+    abs_centres = abs.(centres)
+    radii1 = dropdims(sum(abs.(a), dims=1), dims=1) .- abs_centres
+    radii2 = dropdims(sum(abs.(a), dims=2), dims=2) .- abs_centres
+    radii = min.(radii1, radii2)
+    discs = tuple(zip(centres, radii)...)
+    return discs
+end
+
+"""
 Inner product of two tensors as tangents on a Stiefel manifold, using the canonical metric
 of the manifold. The first argument is the point on the manifold that we are at, the next
 two are the tangent vectors.

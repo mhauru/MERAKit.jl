@@ -179,6 +179,12 @@ function pad_with_zeros_to(op::ModifiedBinaryOp, args...)
     return ModifiedBinaryOp(map(x -> pad_with_zeros_to(x, args...), op)...)
 end
 
+function gershgorin_bounds(op::ModifiedBinaryOp)
+    lb_mid, ub_mid = gershgorin_bounds(op.mid)
+    lb_gap, ub_gap = gershgorin_bounds(op.gap)
+    return min(lb_mid, lb_gap), max(ub_mid, ub_gap)
+end
+
 support(op::ModifiedBinaryOp) = support(op.mid)  # Could equally well be op.gap.
 function expand_support(op::ModifiedBinaryOp, n::Integer)
     mid = expand_support(op.mid, n)
