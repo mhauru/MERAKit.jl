@@ -175,6 +175,10 @@ Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(adjoint, op)...)
 Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(imag, op)...)
 Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(real, op)...)
 
+function pad_with_zeros_to(op::ModifiedBinaryOp, args...)
+    return ModifiedBinaryOp(map(x -> pad_with_zeros_to(x, args...), op)...)
+end
+
 support(op::ModifiedBinaryOp) = support(op.mid)  # Could equally well be op.gap.
 function expand_support(op::ModifiedBinaryOp, n::Integer)
     mid = expand_support(op.mid, n)

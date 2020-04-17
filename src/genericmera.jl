@@ -323,6 +323,16 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
+        # Pad the stored previous_fixedpoint_densitymatrix as well, when padding the scale
+        # invariant isometries.
+        old_rho = m.previous_fixedpoint_densitymatrix[1]
+        if old_rho !== nothing
+            width = causal_cone_width(typeof(m))
+            for i in 1:width
+                old_rho = pad_with_zeros_to(old_rho, i => V, (i+width) => V')
+            end
+            m.previous_fixedpoint_densitymatrix[1] = old_rho
+        end
     elseif depth > num_translayers(m)
             msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
             throw(ArgumentError(msg))
