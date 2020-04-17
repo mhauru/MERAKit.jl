@@ -28,7 +28,6 @@ TernaryMERA = GenericMERA{TernaryLayer}
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
 Base.iterate(layer::TernaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
-Base.eltype(::Type{TernaryLayer}) = TensorMap
 Base.length(layer::TernaryLayer) = 2
 Base.firstindex(layer::TernaryLayer) = 1
 Base.lastindex(layer::TernaryLayer) = 2

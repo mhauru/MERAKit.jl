@@ -28,7 +28,6 @@ BinaryMERA = GenericMERA{BinaryLayer}
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)
 Base.iterate(layer::BinaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
-Base.eltype(::Type{BinaryLayer}) = TensorMap
 Base.length(layer::BinaryLayer) = 2
 Base.firstindex(layer::BinaryLayer) = 1
 Base.lastindex(layer::BinaryLayer) = 2

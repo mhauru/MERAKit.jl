@@ -41,7 +41,6 @@ function Base.iterate(layer::ModifiedBinaryLayer, state)
     state == 2 && return (layer.isometry_right, 3)
     return nothing
 end
-Base.eltype(::Type{ModifiedBinaryLayer}) = TensorMap
 Base.length(layer::ModifiedBinaryLayer) = 3
 Base.firstindex(layer::ModifiedBinaryLayer) = 1
 Base.lastindex(layer::ModifiedBinaryLayer) = 3
