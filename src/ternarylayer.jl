@@ -109,6 +109,18 @@ function randomlayer(::Type{TernaryLayer}, Vin, Vout, Vint=Vout; random_disentan
     return TernaryLayer(u, w)
 end
 
+"""
+Return the operator that is the fixed point of the average ascending superoperator of this
+layer, normalised to have norm 1.
+"""
+function ascending_fixedpoint(layer::TernaryLayer)
+    V = inputspace(layer)
+    width = causal_cone_width(typeof(layer))
+    Vtotal = reduce(⊗, repeat([V], width))
+    eye = id(Vtotal) / sqrt(dim(Vtotal))
+    return eye
+end
+
 # # # Stiefel manifold functions
 
 function stiefel_gradient(h, rho, layer::TernaryLayer, pars; vary_disentanglers=true)

@@ -108,6 +108,18 @@ function randomlayer(::Type{BinaryLayer}, Vin, Vout, Vint=Vout; random_disentang
     return BinaryLayer(u, w)
 end
 
+"""
+Return the operator that is the fixed point of the average ascending superoperator of this
+layer, normalised to have norm 1.
+"""
+function ascending_fixedpoint(layer::BinaryLayer)
+    V = inputspace(layer)
+    width = causal_cone_width(typeof(layer))
+    Vtotal = reduce(⊗, repeat([V], width))
+    eye = id(Vtotal) / sqrt(dim(Vtotal))
+    return eye
+end
+
 # # # Stiefel manifold functions
 
 function stiefel_gradient(h, rho, layer::BinaryLayer, pars; vary_disentanglers=true)

@@ -289,6 +289,17 @@ function densitymatrix_entropy(rho::ModifiedBinaryOp)
     return S
 end
 
+"""
+Return the operator that is the fixed point of the average ascending superoperator of this
+layer, normalised to have norm 1.
+"""
+function ascending_fixedpoint(layer::ModifiedBinaryLayer)
+    V = inputspace(layer)
+    width = causal_cone_width(typeof(layer))
+    Vtotal = reduce(⊗, repeat([V], width))
+    eye = id(Vtotal) / sqrt(dim(Vtotal))
+    return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
+end
 
 # # # Stiefel manifold functions
 
