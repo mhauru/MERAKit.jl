@@ -612,18 +612,46 @@ it makes use of the cache.
 """
 function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     nt = num_translayers(m)
+    # fp is the dominant eigenvector of the ascending superoperator. We are not interested
+    # in contributions to the sum along fp, since they will just be fp * infty, and fp is
+    # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
+    # opsum will be the cumulative variable that holds the terms of the series summed up so
+    # far.
     opsum = TensorMap(zeros, eltype(m), domain(fp) ← domain(fp))
+    op_l = opsum
+    factor = zero(eltype(m))
     l = 1
     while l < pars[:scale_invariant_sum_depth]
+        # Store the old values of op_l and factor, before we overwrite them.
+        old_op = op_l
+        old_factor = factor
+        # Get the next term in the series, with the contribution along fp subtracted.
         op_l = ascended_operator(m, op, nt+l)
         inner = tr(op_l * fp')
         op_l = op_l - inner*fp
+        # Add one more term to opsum.
         opsum = opsum + op_l
-        change = norm(op_l) / norm(opsum)
-        change < pars[:scale_invariant_sum_tol] && break
-        l += 1
+        # factor is the scalar that minimizes |op_l - factor * old_op|.
+        factor = tr(old_op' * op_l) / tr(old_op' * old_op)
+        # We know that eventually the sum should turn into a geometric series, once op_l
+        # is close enough to the dominant eigenvector of the ascending superoperator
+        # (dominant after the fp contribution has been removed). Thus we can estimate the
+        # the whole series as
+        # opsum + sum_{i=1}^inf factor^i op_l = opsum + factor/(1-factor) * op_l.
+        # We compute the change to this that has been caused by adding one more term to
+        # opsum and updating old_op -> op_l and old_factor -> factor.
+        change = norm(old_op*old_factor/(1-old_factor) - op_l/(1-factor))
+        # Once this change is small enough, we say we've converged.
+        if change < pars[:scale_invariant_sum_tol]
+            break
+        else
+            l += 1
+        end
     end
+    # Finally, we add the residual geometric series to the part we've already summed up
+    # term-by-term, to form our final estimate of the value of the series.
+    opsum = opsum + op_l * factor/(1 - factor)
     if :verbosity in keys(pars) && pars[:verbosity] > 3
         msg = "Used $(l) superoperator invocations to build the scale invariant operator sum."
         @info(msg)
