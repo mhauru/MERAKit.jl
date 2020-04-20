@@ -153,8 +153,8 @@ struct ModifiedBinaryOp{T}
     gap::T
 end
 
-ModifiedBinaryOp(op::TensorMap) = ModifiedBinaryOp(op, op)
-Base.convert(::Type{ModifiedBinaryOp}, op::TensorMap) = ModifiedBinaryOp(op)
+ModifiedBinaryOp(op::AbstractTensorMap) = ModifiedBinaryOp(op, op)
+Base.convert(::Type{ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
 
 Base.iterate(op::ModifiedBinaryOp) = (op.mid, 1)
 Base.iterate(op::ModifiedBinaryOp, state) = state == 1 ? (op.gap, 2) : nothing
@@ -201,13 +201,13 @@ TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
 TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
 TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
 
-# Pass element-wise arithmetic down onto the TensorMaps. Promote TensorMaps to
-# ModifiedBinaryOps if necessary.
+# Pass element-wise arithmetic down onto the AbstractTensorMaps. Promote AbstractTensorMaps
+# to ModifiedBinaryOps if necessary.
 for op in (:+, :-, :/, :*)
     eval(:(Base.$(op)(x::ModifiedBinaryOp, y::ModifiedBinaryOp)
            = ModifiedBinaryOp(($(op)(xi, yi) for (xi, yi) in zip(x, y))...)))
-    eval(:(Base.$(op)(x::TensorMap, y::ModifiedBinaryOp) = $(op)(ModifiedBinaryOp(x), y)))
-    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::TensorMap) = $(op)(x, ModifiedBinaryOp(y))))
+    eval(:(Base.$(op)(x::AbstractTensorMap, y::ModifiedBinaryOp) = $(op)(ModifiedBinaryOp(x), y)))
+    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::AbstractTensorMap) = $(op)(x, ModifiedBinaryOp(y))))
 end
 
 Base.:*(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid * a, op.gap * a)
