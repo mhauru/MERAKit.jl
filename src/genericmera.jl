@@ -514,8 +514,21 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
     rho = vecs[1]
     rho /= tr(rho)
-    norm(imag(rho)) ≈ 0 && (rho = real(rho))
+    if eltype(m) <: Real
+        # rho isn't generally real for generic matrices, but we know that it should be for
+        # the descending superoperator.
+        imag_norm = norm(imag(rho))
+        if imag_norm > 1e-12
+            msg = "The fixed point density matrix has a significant imaginary part, that we discard: $(imag_norm)"
+            @warn(msg)
+        end
+        rho = real(rho)
+    end
     m.previous_fixedpoint_densitymatrix[1] = rho
+    if :verbosity in keys(pars) && pars[:verbosity] > 3
+        msg = "Used $(info.numops) superoperator invocations to find the fixed point density matrix."
+        @info(msg)
+    end
     return rho
 end
 
@@ -583,52 +596,39 @@ function ascended_operator(m::GenericMERA, op, depth)
     return opasc
 end
 
-# TODO Understand better the issue of exponential weights vs no weights. As I see it now, no
-# weights is the correct thing when evaluating a gradient. Because the ascended h soon
-# becomes the dominant eigenvector of the ascending superoperator (the identity), the
-# contributions after a few layers are orthogonal to the optimization manifold, and thus the
-# gradient vector is unchanged by them. The exponential weights are just an ad hoc trick for
-# E-V. If this understanding is correct, change the structure of how this is computed, so
-# that for instance pars[:havg_eps] actually has an effect when evaluating a gradient.
-# Probably also change the arguments that this function takes, and update the docstring.
 """
-TODO This docstring is out-of-date.
-Return the sum of the ascended versions of `op` in the scale invariant part of the MERA,
-normalized by the number of tensors in each layer. That is
-``sum_{i=1}^Inf ascended_operator(m, op, num_translayers + i) / scalefactor^(i-1).``
-This infinite sum is of course not summed in total. Instead, we approximate by assuming that
-from some depth `l` onwards all the ascended operators are the same. The tolerance for error
-in this approximation is set by the argument eps.  This function uses `ascended_operator` to
-get the operators at each layer, which means that it makes use of the cache.
+Return the sum of the ascended versions of `op` in the scale invariant part of the MERA.
+To be more precise, this sum is of course infinite, and what we return is the component of
+it orthogonal to the dominant eigenoperator of the ascending superoperator (typically the
+identity). This component converges to a finite number like a geometric series, since all
+non-dominant eigenvalues of the ascending superoperator are smaller than 1.
+
+To approximate the converging series, we use a finite number of terms. The maximum number of
+terms included is pars[:scale_invariant_sum_depth] and the relative error tolerance after
+which we truncate is pas[:scale_invariant_sum_tol].
+
+This function uses `ascended_operator` to get the operators at each layer, which means that
+it makes use of the cache.
 """
-function ascended_operator_avg(m::GenericMERA, op, pars, weight=:none)
-    ops = Any[]
-    opavg = nothing
+function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     nt = num_translayers(m)
-    sf = scalefactor(typeof(m))
-    series_sum = sf/(sf-1)  # This is the value of the series sum_{i=0}^Inf 1/sf^i.
-    # TODO This could be optimized to avoid resumming all the terms every time. Hardly
-    # urgent though, given how subleading this whole thing is in bond dimension.
-    for l in 1:pars[:havg_depth]
-        old_opavg = opavg
+    fp = ascending_fixedpoint(get_layer(m, nt+1))
+    opsum = TensorMap(zeros, eltype(m), domain(fp) ← domain(fp))
+    l = 1
+    while l < pars[:scale_invariant_sum_depth]
         op_l = ascended_operator(m, op, nt+l)
-        push!(ops, op_l)
-        if weight === :exponential
-            # Normalization factors for each term. The last one gets multiplied by
-            # series_sum, since the assumption is that from l onwards all the ascended
-            # operators are the same.
-            normalizations = [one(eltype(m))/sf^(j-1) for j in 1:l]
-            normalizations[end] *= series_sum
-        elseif weight === :none
-            normalizations = [one(eltype(m)) for j in 1:l]
-        else
-            throw(ArgumentError("Unknown value for weight: $weight"))
-        end
-        opavg = sum(op*n for (op, n) in zip(ops, normalizations))
-        change = old_opavg === nothing ? 1 : norm(opavg - old_opavg)/norm(opavg)
-        change < pars[:havg_eps] && break
+        inner = tr(op_l * fp')
+        op_l = op_l - inner*fp
+        opsum = opsum + op_l
+        change = norm(op_l) / norm(opsum)
+        change < pars[:scale_invariant_sum_tol] && break
+        l += 1
     end
-    return opavg
+    if :verbosity in keys(pars) && pars[:verbosity] > 3
+        msg = "Used $(l) superoperator invocations to build the scale invariant operator sum."
+        @info(msg)
+    end
+    return opsum
 end
 
 # # # Extracting CFT data
@@ -782,9 +782,14 @@ have no default values. The different parameters are:
      over consecutive iterations falls below pars[:densitymatrix_delta], the optimization
      terminates. Change is measured as Frobenius norm of the difference. Note that this is
      much more demanding than convergence in just the expectation value.
-    :havg_depth, how deep into the scale invariant layer to go when computing the ascended
-     version of `h` to use for optimizing the scale invariant layer. Should in principle be
-     infinite, but the error goes down exponentially, so in practice 10 is often plenty.
+    :scale_invariant_sum_depth, how deep into the scale invariant layer to go when computing
+     the ascended version of `h` to use for optimizing the scale invariant layer. Should in
+     principle be infinite, but the error goes down exponentially, so in practice 10 is
+     often plenty.
+    :scale_invariant_sum_tol, relative error tolerance that sets when to stop ascending into
+     the scale invariant part. If adding one more term from one more layer makes a difference
+     below this threshold, we truncate the series, even if scale_invariant_sum_depth has not
+     yet been reached.
     Other parameters may be required depending on the type of MERA. See documentation for
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
@@ -818,11 +823,11 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         end
 
         # Special case of the translation invariant layer.
-        havg = ascended_operator_avg(m, h, pars, :exponential)
-        havg_normalised = normalise_ev_hamiltonian(havg)
+        hsi = scale_invariant_operator_sum(m, h, pars)
+        hsi_normalised = normalise_ev_hamiltonian(hsi)
         layer = get_layer(m, Inf)
         rho = densitymatrix(m, Inf, pars)
-        layer, gradnorm_layer = minimize_expectation_ev(havg_normalised, layer, rho, pars;
+        layer, gradnorm_layer = minimize_expectation_ev(hsi_normalised, layer, rho, pars;
                                                         vary_disentanglers=vary_disentanglers)
         gradnorm_sq += gradnorm_layer^2
         set_layer!(m, layer, Inf)
@@ -905,10 +910,10 @@ function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     end
 
     # Special case of the translation invariant layer.
-    havg = ascended_operator_avg(m, h, pars, :none)
+    hsi = scale_invariant_operator_sum(m, h, pars)
     layer = get_layer(m, Inf)
     rho = densitymatrix(m, Inf, pars)
-    grad = stiefel_gradient(havg, rho, layer, pars; kwargs...)
+    grad = stiefel_gradient(hsi, rho, layer, pars; kwargs...)
     push!(layers, grad)
     g = T(layers)
     return g

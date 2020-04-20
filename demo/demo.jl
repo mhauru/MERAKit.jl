@@ -27,8 +27,8 @@ function parse_pars()
                     , "--metric", arg_type=Symbol, default=:canonical
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
-                    , "--havg_depth", arg_type=Int, default=10
-                    , "--havg_eps", arg_type=Float64, default=1e-12
+                    , "--scale_invariant_sum_depth", arg_type=Int, default=10
+                    , "--scale_invariant_sum_tol", arg_type=Float64, default=1e-12
                     , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -62,8 +62,8 @@ function main()
 
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
-    havg_depth = pars[:havg_depth]
-    havg_eps = pars[:havg_eps]
+    scale_invariant_sum_depth = pars[:scale_invariant_sum_depth]
+    scale_invariant_sum_tol = pars[:scale_invariant_sum_tol]
     pars[:initial_opt_pars] = Dict(:method => method,
                                    :retraction => retraction,
                                    :transport => transport,
@@ -71,8 +71,8 @@ function main()
                                    :gradient_delta => 1e-5,
                                    :maxiter => 30,
                                    :isometries_only_iters => 10,
-                                   :havg_depth => havg_depth,
-                                   :havg_eps => havg_eps,
+                                   :scale_invariant_sum_depth => scale_invariant_sum_depth,
+                                   :scale_invariant_sum_tol => scale_invariant_sum_tol,
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
                                    :isometry_iters => 1,
@@ -89,8 +89,8 @@ function main()
                                :gradient_delta => 1e-5,
                                :maxiter => 50,
                                :isometries_only_iters => 0,
-                               :havg_depth => havg_depth,
-                               :havg_eps => havg_eps,
+                               :scale_invariant_sum_depth => scale_invariant_sum_depth,
+                               :scale_invariant_sum_tol => scale_invariant_sum_tol,
                                :layer_iters => 1,
                                :disentangler_iters => 1,
                                :isometry_iters => 1,
@@ -106,8 +106,8 @@ function main()
                                  :gradient_delta => 1e-7,
                                  :maxiter => 300,
                                  :isometries_only_iters => 0,
-                                 :havg_depth => havg_depth,
-                                 :havg_eps => havg_eps,
+                                 :scale_invariant_sum_depth => scale_invariant_sum_depth,
+                                 :scale_invariant_sum_tol => scale_invariant_sum_tol,
                                  :layer_iters => 1,
                                  :disentangler_iters => 1,
                                  :isometry_iters => 1,

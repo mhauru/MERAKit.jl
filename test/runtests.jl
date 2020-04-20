@@ -284,8 +284,8 @@ function test_optimization(meratype, spacetype, method)
                 :gradient_delta => 1e-4,
                 :maxiter => 500,
                 :isometries_only_iters => 30,
-                :havg_depth => 10,
-                :havg_eps => 1e-12,
+                :scale_invariant_sum_depth => 10,
+                :scale_invariant_sum_tol => 1e-12,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
                 :isometry_iters => 1,
@@ -325,7 +325,8 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metr
     ham = ham + ham'
     eye = id(V)
 
-    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10, :metric => metric)
+    pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
+                :metric => metric)
 
     can_inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
     euc_inner(m, x, y) = 2*real(euclidean_inner(m, x, y))
@@ -399,7 +400,8 @@ function test_cayley_transport(meratype, spacetype, metric)
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
 
-    pars = Dict(:havg_eps => 1e-12, :havg_depth => 10, :metric => metric)
+    pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
+                :metric => metric)
 
     retract = cayley_retract
     inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
