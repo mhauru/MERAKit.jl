@@ -27,8 +27,7 @@ function parse_pars()
                     , "--metric", arg_type=Symbol, default=:canonical
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
-                    , "--scale_invariant_sum_depth", arg_type=Int, default=10
-                    , "--scale_invariant_sum_tol", arg_type=Float64, default=1e-12
+                    , "--scale_invariant_eps", arg_type=Float64, default=1e-6
                     , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -62,8 +61,7 @@ function main()
 
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
-    scale_invariant_sum_depth = pars[:scale_invariant_sum_depth]
-    scale_invariant_sum_tol = pars[:scale_invariant_sum_tol]
+    scale_invariant_eps = pars[:scale_invariant_eps]
     pars[:initial_opt_pars] = Dict(:method => method,
                                    :retraction => retraction,
                                    :transport => transport,
@@ -71,50 +69,32 @@ function main()
                                    :gradient_delta => 1e-5,
                                    :maxiter => 30,
                                    :isometries_only_iters => 10,
-                                   :scale_invariant_sum_depth => scale_invariant_sum_depth,
-                                   :scale_invariant_sum_tol => scale_invariant_sum_tol,
+                                   :scale_invariant_sum_depth => 50,
+                                   :scale_invariant_sum_tol => scale_invariant_eps,
                                    :layer_iters => 1,
                                    :disentangler_iters => 1,
                                    :isometry_iters => 1,
-                                   :ls_epsilon => 1e-4,
+                                   :ls_epsilon => 1e-6,
                                    :lbfgs_m => pars[:lbfgs_m],
                                    :cg_flavor => pars[:cg_flavor],
-                                   :verbosity => pars[:verbosity])
+                                   :verbosity => pars[:verbosity],
+                                   :densitymatrix_eigsolve_pars => Dict(
+                                                                        :tol => scale_invariant_eps,
+                                                                        :krylovdim => 4,
+                                                                        :verbosity => 0,
+                                                                        :maxiter => 20,
+                                                                       ),
+                                  )
     # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
     # but not all.
-    pars[:mid_opt_pars] = Dict(:method => method,
-                               :retraction => retraction,
-                               :transport => transport,
-                               :metric => metric,
-                               :gradient_delta => 1e-5,
-                               :maxiter => 50,
-                               :isometries_only_iters => 0,
-                               :scale_invariant_sum_depth => scale_invariant_sum_depth,
-                               :scale_invariant_sum_tol => scale_invariant_sum_tol,
-                               :layer_iters => 1,
-                               :disentangler_iters => 1,
-                               :isometry_iters => 1,
-                               :ls_epsilon => 1e-4,
-                               :lbfgs_m => pars[:lbfgs_m],
-                               :cg_flavor => pars[:cg_flavor],
-                               :verbosity => pars[:verbosity])
+    pars[:mid_opt_pars] = copy(pars[:initial_opt_pars])
+    pars[:mid_opt_pars][:maxiter] = 50
+    pars[:mid_opt_pars][:isometry_iters] = 0
     # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
-    pars[:final_opt_pars] = Dict(:method => method,
-                                 :retraction => retraction,
-                                 :transport => transport,
-                                 :metric => metric,
-                                 :gradient_delta => 1e-7,
-                                 :maxiter => 300,
-                                 :isometries_only_iters => 0,
-                                 :scale_invariant_sum_depth => scale_invariant_sum_depth,
-                                 :scale_invariant_sum_tol => scale_invariant_sum_tol,
-                                 :layer_iters => 1,
-                                 :disentangler_iters => 1,
-                                 :isometry_iters => 1,
-                                 :ls_epsilon => 1e-4,
-                                 :lbfgs_m => pars[:lbfgs_m],
-                                 :cg_flavor => pars[:cg_flavor],
-                                 :verbosity => pars[:verbosity])
+    pars[:final_opt_pars] = copy(pars[:initial_opt_pars])
+    pars[:final_opt_pars][:gradient_delta] = 1e-7
+    pars[:final_opt_pars][:maxiter] = 300
+    pars[:final_opt_pars][:isometry_iters] = 0
 
     # Get the Hamiltonian.
     if model == "Ising"

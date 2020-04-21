@@ -30,8 +30,7 @@ function parse_pars()
                     , "--metric", arg_type=Symbol, default=:canonical
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
-                    , "--scale_invariant_sum_depth", arg_type=Int, default=10
-                    , "--scale_invariant_sum_tol", arg_type=Float64, default=1e-12
+                    , "--scale_invariant_eps", arg_type=Float64, default=1e-6
                     , "--verbosity", arg_type=Int, default=2
                    )
     pars = parse_args(ARGS, settings; as_symbols=true)
@@ -56,8 +55,7 @@ function main()
     end
     block_size = pars[:block_size]
     reps = pars[:reps]
-    scale_invariant_sum_depth = pars[:scale_invariant_sum_depth]
-    scale_invariant_sum_tol = pars[:scale_invariant_sum_tol]
+    scale_invariant_eps = pars[:scale_invariant_eps]
     opt_pars = Dict(:method => pars[:method],
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
@@ -65,15 +63,21 @@ function main()
                     :gradient_delta => 1e-15,
                     :maxiter => 500,
                     :isometries_only_iters => 0,
-                    :scale_invariant_sum_depth => scale_invariant_sum_depth,
-                    :scale_invariant_sum_tol => scale_invariant_sum_tol,
+                    :scale_invariant_sum_depth => 50,
+                    :scale_invariant_sum_tol => scale_invariant_eps,
                     :layer_iters => 1,
                     :disentangler_iters => 1,
                     :isometry_iters => 1,
-                    :ls_epsilon => 1e-4,
+                    :ls_epsilon => 1e-6,
                     :lbfgs_m => pars[:lbfgs_m],
                     :cg_flavor => pars[:cg_flavor],
                     :verbosity => pars[:verbosity],
+                    :densitymatrix_eigsolve_pars => Dict(
+                                                         :tol => scale_invariant_eps,
+                                                         :krylovdim => 4,
+                                                         :verbosity => 0,
+                                                         :maxiter => 20,
+                                                        ),
                    )
 
     logstr = "Running demo_refine.jl with"

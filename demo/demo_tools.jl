@@ -100,8 +100,7 @@ Normalize an operator by subtracting a constant so that it's spectrum is negativ
 semidefinite. Return the normalized operator and the constant that was subtracted.
 """
 function normalize_H(H)
-    # TODO Switch to using an eigendecomposition?
-    c = norm(H)
+    c = maximum(convert(Array, eigh(H)[1]))
     eye = isomorphism(codomain(H), domain(H))
     H = H - eye*c
     return H, c
@@ -284,7 +283,9 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
         ms = deepcopy(m)
         ds = dim(V, s)
         chi_s = ds + (chi - d)
-        expand_bonddim!(ms, i, Dict(s => chi_s))
+        istop = (i == num_translayers(ms))
+        expand_bonddim!(ms, i, Dict(s => chi_s); check_invar=!istop)
+        expand_internal_bonddim!(ms, i+1, Dict(s => chi_s))
         # Just to make the MERA isometric again, after expanding bond dimensions.
         ms = minimize_expectation!(ms, h, isometrisation_pars; normalization=normalization)
         msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
