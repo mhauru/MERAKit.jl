@@ -346,6 +346,11 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     matching_bonds = [(space(u, 3)', space(wl, 2)),
                       (space(u, 4)', space(wr, 1))]
     allmatch = all([==(pair...) for pair in matching_bonds])
+    # Check that the dimensions are such that isometricity can hold.
+    for v in layer
+        codom, dom = fuse(codomain(v)), fuse(domain(v))
+        allmatch = allmatch && min(dom, codom) == dom
+    end
     return allmatch
 end
 
