@@ -170,7 +170,7 @@ Hermitian operator.
 """
 function test_expand_bonddim(meratype, spacetype)
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(spacetype, meratype, layers, 4)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -190,7 +190,10 @@ function test_expand_bonddim(meratype, spacetype)
     # Expand the intralayer spaces, check that expectation value is preserved.
     for i in 1:(layers-1)
         V = internalspace(m, i)
-        newdims = Dict(s => dim(V, s)+1 for s in sectors(V))
+        Vout = outputspace(m, i)
+        newdims = Dict(s => dim(V, s) < dim(Vout, s) ? dim(V, s) + 1 : dim(V, s)
+                       for s in sectors(V)
+                      )
         m = expand_internal_bonddim!(m, i, newdims)
     end
     new_expectation = expect(randomop, m)
@@ -284,8 +287,8 @@ function test_optimization(meratype, spacetype, method)
                 :gradient_delta => 1e-4,
                 :maxiter => 500,
                 :isometries_only_iters => 30,
-                :scale_invariant_sum_depth => 10,
-                :scale_invariant_sum_tol => 1e-12,
+                :scale_invariant_sum_depth => 50,
+                :scale_invariant_sum_tol => 1e-6,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
                 :isometry_iters => 1,
@@ -294,7 +297,14 @@ function test_optimization(meratype, spacetype, method)
                 :metric => :canonical,
                 :lbfgs_m => 8,
                 :ls_epsilon => 1e-2,
-                :verbosity => 1)
+                :verbosity => 1,
+                :densitymatrix_eigsolve_pars => Dict(
+                                                     :tol => 1e-6,
+                                                     :krylovdim => 4,
+                                                     :verbosity => 0,
+                                                     :maxiter => 20,
+                                                    ),
+               )
 
     op = particle_number_operator(spacetype)
     width = causal_cone_width(meratype)
