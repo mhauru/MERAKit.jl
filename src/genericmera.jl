@@ -122,7 +122,7 @@ function densitymatrix_entropy(rho)
     eigs = eigh(rho)[1]
     eigs = real.(diag(convert(Array, eigs)))
     if sum(abs.(eigs[eigs .<= 0.])) > 1e-13
-        warn("Significant negative eigenvalues for a density matrix: $eigs")
+        @warn("Significant negative eigenvalues for a density matrix: $eigs")
     end
     eigs = eigs[eigs .> 0.]
     S = -dot(eigs, log.(eigs))
@@ -309,7 +309,7 @@ the individual tensors. This is however of no consequence, since the MERA as a s
 exactly the same. A round of optimization on the MERA will restore isometricity of each
 tensor.
 """
-function expand_bonddim!(m::GenericMERA, depth, newdims)
+function expand_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
     V = inputspace(m, depth)
     V = expand_vectorspace(V, newdims)
 
@@ -337,7 +337,7 @@ function expand_bonddim!(m::GenericMERA, depth, newdims)
             msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
             throw(ArgumentError(msg))
     end
-    set_layer!(m, next_layer, depth+1; check_invar=true)
+    set_layer!(m, next_layer, depth+1; check_invar=check_invar)
 end
 
 """
@@ -354,12 +354,12 @@ tensor.
 Note that not all MERAs have an internal bond dimension, and some may have several, so this
 function will not make sense for all MERA types.
 """
-function expand_internal_bonddim!(m::GenericMERA, depth, newdims)
+function expand_internal_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
     V = internalspace(m, depth)
     V = expand_vectorspace(V, newdims)
     layer = get_layer(m, depth)
     layer = expand_internalspace(layer, V)
-    set_layer!(m, layer, depth)
+    set_layer!(m, layer, depth; check_invar=check_invar)
 end
 
 """
@@ -632,8 +632,8 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
         # Add one more term to opsum.
         opsum = opsum + op_l
         # factor is the scalar that minimizes |op_l - factor * old_op|.
-        inner = tr(old_op' * old_op)
-        factor = inner == 0.0 ? 0.0 : tr(old_op' * op_l) / inner
+        old_norm = tr(old_op' * old_op)
+        factor = old_norm == 0.0 ? 0.0 : tr(old_op' * op_l) / old_norm
         # We know that eventually the sum should turn into a geometric series, once op_l
         # is close enough to the dominant eigenvector of the ascending superoperator
         # (dominant after the fp contribution has been removed). Thus we can estimate the
