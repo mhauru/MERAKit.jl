@@ -539,8 +539,7 @@ an initial guess for the fixed-point density matrix.
 function thermal_densitymatrix(m::GenericMERA, depth)
     V = inputspace(m, Inf)
     width = causal_cone_width(typeof(m))
-    # TODO Specify eltype
-    eye = id(V)
+    eye = id(Matrix{eltype(m)}, V)
     rho = ⊗(repeat([eye], width)...)
     return rho
 end
@@ -622,7 +621,7 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     op_l = opsum
     factor = zero(eltype(m))
     l = 1
-    while l < pars[:scale_invariant_sum_depth]
+    while l <= pars[:scale_invariant_sum_depth]
         # Store the old values of op_l and factor, before we overwrite them.
         old_op = op_l
         old_factor = factor
