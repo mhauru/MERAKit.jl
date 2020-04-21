@@ -632,7 +632,8 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
         # Add one more term to opsum.
         opsum = opsum + op_l
         # factor is the scalar that minimizes |op_l - factor * old_op|.
-        factor = tr(old_op' * op_l) / tr(old_op' * old_op)
+        inner = tr(old_op' * old_op)
+        factor = inner == 0.0 ? 0.0 : tr(old_op' * op_l) / inner
         # We know that eventually the sum should turn into a geometric series, once op_l
         # is close enough to the dominant eigenvector of the ascending superoperator
         # (dominant after the fp contribution has been removed). Thus we can estimate the
@@ -650,7 +651,12 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     end
     # Finally, we add the residual geometric series to the part we've already summed up
     # term-by-term, to form our final estimate of the value of the series.
-    opsum = opsum + op_l * factor/(1 - factor)
+    if factor == 1
+        msg = "factor in scale_invariant_operator_sum is exactly 1.0, something went wrong."
+        @warn(msg)
+    else
+        opsum = opsum + op_l * factor/(1 - factor)
+    end
     if :verbosity in keys(pars) && pars[:verbosity] > 3
         msg = "Used $(l) superoperator invocations to build the scale invariant operator sum."
         @info(msg)
