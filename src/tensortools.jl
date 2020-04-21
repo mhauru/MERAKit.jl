@@ -213,9 +213,13 @@ function gershgorin_discs(t::TensorMap{S, N, N}) where {S, N}
 end
 
 function gershgorin_bounds(a::Array{S, 2}) where {S}
+    if norm(a - a')/norm(a) > 1e-14
+        msg = "Can't compute gershgorin_bounds for a non-Hermitian operator."
+        throw(ArgumentError(msg))
+    end
     discs = gershgorin_discs(a)
-    lb = minimum(c - r for (c, r) in discs)
-    ub = maximum(c + r for (c, r) in discs)
+    lb = minimum(real(c) - r for (c, r) in discs)
+    ub = maximum(real(c) + r for (c, r) in discs)
     return lb, ub
 end
 
