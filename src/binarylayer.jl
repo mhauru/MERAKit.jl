@@ -38,7 +38,7 @@ function Base.getindex(layer::BinaryLayer, i)
 end
 
 """
-The ratio by which the number of sites changes when go down through this layer.
+The ratio by which the number of sites changes when you go down through this layer.
 """
 scalefactor(::Type{BinaryMERA}) = 2
 
@@ -120,35 +120,22 @@ function ascending_fixedpoint(layer::BinaryLayer)
     return eye
 end
 
-# # # Stiefel manifold functions
-
-function stiefel_gradient(h, rho, layer::BinaryLayer, pars; vary_disentanglers=true)
+function gradient(h, rho, layer::BinaryLayer; metric=:euclidean, vary_disentanglers=true)
     if vary_disentanglers
         uenv = environment_disentangler(h, layer, rho)
     else
         # TODO We could save some subleading computations by not running the whole machinery
         # when uenv .== 0, but this implementation is much simpler.
-        u = layer.disentangler
-        uenv = TensorMap(zeros, eltype(layer), codomain(u) ← domain(u))
+        uenv = zero(layer.disentangler)
     end
     wenv = environment_isometry(h, layer, rho)
     u, w = layer
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    if pars[:metric] === :canonical
-        projection = stiefel_projection_canonical
-    elseif pars[:metric] === :euclidean
-        projection = stiefel_projection_euclidean
-    end
-    ugrad = projection(u, uenv)
-    wgrad = projection(w, wenv)
+    # TODO Where exactly does this factor of 2 come from again? The conjugate part?
+    ugrad = Stiefel.project(2*uenv, u; metric=metric)
+    wgrad = Stiefel.project(2*wenv, w; metric=metric)
     return BinaryLayer(ugrad, wgrad)
-end
-
-function stiefel_geodesic(l::BinaryLayer, ltan::BinaryLayer, alpha::Number)
-    u, utan = stiefel_geodesic_isometry(l.disentangler, ltan.disentangler, alpha)
-    w, wtan = stiefel_geodesic_isometry(l.isometry, ltan.isometry, alpha)
-    return BinaryLayer(u, w), BinaryLayer(utan, wtan)
 end
 
 # # # Invariants

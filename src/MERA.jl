@@ -1,6 +1,7 @@
 module MERA
 
 using TensorKit
+using TensorKitManifolds
 using TensorOperations  # We need this because TensorKit doesn't reexport @ncon
 using KrylovKit
 using OptimKit
@@ -26,9 +27,7 @@ export minimize_expectation!
 export pseudoserialize, depseudoserialize
 export reset_storage!, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
-export istangent
-export stiefel_geodesic, stiefel_gradient, stiefel_inner, euclidean_inner
-export cayley_retract, cayley_transport
+export gradient, retract, transport, inner
 
 include("tensortools.jl")
 include("genericmera.jl")

@@ -34,26 +34,20 @@ function tensorwise_scale(layer::T, alpha::Number) where T <: SimpleLayer
     return T((t*alpha for t in layer)...)
 end
 
-# # # Stiefel manifold functions
+# # # Manifold functions
 
-function istangent(l::T, ltan::T) where T <: SimpleLayer
-    return all(istangent_isometry(t...) for t in zip(l, ltan))
+function inner(l::T, l1::T, l2::T; metric=:euclidean) where T <: SimpleLayer
+    return sum((Stiefel.inner(t...; metric=metric) for t in zip(l, l1, l2)))
 end
 
-function stiefel_inner(l::T, l1::T, l2::T) where T <: SimpleLayer
-    return sum((stiefel_inner(t...) for t in zip(l, l1, l2)))
-end
-
-function euclidean_inner(l::T, l1::T, l2::T) where T <: SimpleLayer
-    return sum((euclidean_inner(t...) for t in zip(l, l1, l2)))
-end
-
-function cayley_retract(l::T, ltan::T, alpha::Number) where T <: SimpleLayer
-    ts_and_ttans = [cayley_retract(t..., alpha) for t in zip(l, ltan)]
+function retract(l::T, ltan::T, alpha::Real; alg=:exp) where T <: SimpleLayer
+    ts_and_ttans = [Stiefel.retract(t..., alpha; alg=alg) for t in zip(l, ltan)]
     ts, ttans = zip(ts_and_ttans...)
     return T(ts...), T(ttans...)
 end
 
-function cayley_transport(l::T, ltan::T, lvec::T, alpha::Number) where T <: SimpleLayer
-    return T((cayley_transport(t..., alpha) for t in zip(l, ltan, lvec))...)
+function transport(lvec::T, l::T, ltan::T, alpha::Real, lend::T; alg=:exp
+                  ) where {T <: SimpleLayer}
+    return T((Stiefel.transport(t[1], t[2], t[3], alpha, t[4]; alg=alg)
+              for t in zip(lvec, l, ltan, lend))...)
 end

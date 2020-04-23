@@ -322,7 +322,7 @@ end
 """
 Test gradients and retraction.
 """
-function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metric)
+function test_gradient_and_retraction(meratype, spacetype, alg, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -338,17 +338,7 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metr
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
                 :metric => metric)
 
-    can_inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
-    euc_inner(m, x, y) = 2*real(euclidean_inner(m, x, y))
-    if pars[:metric] === :canonical
-        inner = can_inner
-    elseif pars[:metric] === :euclidean
-        inner = euc_inner
-    else
-        msg = "Unknown metric $(pars[:metric])."
-        throw(ArgumentError(msg))
-    end
-    fg(x) = (expect(ham, x), stiefel_gradient(ham, x, pars))
+    fg(x) = (expect(ham, x), gradient(ham, x, pars; metric=metric))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
 
@@ -357,47 +347,29 @@ function test_stiefel_gradient_and_retraction(meratype, spacetype, retract, metr
     alpha = 2.7
     delta = 0.0001
     tanorig = fg(morig)[2]
-    m1, tan1 = retract(morig, tanorig, alpha)
-    m2, tan2 = retract(morig, tanorig, alpha+delta)
+    m1, tan1 = retract(morig, tanorig, alpha; alg=alg)
+    m2, tan2 = retract(morig, tanorig, alpha+delta; alg=alg)
 
-    # Check that the gradient is a Stiefel tangent vector.
-    @test istangent(morig, tanorig)
-    # Check that the tangents really are tangents
-    @test istangent(m1, tan1)
-    @test istangent(m2, tan2)
     # Check that the points we retracted to are normalized MERAs.
     @test expect(eye, m1) ≈ 1.0
     @test expect(eye, m2) ≈ 1.0
 
-    # We have three ways of computing the different between m1 and m2: Just taking the
-    # different, multiplying the tangent at m1 by delta, and multiplying the tangent at m2
-    # by delta. These should all give roughly the same answer, to order delta or so.
-    # Confirm this by taking the overlaps between different options, and make sure that the
-    # overlap is roughly the same as the norm.
-    diff1 = scale!(tan1, delta)
-    diff2 = scale!(tan2, delta)
-    diffreco = add!(m2, m1, -1)
-    overlap1 = inner(m1, diff1, diffreco)
-    overlap2 = inner(m2, diff2, diffreco)
-    norm1 = inner(m1, diff1, diff1)
-    norm2 = inner(m2, diff2, diff2)
-    @test isapprox(overlap1, norm1; rtol=10*delta)
-    @test isapprox(overlap2, norm2; rtol=10*delta)
+    # TODO If we implement getting a tangent vector that goes from m1 to m2, we should put
+    # in a test that checks that that vector is roughly tan1*delta.
 
     # Get the energies and gradients at both points. Check that the energy difference
     # between them is the inner product of the gradient and the tangent.
     f1, g1 = fg(m1)
     f2, g2 = fg(m2)
     reco1 = (f2 - f1)/delta
-    reco2 = (inner(m1, tan1, g1) + inner(m2, tan2, g2)) / 2.0
+    reco2 = (inner(m1, tan1, g1; metric=metric) + inner(m2, tan2, g2; metric=metric)) / 2.0
     @test isapprox(reco1, reco2; rtol=10*delta)
 end
 
 """
-Test the isometric Cayley parallel transport from
-http://www.optimization-online.org/DB_FILE/2016/09/5617.pdf
+Test vector transport.
 """
-function test_cayley_transport(meratype, spacetype, metric)
+function test_transport(meratype, spacetype, alg, metric)
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -413,21 +385,15 @@ function test_cayley_transport(meratype, spacetype, metric)
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
                 :metric => metric)
 
-    retract = cayley_retract
-    inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
-
-    g1, g2, g3 = [stiefel_gradient(ham, m, pars) for ham in hams]
+    g1, g2, g3 = [gradient(ham, m, pars; metric=metric) for ham in hams]
     # Transport g2 and g3 along the retraction by g1, by distance alpha.
     alpha = 2.7
-    g2t = cayley_transport(m, g1, g2, alpha)
-    g3t = cayley_transport(m, g1, g3, alpha)
+    mt = retract(m, g1, alpha; alg=alg)[1]
+    g2t = transport(g2, m, g1, alpha, mt; alg=alg)
+    g3t = transport(g3, m, g1, alpha, mt; alg=alg)
 
-    # Check that the transported vectors are proper tangents.
-    mt = retract(m, g1, alpha)[1]
-    @test istangent(mt, g2t)
-    @test istangent(mt, g3t)
     # Check that the inner product has been preserved by the transport.
-    @test inner(m, g2, g3) ≈ inner(mt, g2t, g3t)
+    @test inner(m, g2, g3; metric=metric) ≈ inner(mt, g2t, g3t; metric=metric)
 end
 
 function test_with_all_types(testfunc, meratypes, spacetypes, args...)
@@ -442,6 +408,7 @@ meratypes = (ModifiedBinaryMERA, BinaryMERA, TernaryMERA)
 spacetypes = (ComplexSpace, Z2Space)
 
 # Run the tests on different MERAs and vector spaces.
+# Basics
 @testset "Ascend and descend" begin
     test_with_all_types(test_ascend_and_descend, meratypes, spacetypes)
 end
@@ -466,24 +433,38 @@ end
 @testset "Reset storage" begin
     test_with_all_types(test_reset_storage, meratypes, spacetypes)
 end
-@testset "Stiefel gradient and Cayley retraction, canonical metric" begin
-    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
-                        cayley_retract, :canonical)
+
+# Manifold operations
+@testset "Stiefel gradient and retraction, Cayley transform, canonical metric" begin
+    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
+                        :cayley, :canonical)
 end
-@testset "Stiefel gradient and Cayley retraction, Euclidean metric" begin
-    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
-                        cayley_retract, :euclidean)
+@testset "Stiefel gradient and retraction, Cayley transform, Euclidean metric" begin
+    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
+                        :cayley, :euclidean)
 end
-@testset "Stiefel gradient and Stiefel geodesic retraction" begin
-    test_with_all_types(test_stiefel_gradient_and_retraction, meratypes, spacetypes,
-                        stiefel_geodesic, :canonical)
+@testset "Stiefel gradient and retraction, exponential, canonical metric" begin
+    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
+                        :exp, :canonical)
 end
-@testset "Cayley parallel transport, canonical metric" begin
-    test_with_all_types(test_cayley_transport, meratypes, spacetypes, :canonical)
+@testset "Stiefel gradient and retraction, exponential, Euclidean metric" begin
+    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
+                        :exp, :euclidean)
 end
-@testset "Cayley parallel transport, Euclidean metric" begin
-    test_with_all_types(test_cayley_transport, meratypes, spacetypes, :euclidean)
+@testset "Stiefel transport, cayley transform, canonical metric" begin
+    test_with_all_types(test_transport, meratypes, spacetypes, :cayley, :canonical)
 end
+@testset "Stiefel transport, cayley transform, Euclidean metric" begin
+    test_with_all_types(test_transport, meratypes, spacetypes, :cayley, :euclidean)
+end
+@testset "Stiefel transport, exponential, canonical metric" begin
+    test_with_all_types(test_transport, meratypes, spacetypes, :exp, :canonical)
+end
+@testset "Stiefel transport, exponential, Euclidean metric" begin
+    test_with_all_types(test_transport, meratypes, spacetypes, :exp, :euclidean)
+end
+
+# Optimization
 @testset "Optimization E-V" begin
     test_with_all_types((mt, st) -> test_optimization(mt, st, :ev), meratypes, spacetypes)
 end

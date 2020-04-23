@@ -919,28 +919,21 @@ function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     return T(layers)
 end
 
-function stiefel_inner(m::T, m1::T, m2::T) where T <: GenericMERA
+function inner(m::T, m1::T, m2::T; metric=:euclidean) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    inner = sum([stiefel_inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i))
-                 for i in 1:n])
-    return inner
+    res = sum([inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i); metric=metric)
+               for i in 1:n])
+    return res
 end
 
-function euclidean_inner(m::T, m1::T, m2::T) where T <: GenericMERA
-    n = max(num_translayers(m1), num_translayers(m2)) + 1
-    inner = sum([euclidean_inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i))
-                 for i in 1:n])
-    return inner
-end
-
-function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
+function gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     nt = num_translayers(m)
     layers = []
     for l in 1:nt
         layer = get_layer(m, l)
         rho = densitymatrix(m, l+1, pars)
         hl = ascended_operator(m, h, l)
-        grad = stiefel_gradient(hl, rho, layer, pars; kwargs...)
+        grad = gradient(hl, rho, layer; kwargs...)
         push!(layers, grad)
     end
 
@@ -948,27 +941,23 @@ function stiefel_gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     hsi = scale_invariant_operator_sum(m, h, pars)
     layer = get_layer(m, Inf)
     rho = densitymatrix(m, Inf, pars)
-    grad = stiefel_gradient(hsi, rho, layer, pars; kwargs...)
+    grad = gradient(hsi, rho, layer; kwargs...)
     push!(layers, grad)
     g = T(layers)
     return g
 end
 
-function stiefel_geodesic(m::T, mtan::T, alpha::Number) where T <: GenericMERA
-    layers, layers_tan = zip([stiefel_geodesic(l, ltan, alpha)
+function retract(m::T, mtan::T, alpha::Real; kwargs...) where T <: GenericMERA
+    layers, layers_tan = zip([retract(l, ltan, alpha; kwargs...)
                               for (l, ltan) in zip(m.layers, mtan.layers)]...)
     return T(layers), T(layers_tan)
 end
 
-function cayley_retract(m::T, mtan::T, alpha::Number) where T <: GenericMERA
-    layers, layers_tan = zip([cayley_retract(l, ltan, alpha)
-                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
-    return T(layers), T(layers_tan)
-end
-
-function cayley_transport(m::T, mtan::T, mvec::T, alpha::Number) where T <: GenericMERA
-    layers = [cayley_transport(l, ltan, lvec, alpha)
-              for (l, ltan, lvec) in zip(m.layers, mtan.layers, mvec.layers)]
+function transport(mvec::T, m::T, mtan::T, alpha::Real, mend::T; kwargs...
+                  ) where T <: GenericMERA
+    layers = [transport(lvec, l, ltan, alpha, lend; kwargs...)
+              for (lvec, l, ltan, lend)
+              in zip(mvec.layers, m.layers, mtan.layers, mend.layers)]
     return T(layers)
 end
 
@@ -982,47 +971,17 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
 
     function fg(x)
         f = normalization(expect(h, x, pars))
-        g = normalization(stiefel_gradient(h, x, pars;
-                                           vary_disentanglers=vary_disentanglers))
+        g = normalization(gradient(h, x, pars; metric=pars[:metric],
+                                   vary_disentanglers=vary_disentanglers))
         return f, g
     end
 
-    if pars[:retraction] == :geodesic
-        retract = stiefel_geodesic
-    elseif pars[:retraction] == :cayley
-        retract = cayley_retract
-    else
-        msg = "Unknown retraction $(pars[:retraction])."
-        throw(ArgumentError(msg))
-    end
-
-    # TODO Defining these here instead of within `if` is just a work-around for limitations
-    # of Revise.
-    transport_id!(vec1, x, vec2, alpha, endpoint) = vec1
-    transport_cay!(vec1, x, vec2, alpha, endpoint) = cayley_transport(x, vec2, vec1, alpha)
-    if pars[:transport] == :identity
-        transport! = transport_id!
-        isometric = false
-    elseif pars[:transport] == :cayley
-        transport! = transport_cay!
-        isometric = true
-    else
-        msg = "Unknown parallel transport $(pars[:transport])."
-        throw(ArgumentError(msg))
-    end
-
-    can_inner(m, x, y) = 2*real(stiefel_inner(m, x, y))
-    euc_inner(m, x, y) = 2*real(euclidean_inner(m, x, y))
-    if pars[:metric] === :canonical
-        inner = can_inner
-    elseif pars[:metric] === :euclidean
-        inner = euc_inner
-    else
-        msg = "Unknown metric $(pars[:metric])."
-        throw(ArgumentError(msg))
-    end
-    scale!(vec, beta) = tensorwise_scale(vec, beta)
-    add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
+    # TODO Maybe use the mutating versions.
+    rtrct(args...; kwargs...) = retract(args...; alg=pars[:retraction], kwargs...)
+    trnsprt(args...; kwargs...) = transport(args...; alg=pars[:transport], kwargs...)
+    innr(args...; kwargs...) = inner(args...; metric=pars[:metric], kwargs...)
+    scale(vec, beta) = tensorwise_scale(vec, beta)
+    add(vec1, vec2, beta) = tensorwise_sum(vec1, scale(vec2, beta))
     linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])
 
     if pars[:method] == :cg || pars[:method] == :conjugategradient
@@ -1053,8 +1012,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))
     end
-    res = optimize(fg, m, alg; scale! = scale!, add! = add!, retract=retract,
-                   inner=inner, transport! = transport!, isometrictransport=isometric)
+    res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
+                   inner=innr, transport! = trnsprt, isometrictransport=true)
     m, expectation, normgrad, normgradhistory = res
     @info("Gradient optimization done. Expectation = $(expectation).")
     return m

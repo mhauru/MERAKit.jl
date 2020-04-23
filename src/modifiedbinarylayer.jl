@@ -301,38 +301,25 @@ function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
-# # # Stiefel manifold functions
-
-function stiefel_gradient(h, rho, layer::ModifiedBinaryLayer, pars; vary_disentanglers=true)
+function gradient(h, rho, layer::ModifiedBinaryLayer; metric=:euclidean,
+                  vary_disentanglers=true)
     if vary_disentanglers
         uenv = environment_disentangler(h, layer, rho)
     else
         # TODO We could save some subleading computations by not running the whole machinery
         # when uenv .== 0, but this implementation is much simpler.
-        u = layer.disentangler
-        uenv = TensorMap(zeros, eltype(layer), codomain(u) ← domain(u))
+        uenv = zero(layer.disentangler)
     end
     wlenv = environment_isometry_left(h, layer, rho)
     wrenv = environment_isometry_right(h, layer, rho)
     u, wl, wr = layer
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    if pars[:metric] === :canonical
-        projection = stiefel_projection_canonical
-    elseif pars[:metric] === :euclidean
-        projection = stiefel_projection_euclidean
-    end
-    ugrad = projection(u, uenv)
-    wlgrad = projection(wl, wlenv)
-    wrgrad = projection(wr, wrenv)
+    # TODO Where exactly does this factor of 2 come from again? The conjugate part?
+    ugrad = Stiefel.project(2*uenv, u; metric=metric)
+    wlgrad = Stiefel.project(2*wlenv, wl; metric=metric)
+    wrgrad = Stiefel.project(2*wrenv, wr; metric=metric)
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
-end
-
-function stiefel_geodesic(l::ModifiedBinaryLayer, ltan::ModifiedBinaryLayer, alpha::Number)
-    u, utan = stiefel_geodesic_isometry(l.disentangler, ltan.disentangler, alpha)
-    wl, wltan = stiefel_geodesic_isometry(l.isometry_left, ltan.isometry_left, alpha)
-    wr, wrtan = stiefel_geodesic_isometry(l.isometry_right, ltan.isometry_right, alpha)
-    return ModifiedBinaryLayer(u, wl, wr), ModifiedBinaryLayer(utan, wltan, wrtan)
 end
 
 # # # Invariants
