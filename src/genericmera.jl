@@ -513,6 +513,8 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     eigsolve_pars = get(pars, :densitymatrix_eigsolve_pars, Dict())
     vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
     rho = vecs[1]
+    # We know the result should always be Hermitian, and scaled to have trace 1.
+    rho = (rho + rho') / 2.0
     rho /= tr(rho)
     if eltype(m) <: Real
         # rho isn't generally real for generic matrices, but we know that it should be for
