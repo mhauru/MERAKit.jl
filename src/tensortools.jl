@@ -237,3 +237,21 @@ function gershgorin_discs(a::Array{S, 2}) where {S}
     discs = tuple(zip(centres, radii)...)
     return discs
 end
+
+"""
+Get the module for the type of tensor manifold specified by the Symbol `s`, which should one
+of `:grassmann, :stiefel, :unitary`.
+"""
+function manifoldmodule(s::Symbol)
+    if s === :grassmann
+        manifold = Grassmann
+    elseif s === :stiefel
+        manifold = Stiefel
+    elseif s === :unitary
+        manifold = Unitary
+    else
+        msg = "Unknown tensor manifold type: $(isometrymanifold)"
+        throw(ArgumentError(msg))
+    end
+    return manifold
+end

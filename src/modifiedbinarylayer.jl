@@ -301,8 +301,8 @@ function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
-function gradient(h, rho, layer::ModifiedBinaryLayer; metric=:euclidean,
-                  vary_disentanglers=true)
+function gradient(h, rho, layer::ModifiedBinaryLayer; isometrymanifold=:grassmann,
+                  metric=:euclidean, vary_disentanglers=true)
     if vary_disentanglers
         uenv = environment_disentangler(h, layer, rho)
     else
@@ -316,9 +316,9 @@ function gradient(h, rho, layer::ModifiedBinaryLayer; metric=:euclidean,
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
     # TODO Where exactly does this factor of 2 come from again? The conjugate part?
-    ugrad = Stiefel.project(2*uenv, u; metric=metric)
-    wlgrad = Stiefel.project(2*wlenv, wl; metric=metric)
-    wrgrad = Stiefel.project(2*wrenv, wr; metric=metric)
+    ugrad = Stiefel.project!(2*uenv, u; metric=metric)
+    wlgrad = manifoldmodule(isometrymanifold).project!(2*wlenv, wl; metric=metric)
+    wrgrad = manifoldmodule(isometrymanifold).project!(2*wrenv, wr; metric=metric)
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
 end
 

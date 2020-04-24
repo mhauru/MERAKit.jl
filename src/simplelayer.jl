@@ -36,18 +36,20 @@ end
 
 # # # Manifold functions
 
-function inner(l::T, l1::T, l2::T; metric=:euclidean) where T <: SimpleLayer
-    return sum((Stiefel.inner(t...; metric=metric) for t in zip(l, l1, l2)))
+function TensorKitManifolds.inner(l::T, l1::T, l2::T; metric=:euclidean
+                                 ) where T <: SimpleLayer
+    return sum((inner(t...; metric=metric) for t in zip(l, l1, l2)))
 end
 
-function retract(l::T, ltan::T, alpha::Real; alg=:exp) where T <: SimpleLayer
-    ts_and_ttans = [Stiefel.retract(t..., alpha; alg=alg) for t in zip(l, ltan)]
+function TensorKitManifolds.retract(l::T, ltan::T, alpha::Real; alg=:exp
+                                   ) where T <: SimpleLayer
+    ts_and_ttans = [retract(t..., alpha; alg=alg) for t in zip(l, ltan)]
     ts, ttans = zip(ts_and_ttans...)
     return T(ts...), T(ttans...)
 end
 
-function transport(lvec::T, l::T, ltan::T, alpha::Real, lend::T; alg=:exp
-                  ) where {T <: SimpleLayer}
-    return T((Stiefel.transport(t[1], t[2], t[3], alpha, t[4]; alg=alg)
+function TensorKitManifolds.transport!(lvec::T, l::T, ltan::T, alpha::Real, lend::T;
+                                       alg=:exp) where {T <: SimpleLayer}
+    return T((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
               for t in zip(lvec, l, ltan, lend))...)
 end

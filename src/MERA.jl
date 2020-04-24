@@ -27,7 +27,7 @@ export minimize_expectation!
 export pseudoserialize, depseudoserialize
 export reset_storage!, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
-export gradient, retract, transport, inner
+export gradient, retract, transport!, inner
 
 include("tensortools.jl")
 include("genericmera.jl")

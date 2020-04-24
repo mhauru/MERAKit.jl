@@ -22,6 +22,7 @@ function parse_pars()
                     , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--method", arg_type=Symbol, default=:ev
+                    , "--isometrymanifold", arg_type=Symbol, default=:grassmann
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--metric", arg_type=Symbol, default=:canonical
@@ -48,10 +49,6 @@ function main()
         pars[:symmetry] = symmetry
     end
     block_size = pars[:block_size]
-    method = pars[:method]
-    retraction = pars[:retraction]
-    transport = pars[:transport]
-    metric = pars[:metric]
 
     logstr = "Running demo.jl with"
     for (k, v) in pars
@@ -62,10 +59,11 @@ function main()
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
     scale_invariant_eps = pars[:scale_invariant_eps]
-    pars[:initial_opt_pars] = Dict(:method => method,
-                                   :retraction => retraction,
-                                   :transport => transport,
-                                   :metric => metric,
+    pars[:initial_opt_pars] = Dict(:method => pars[:method],
+                                   :isometrymanifold => pars[:isometrymanifold],
+                                   :retraction => pars[:retraction],
+                                   :transport => pars[:transport],
+                                   :metric => pars[:metric],
                                    :gradient_delta => 1e-5,
                                    :maxiter => 30,
                                    :isometries_only_iters => 10,

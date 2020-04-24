@@ -121,7 +121,8 @@ function ascending_fixedpoint(layer::TernaryLayer)
     return eye
 end
 
-function gradient(h, rho, layer::TernaryLayer; metric=:euclidean, vary_disentanglers=true)
+function gradient(h, rho, layer::TernaryLayer; isometrymanifold=:grassmann,
+                  metric=:euclidean, vary_disentanglers=true)
     if vary_disentanglers
         uenv = environment_disentangler(h, layer, rho)
     else
@@ -134,8 +135,8 @@ function gradient(h, rho, layer::TernaryLayer; metric=:euclidean, vary_disentang
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
     # TODO Where exactly does this factor of 2 come from again? The conjugate part?
-    ugrad = Stiefel.project(2*uenv, u; metric=metric)
-    wgrad = Stiefel.project(2*wenv, w; metric=metric)
+    ugrad = Stiefel.project!(2*uenv, u; metric=metric)
+    wgrad = manifoldmodule(isometrymanifold).project!(2*wenv, w; metric=metric)
     return TernaryLayer(ugrad, wgrad)
 end
 

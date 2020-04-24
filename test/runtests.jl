@@ -292,6 +292,7 @@ function test_optimization(meratype, spacetype, method)
                 :layer_iters => 1,
                 :disentangler_iters => 1,
                 :isometry_iters => 1,
+                :isometrymanifold => :grassmann,
                 :retraction => :cayley,
                 :transport => :cayley,
                 :metric => :canonical,
@@ -336,7 +337,7 @@ function test_gradient_and_retraction(meratype, spacetype, alg, metric)
     eye = id(V)
 
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :metric => metric)
+                :isometrymanifold => :grassmann, :metric => metric)
 
     fg(x) = (expect(ham, x), gradient(ham, x, pars; metric=metric))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
@@ -383,17 +384,19 @@ function test_transport(meratype, spacetype, alg, metric)
     hams = [ham + ham' for ham in hams]
 
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :metric => metric)
+                :isometrymanifold => :grassmann, :metric => metric)
 
     g1, g2, g3 = [gradient(ham, m, pars; metric=metric) for ham in hams]
+    angle_pre = inner(m, g2, g3; metric=metric)
     # Transport g2 and g3 along the retraction by g1, by distance alpha.
     alpha = 2.7
     mt = retract(m, g1, alpha; alg=alg)[1]
-    g2t = transport(g2, m, g1, alpha, mt; alg=alg)
-    g3t = transport(g3, m, g1, alpha, mt; alg=alg)
+    g2t = transport!(g2, m, g1, alpha, mt; alg=alg)
+    g3t = transport!(g3, m, g1, alpha, mt; alg=alg)
+    angle_post = inner(mt, g2t, g3t; metric=metric)
 
     # Check that the inner product has been preserved by the transport.
-    @test inner(m, g2, g3; metric=metric) ≈ inner(mt, g2t, g3t; metric=metric)
+    @test angle_pre ≈ angle_post
 end
 
 function test_with_all_types(testfunc, meratypes, spacetypes, args...)

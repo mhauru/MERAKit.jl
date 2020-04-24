@@ -25,6 +25,7 @@ function parse_pars()
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--datasuffix", arg_type=String, default=""
                     , "--method", arg_type=Symbol, default=:ev
+                    , "--isometrymanifold", arg_type=Symbol, default=:grassmann
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--metric", arg_type=Symbol, default=:canonical
@@ -57,6 +58,7 @@ function main()
     reps = pars[:reps]
     scale_invariant_eps = pars[:scale_invariant_eps]
     opt_pars = Dict(:method => pars[:method],
+                    :isometrymanifold => pars[:isometrymanifold],
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
                     :metric => pars[:metric],

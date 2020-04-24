@@ -919,7 +919,8 @@ function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     return T(layers)
 end
 
-function inner(m::T, m1::T, m2::T; metric=:euclidean) where T <: GenericMERA
+function TensorKitManifolds.inner(m::T, m1::T, m2::T; metric=:euclidean
+                                 ) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
     res = sum([inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i); metric=metric)
                for i in 1:n])
@@ -927,6 +928,9 @@ function inner(m::T, m1::T, m2::T; metric=:euclidean) where T <: GenericMERA
 end
 
 function gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
+    kwargs = Dict{Symbol, Any}(kwargs)
+    :metric ∉ keys(kwargs) && (kwargs[:metric] = pars[:metric])
+    :isometrymanifold ∉ keys(kwargs) && (kwargs[:isometrymanifold] = pars[:isometrymanifold])
     nt = num_translayers(m)
     layers = []
     for l in 1:nt
@@ -947,15 +951,16 @@ function gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
     return g
 end
 
-function retract(m::T, mtan::T, alpha::Real; kwargs...) where T <: GenericMERA
+function TensorKitManifolds.retract(m::T, mtan::T, alpha::Real; kwargs...
+                                   ) where T <: GenericMERA
     layers, layers_tan = zip([retract(l, ltan, alpha; kwargs...)
                               for (l, ltan) in zip(m.layers, mtan.layers)]...)
     return T(layers), T(layers_tan)
 end
 
-function transport(mvec::T, m::T, mtan::T, alpha::Real, mend::T; kwargs...
-                  ) where T <: GenericMERA
-    layers = [transport(lvec, l, ltan, alpha, lend; kwargs...)
+function TensorKitManifolds.transport!(mvec::T, m::T, mtan::T, alpha::Real, mend::T;
+                                       kwargs...) where T <: GenericMERA
+    layers = [transport!(lvec, l, ltan, alpha, lend; kwargs...)
               for (lvec, l, ltan, lend)
               in zip(mvec.layers, m.layers, mtan.layers, mend.layers)]
     return T(layers)
@@ -971,14 +976,12 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
 
     function fg(x)
         f = normalization(expect(h, x, pars))
-        g = normalization(gradient(h, x, pars; metric=pars[:metric],
-                                   vary_disentanglers=vary_disentanglers))
+        g = normalization(gradient(h, x, pars; vary_disentanglers=vary_disentanglers))
         return f, g
     end
 
-    # TODO Maybe use the mutating versions.
     rtrct(args...; kwargs...) = retract(args...; alg=pars[:retraction], kwargs...)
-    trnsprt(args...; kwargs...) = transport(args...; alg=pars[:transport], kwargs...)
+    trnsprt!(args...; kwargs...) = transport!(args...; alg=pars[:transport], kwargs...)
     innr(args...; kwargs...) = inner(args...; metric=pars[:metric], kwargs...)
     scale(vec, beta) = tensorwise_scale(vec, beta)
     add(vec1, vec2, beta) = tensorwise_sum(vec1, scale(vec2, beta))
@@ -1013,7 +1016,7 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
         throw(ArgumentError(msg))
     end
     res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
-                   inner=innr, transport! = trnsprt, isometrictransport=true)
+                   inner=innr, transport! = trnsprt!, isometrictransport=true)
     m, expectation, normgrad, normgradhistory = res
     @info("Gradient optimization done. Expectation = $(expectation).")
     return m
