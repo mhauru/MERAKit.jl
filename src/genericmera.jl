@@ -782,7 +782,7 @@ function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
                 i += 2
                 i+1 > length(caps) && (i = 1)  # Go back to the first method.
                 total_iters += iters
-                total_iters > pars[:maxiter] && break
+                total_iters >= pars[:maxiter] && break
             end
             return m
         end
