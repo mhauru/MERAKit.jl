@@ -213,8 +213,9 @@ function gershgorin_discs(t::TensorMap{S, N, N}) where {S, N}
 end
 
 function gershgorin_bounds(a::Array{S, 2}) where {S}
-    if norm(a - a')/norm(a) > 1e-12
-        msg = "Can't compute gershgorin_bounds for a non-Hermitian operator."
+    nonhermiticity = norm(a - a')/norm(a)
+    if nonhermiticity > 1e-12
+        msg = "Can't compute gershgorin_bounds for a non-Hermitian operator (non-hermiticity = $(nonhermiticity))."
         throw(ArgumentError(msg))
     end
     discs = gershgorin_discs(a)
