@@ -226,6 +226,20 @@ function Base.fill!(op::ModifiedBinaryOp, a::Number)
     return op
 end
 
+function LinearAlgebra.dot(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
+    dotmid = dot(op1.mid, op2.mid)
+    dotgap = dot(op1.gap, op2.gap)
+    return (dotmid + dotgap) / 2.0
+end
+
+function LinearAlgebra.dot(op1::ModifiedBinaryOp, t2::AbstractTensorMap)
+    return dot(op1, ModifiedBinaryOp(t2))
+end
+
+function LinearAlgebra.dot(t1::AbstractTensorMap, op2::ModifiedBinaryOp)
+    return dot(ModifiedBinaryOp(t1), op2)
+end
+
 function LinearAlgebra.rmul!(op::ModifiedBinaryOp, a::Number)
     rmul!(op.mid, a)
     rmul!(op.gap, a)

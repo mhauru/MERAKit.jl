@@ -105,8 +105,8 @@ function test_ascend_and_descend(meratype, spacetype)
         randomop2 = TensorMap(randn, ComplexF64, lower_space ← lower_space)
         down1 = descend(randomop1, m, startscale=i+1, endscale=i)
         up2 = ascend(randomop2, m, startscale=i, endscale=i+1)
-        e1 = tr(down1 * randomop2)
-        e2 = tr(up2 * randomop1)
+        e1 = dot(down1, randomop2)
+        e2 = dot(randomop1, up2)
         @test e1 ≈ e2
     end
 end
@@ -178,11 +178,19 @@ function test_expand_bonddim(meratype, spacetype)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
     expectation = expect(randomop, m)
+    sf = scalefactor(meratype)
 
     # Expand the interlayer spaces, check that expectation value is preserved.
     for i in 1:(layers-1)
         V = inputspace(m, i)
-        newdims = Dict(s => dim(V, s)+1 for s in sectors(V))
+        expandable_sectors = sectors(V)
+        Vint = fuse(⊗(repeat([internalspace(m, i)], sf)...))
+        expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
+        if i == layers-1
+            Vint = fuse(⊗(repeat([internalspace(m, i+1)], sf)...))
+            expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
+        end
+        newdims = Dict(s => dim(V, s) + 1 for s in expandable_sectors)
         m = expand_bonddim!(m, i, newdims)
     end
     new_expectation = expect(randomop, m)

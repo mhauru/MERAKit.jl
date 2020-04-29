@@ -640,13 +640,13 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
         old_factor = factor
         # Get the next term in the series, with the contribution along fp subtracted.
         op_l = ascended_operator(m, op, nt+l)
-        inner = tr(op_l * fp')
+        inner = dot(fp, op_l)
         op_l = op_l - inner*fp
         # Add one more term to opsum.
         opsum = opsum + op_l
         # factor is the scalar that minimizes |op_l - factor * old_op|.
-        old_norm = tr(old_op' * old_op)
-        factor = old_norm == 0.0 ? 0.0 : tr(old_op' * op_l) / old_norm
+        old_norm = dot(old_op, old_op)
+        factor = old_norm == 0.0 ? 0.0 : dot(old_op, op_l) / old_norm
         # We know that eventually the sum should turn into a geometric series, once op_l
         # is close enough to the dominant eigenvector of the ascending superoperator
         # (dominant after the fp contribution has been removed). Thus we can estimate the
@@ -742,7 +742,7 @@ function expect(op, m::GenericMERA, pars=Dict(); opscale=1, evalscale=1)
     op = ascended_operator(m, op, evalscale)
     # If the operator is defined on a smaller support (number of sites) than rho, expand it.
     op = expand_support(op, support(rho))
-    value = tr(rho * op)
+    value = dot(rho, op)
     if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")
     end
