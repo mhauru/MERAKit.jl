@@ -104,6 +104,17 @@ function release_transitionlayer!(m::GenericMERA)
 end
 
 """
+Project all the tensors of the MERA to respect the isometricity condition.
+"""
+function TensorKitManifolds.projectisometric(m::T) where T <: GenericMERA
+    return T(map(projectisometric, m.layers))
+end
+
+function TensorKitManifolds.projectisometric!(m::T) where T <: GenericMERA
+    return T(map(projectisometric!, m.layers))
+end
+
+"""
 Given a MERA and a depth, return the vector space of the downwards-pointing (towards the
 physical level) indices of the layer at that depth.
 """

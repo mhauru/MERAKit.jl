@@ -273,6 +273,32 @@ function test_reset_storage(meratype, spacetype)
 end
 
 """
+Create a MERA that breaks the isometricity condition, by summing up two random MERAs.
+Restore isometricity with projectisometric and projectisometric!, and confirm that the
+expectation value of the identity is indeed 1 after this.
+"""
+function test_projectisometric(meratype, spacetype)
+    layers = 4
+    spaces = random_layerspaces(spacetype, meratype, layers)
+    intspaces = random_internalspaces(spaces, meratype)
+    m1 = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
+    m2 = random_MERA(meratype, spaces, intspaces; random_disentangler=true)
+    m = tensorwise_sum(m1, m2)
+    V = outputspace(m, 1)
+    eye = id(V)
+    # Test that we've broken isometricity
+    @test !(expect(eye, m; evalscale=1) ≈ 1.0)
+    # Test that the new MERA is isometric, but that the old one hasn't changed.
+    m_new = projectisometric(m)
+    @test expect(eye, m_new; evalscale=1) ≈ 1.0
+    @test !(expect(eye, m; evalscale=1) ≈ 1.0)
+    # Test that projectisometric! works too. Note that there's no guarantee that it modifies
+    # the old m to be isometric. The ! simply gives it permission to mess with old objects.
+    m = projectisometric!(m)
+    @test expect(eye, m; evalscale=1) ≈ 1.0
+end
+
+"""
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
@@ -435,6 +461,9 @@ end
 end
 @testset "Reset storage" begin
     test_with_all_types(test_reset_storage, meratypes, spacetypes)
+end
+@testset "Reset projectisometric" begin
+    test_with_all_types(test_projectisometric, meratypes, spacetypes)
 end
 
 # Manifold operations

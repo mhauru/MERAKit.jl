@@ -18,6 +18,14 @@ function remove_symmetry(layer::T) where T <: SimpleLayer
     return T(map(remove_symmetry, layer)...)
 end
 
+function TensorKitManifolds.projectisometric(layer::T) where T <: SimpleLayer
+    return T(map(projectisometric, layer)...)
+end
+
+function TensorKitManifolds.projectisometric!(layer::T) where T <: SimpleLayer
+    return T(map(projectisometric!, layer)...)
+end
+
 function pseudoserialize(layer::T) where T <: SimpleLayer
     return repr(T), map(pseudoserialize, layer)
 end

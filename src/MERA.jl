@@ -25,6 +25,7 @@ export release_transitionlayer!, expand_bonddim!, expand_internal_bonddim!
 export expect
 export minimize_expectation!
 export pseudoserialize, depseudoserialize
+export projectisometric, projectisometric!
 export reset_storage!, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
 export gradient, retract, transport!, inner
