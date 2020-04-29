@@ -215,7 +215,7 @@ end
 Ascend a threesite `op` with an extra free leg from the bottom of the given layer to the
 top.
 """
-function ascend(op::TensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
+function ascend(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer, pos=:avg) where {S1}
     u, w = layer
     if in(pos, (:left, :l, :L))
         @tensor(

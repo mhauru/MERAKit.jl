@@ -4,7 +4,7 @@
 """
 A TensorMap from N indices to N indices.
 """
-SquareTensorMap{N} = TensorMap{S1, N, N} where {S1}
+SquareTensorMap{N} = AbstractTensorMap{S1, N, N} where {S1}
 
 """
 Given two vector spaces, create an isometric/unitary TensorMap from one to the other. This
@@ -132,7 +132,8 @@ end
 """
 Reconstruct a TensorMap given the output of `pseudoserialize`.
 """
-function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data) where T <: TensorMap
+function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data
+                          ) where T <: AbstractTensorMap
     # We make use of the nice fact that many TensorKit objects return on repr
     # strings that are valid syntax to reconstruct these objects.
     dom = eval(Meta.parse(domstr))
@@ -160,7 +161,7 @@ spacedict[i]` should be of the same type. If `Vnew` is strictly larger than `Vol
 is padded with zeros to fill in the new elements. Otherwise some elements of `t` will be
 truncated away.
 """
-function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
+function pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
     # Expanders are the matrices by which each index will be multiplied to change the space.
     idmat(T, shp) = Array{T}(I, shp)
     expanders = [TensorMap(idmat, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict]
@@ -180,13 +181,13 @@ function pad_with_zeros_to(t::TensorMap, spacedict::Dict)
     return t_new
 end
 
-pad_with_zeros_to(t::TensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
+pad_with_zeros_to(t::AbstractTensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
 
 """
 Fuse the domain and codomain of a TensorMap, and return the resulting matrix (as a
 TensorMap).
 """
-function convert_to_matrix(t::TensorMap)
+function convert_to_matrix(t::AbstractTensorMap)
     dom, codom = domain(t), codomain(t)
     domainfuser = isomorphism(dom, fuse(dom))
     codomainfuser = isomorphism(codom, fuse(codom))
@@ -199,7 +200,7 @@ For a Hermitian square tensor (fusing the domain and codomain into single indice
 lower and upper bound between which all its eigenvalues lie. This costs O(D^2) where D is
 the matrix dimension.
 """
-function gershgorin_bounds(t::TensorMap{S, N, N}) where {S, N}
+function gershgorin_bounds(t::AbstractTensorMap{S, N, N}) where {S, N}
     return gershgorin_bounds(convert(Array, convert_to_matrix(t)))
 end
 
@@ -208,7 +209,7 @@ For a square tensor (fusing the domain and codomain into single indices), return
 its Gershgorin discs, as pairs (c, r) where c is the centre and r is the radius. This costs
 O(D^2) where D is the matrix dimension.
 """
-function gershgorin_discs(t::TensorMap{S, N, N}) where {S, N}
+function gershgorin_discs(t::AbstractTensorMap{S, N, N}) where {S, N}
     return gershgorin_discs(convert(Array, convert_to_matrix(t)))
 end
 

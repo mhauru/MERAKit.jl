@@ -422,7 +422,7 @@ end
 Ascend a threesite `op` from the bottom of the given layer to the top.
 """
 function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer, pos=:avg
-               ) where {S1, T <: TensorMap{S1,2,3}}
+               ) where {S1, T <: AbstractTensorMap{S1,2,3}}
     u, wl, wr = layer
     op_mid, op_gap = op
     if in(pos, (:left, :l, :L))
@@ -487,7 +487,8 @@ function ascend(op::SquareTensorMap{1}, layer::ModifiedBinaryLayer, pos=:avg)
     return ascend(op, layer, pos)
 end
 
-function ascend(op::TensorMap{S1,2,3}, layer::ModifiedBinaryLayer, pos=:avg) where {S1}
+function ascend(op::AbstractTensorMap{S1,2,3}, layer::ModifiedBinaryLayer, pos=:avg
+               ) where {S1}
     op = ModifiedBinaryOp(op)
     return ascend(op, layer, pos)
 end
@@ -550,7 +551,7 @@ function descend(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer, pos=:avg)
     return scaled_rho
 end
 
-function descend(op::TensorMap, layer::ModifiedBinaryLayer, pos=:avg)
+function descend(op::AbstractTensorMap, layer::ModifiedBinaryLayer, pos=:avg)
     return descend(ModifiedBinaryOp(op), layer, pos)
 end
 

@@ -241,7 +241,7 @@ end
 """
 Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
 """
-function ascend(op::TensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
+function ascend(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
     u, w = layer
     if in(pos, (:left, :l, :L))
         # Cost: 2X^8 + 2X^7 + 2X^6
