@@ -3,6 +3,7 @@ using TensorKit
 using LinearAlgebra
 using MERA
 using Logging
+using Random
 
 function particle_number_operator(::Type{Z2Space})
     V = Z2Space(ℤ₂(0) => 1, ℤ₂(1) => 1)
@@ -314,7 +315,7 @@ function test_optimization(meratype, spacetype, method)
                 :maxiter => 500,
                 :isometries_only_iters => 30,
                 :scale_invariant_sum_depth => 50,
-                :scale_invariant_sum_tol => 1e-6,
+                :scale_invariant_sum_tol => 1e-8,
                 :layer_iters => 1,
                 :disentangler_iters => 1,
                 :isometry_iters => 1,
@@ -323,10 +324,10 @@ function test_optimization(meratype, spacetype, method)
                 :transport => :cayley,
                 :metric => :canonical,
                 :lbfgs_m => 8,
-                :ls_epsilon => 1e-2,
+                :ls_epsilon => 1e-6,
                 :verbosity => 1,
                 :densitymatrix_eigsolve_pars => Dict(
-                                                     :tol => 1e-6,
+                                                     :tol => 1e-8,
                                                      :krylovdim => 4,
                                                      :verbosity => 0,
                                                      :maxiter => 20,
@@ -433,6 +434,7 @@ function test_with_all_types(testfunc, meratypes, spacetypes, args...)
     end
 end
 
+Random.seed!(1)  # For reproducing the same tests again and again.
 meratypes = (ModifiedBinaryMERA, BinaryMERA, TernaryMERA)
 spacetypes = (ComplexSpace, Z2Space)
 
