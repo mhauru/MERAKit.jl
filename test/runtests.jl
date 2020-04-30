@@ -333,7 +333,7 @@ function test_optimization(meratype, spacetype, method)
                 :metric => :canonical,
                 :lbfgs_m => 8,
                 :ls_epsilon => 1e-6,
-                :verbosity => 1,
+                :verbosity => 0,
                 :densitymatrix_eigsolve_pars => Dict(
                                                      :tol => 1e-8,
                                                      :krylovdim => 4,
