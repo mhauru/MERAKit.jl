@@ -1098,6 +1098,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
     res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
                    inner=innr, transport! = trnsprt!, isometrictransport=true)
     m, expectation, normgrad, normgradhistory = res
-    @info("Gradient optimization done. Expectation = $(expectation).")
+    if pars[:verbosity] > 0
+        @info("Gradient optimization done. Expectation = $(expectation).")
+    end
     return m
 end
