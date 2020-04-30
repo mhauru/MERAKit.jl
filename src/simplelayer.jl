@@ -61,3 +61,11 @@ function TensorKitManifolds.transport!(lvec::T, l::T, ltan::T, alpha::Real, lend
     return T((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
               for t in zip(lvec, l, ltan, lend))...)
 end
+
+function gradient_normsq(layer::T, env::T; normalization=noop_firstarg,
+                         isometrymanifold=:grassmann, metric=:euclidean
+                        ) where {T <: SimpleLayer}
+    grad = normalization(gradient(layer, env; isometrymanifold=isometrymanifold,
+                                  metric=metric))
+    return sum(inner(x, z, z; metric=metric) for (x, z) in zip(layer, grad))
+end

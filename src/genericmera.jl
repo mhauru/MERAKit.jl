@@ -26,6 +26,7 @@ struct GenericMERA{T}
     layers::Vector{T}
     stored_densitymatrices::Vector
     stored_operators::Dict{Any, Vector}
+    stored_environments::Dict{Any, Vector{Union{Nothing, T}}}
     # previous_fixedpoint_densitymatrix will only ever store one value, but we store it in a
     # Vector, since that matches with the rest of the storage format and keeps GenericMERA
     # immutable.
@@ -35,8 +36,9 @@ struct GenericMERA{T}
         num_layers = length(layers)
         stored_densitymatrices = Vector{Any}(repeat([nothing], num_layers))
         stored_operators = Dict{Any, Vector}()
+        stored_environments = Dict{Any, Vector{Union{Nothing, T}}}()
         previous_fixedpoint_densitymatrix = Any[nothing]
-        new(collect(layers), stored_densitymatrices, stored_operators,
+        new(collect(layers), stored_densitymatrices, stored_operators, stored_environments,
             previous_fixedpoint_densitymatrix)
     end
 end
@@ -96,9 +98,8 @@ function release_transitionlayer!(m::GenericMERA)
     push!(m.layers, layer)
     density_matrix = m.stored_densitymatrices[end]
     push!(m.stored_densitymatrices, density_matrix)
-    for (k, v) in m.stored_operators
-        operator = v[end]
-        push!(v, operator)
+    for (k, v) in m.stored_environments
+        push!(v, nothing)
     end
     return m
 end
@@ -146,18 +147,23 @@ densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatr
 # normalization function.
 noop_firstarg(args...) = args[1]
 
-# # # Storage of density matrices and ascended operators
+# # # Storage of density matrices, ascended operators, and environments
 
-# The storage format for density matrices and operators is a little different:
-# For density matrices we always store a Vector of the same length as there are layers. If
-# a density matrix is not in store, `nothing` is kept as the corresponding element.
-# For operators, m.stored_operators is a dictionary with operators as keys, and each
-# element is a Vector that lists the ascended versions of that operator, starting from the
-# physical one, which is nothing but the original operator. No place-holder `nothing`s are
-# stored, the Vector ends when storage ends.
-# This difference is because density matrices are naturally generated from the top, and
-# there will never be more than the number of layers of them. Operators are generated from
-# the bottom, and they may go arbitrarily high in the MERA (into the scale invariant part).
+# The storage formats for density matrices, operators, and environments are a little
+# different: For density matrices we always store a Vector of the same length as there are
+# layers. If a density matrix is not in store, `nothing` is kept as the corresponding
+# element. For operators, m.stored_operators is a dictionary with operators as keys, and
+# each element is a Vector that lists the ascended versions of that operator, starting from
+# the physical one, which is nothing but the original operator. No place-holder `nothing`s
+# are stored, the Vector ends when storage ends. For environments, m.stored_environments is
+# a Dict just like m.stored_operators, but its values are Vectors that hold either Layers
+# are Nothings, where each Layer has instead of tensors of the layer, environments for the
+# tensors of a layer.
+# To understand the reason for these differences, note that density matrices are naturally
+# generated from the top, and there will never be more than the number of layers of them.
+# Similarly it doesn't make sense to have more than one environment for each layer.
+# Operators are generated from the bottom, and they may go arbitrarily high in the MERA
+# (into the scale invariant part).
 
 """
 Reset stored density matrices and ascended operators, so that they will be recomputed when
@@ -171,12 +177,16 @@ function reset_storage!(m::GenericMERA, depth)
         last_index = min(depth, length(v))
         m.stored_operators[k] = v[1:last_index]
     end
+    # Changing anything always invalidates all environments, since they depend on things
+    # both above and below.
+    reset_environment_storage!(m)
     return m
 end
 
 function reset_storage!(m::GenericMERA)
     m.stored_densitymatrices[:] .= nothing
     reset_operator_storage!(m)
+    reset_environment_storage!(m)
     return m
 end
 
@@ -267,6 +277,54 @@ function reset_operator_storage!(m::GenericMERA)
     ops = keys(m.stored_operators)
     for op in ops
         reset_operator_storage!(m, op)
+    end
+    return m
+end
+
+"""
+Return the environments related to `op`. Initialize storage for `op` if necessary.
+"""
+function environment_storage(m::GenericMERA{T}, op) where T
+    if !(op in keys(m.stored_environments))
+        num_layers = length(m.layers)
+        m.stored_environments[op] = repeat(Union{Nothing, T}[nothing], num_layers)
+    end
+    return m.stored_environments[op]
+end
+
+"""
+Return whether the environment related to `op` at `depth` is already in store.
+"""
+function has_environment_stored(m::GenericMERA, op, depth)
+    storage = environment_storage(m, op)
+    return storage[depth] !== nothing
+end
+
+"""
+Return the environment related to `op` at `depth`. Return `nothing` is this environment is
+not in store.
+"""
+function get_stored_environment(m::GenericMERA, op, depth)
+    storage = environment_storage(m, op)
+    return storage[depth]
+end
+
+"""
+Store `env`, the environments related to `op` at `depth`.
+"""
+function set_stored_environment!(m::GenericMERA, env, op, depth)
+    storage = environment_storage(m, op)
+    storage[depth] = env
+    return m
+end
+
+"""
+Reset storage for environments.
+"""
+function reset_environment_storage!(m::GenericMERA)
+    ops = keys(m.stored_environments)
+    for op in ops
+        delete!(m.stored_environments, op)
     end
     return m
 end
@@ -398,8 +456,8 @@ remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
 # constructing it back. This can be used for storing MERAs on disk.
 # TODO Once JLD or JLD2 works properly we should be able to get rid of this.
 #
-# Note that pseudoserialization discards stored_densitymatrices and stored_operators, which
-# then need to be recomputed after deserialization.
+# Note that pseudoserialization discards stored_densitymatrices, stored_operators, and
+# stored_environments, which then need to be recomputed after deserialization.
 
 """
 Return a tuple of objects that can be used to reconstruct a given MERA, and that are all of
@@ -677,6 +735,28 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     return opsum
 end
 
+"""
+Return the environment related to `op` at `depth`. This function uses the cache to store the
+environment and retrieve it from storage if it is already there.
+"""
+function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
+    if has_environment_stored(m, op, depth)
+        env = get_stored_environment(m, op, depth)
+    else
+        if depth <= num_translayers(m)
+            op_below = ascended_operator(m, op, depth)
+        else
+            op_below = scale_invariant_operator_sum(m, op, pars)
+        end
+        op_below = normalise_hamiltonian(op_below)
+        rho_above = densitymatrix(m, depth+1, pars)
+        layer = get_layer(m, depth)
+        env = environment(layer, op_below, rho_above; vary_disentanglers=vary_disentanglers)
+        set_stored_environment!(m, env, op, depth)
+    end
+    return env
+end
+
 # # # Extracting CFT data
 
 """
@@ -855,28 +935,25 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
         counter += 1
         old_rhos = rhos
         old_expectation = expectation
-        gradnorm_sq = 0
+        gradnorm_sq = 0.0
 
-        for l in lowest_depth:nt
-            rho = densitymatrix(m, l+1, pars)
-            hl = ascended_operator(m, h, l)
-            hl_normalised = normalise_ev_hamiltonian(hl)
-            layer = get_layer(m, l)
-            layer, gradnorm_layer = minimize_expectation_ev(hl_normalised, layer, rho, pars;
-                                                            vary_disentanglers=vary_disentanglers)
-            gradnorm_sq += gradnorm_layer^2
-            set_layer!(m, layer, l)
+        for l in lowest_depth:nt+1
+            env, layer = nothing, nothing
+            for i in 1:pars[:layer_iters]
+                env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
+                layer = get_layer(m, l)
+                new_layer = minimize_expectation_ev(layer, env, pars;
+                                                    vary_disentanglers=vary_disentanglers)
+                set_layer!(m, new_layer, l)
+            end
+            # We use the latest env and the corresponding layer to compute the norm of the
+            # gradient. This isn't quite the gradient at the end point, which is what we
+            # would want, but close enough.
+            gradnorm_sq += gradient_normsq(layer, env;
+                                           normalization=normalization,
+                                           isometrymanifold=pars[:isometrymanifold],
+                                           metric=pars[:metric])
         end
-
-        # Special case of the translation invariant layer.
-        hsi = scale_invariant_operator_sum(m, h, pars)
-        hsi_normalised = normalise_ev_hamiltonian(hsi)
-        layer = get_layer(m, Inf)
-        rho = densitymatrix(m, Inf, pars)
-        layer, gradnorm_layer = minimize_expectation_ev(hsi_normalised, layer, rho, pars;
-                                                        vary_disentanglers=vary_disentanglers)
-        gradnorm_sq += gradnorm_layer^2
-        set_layer!(m, layer, Inf)
 
         gradnorm = normalization(sqrt(gradnorm_sq), Val(:gradient))
         rhos = densitymatrices(m, pars)
@@ -907,7 +984,7 @@ end
 Change the additive normalisation of a local Hamiltonian term to make it suitable for
 computing an E-V update environment.
 """
-function normalise_ev_hamiltonian(h)
+function normalise_hamiltonian(h)
     lb, ub = gershgorin_bounds(h)
     eye = id(domain(h))
     return h - ub*eye
@@ -938,26 +1015,18 @@ function TensorKitManifolds.inner(m::T, m1::T, m2::T; metric=:euclidean
     return res
 end
 
-function gradient(h, m::T, pars; kwargs...) where T <: GenericMERA
+function gradient(h, m::T, pars; vary_disentanglers=true, kwargs...) where T <: GenericMERA
     kwargs = Dict{Symbol, Any}(kwargs)
     :metric ∉ keys(kwargs) && (kwargs[:metric] = pars[:metric])
     :isometrymanifold ∉ keys(kwargs) && (kwargs[:isometrymanifold] = pars[:isometrymanifold])
     nt = num_translayers(m)
     layers = []
-    for l in 1:nt
+    for l in 1:nt+1
         layer = get_layer(m, l)
-        rho = densitymatrix(m, l+1, pars)
-        hl = ascended_operator(m, h, l)
-        grad = gradient(hl, rho, layer; kwargs...)
+        env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
+        grad = gradient(layer, env; kwargs...)
         push!(layers, grad)
     end
-
-    # Special case of the translation invariant layer.
-    hsi = scale_invariant_operator_sum(m, h, pars)
-    layer = get_layer(m, Inf)
-    rho = densitymatrix(m, Inf, pars)
-    grad = gradient(hsi, rho, layer; kwargs...)
-    push!(layers, grad)
     g = T(layers)
     return g
 end

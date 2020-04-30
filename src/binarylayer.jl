@@ -120,17 +120,10 @@ function ascending_fixedpoint(layer::BinaryLayer)
     return eye
 end
 
-function gradient(h, rho, layer::BinaryLayer; isometrymanifold=:grassmann,
-                  metric=:euclidean, vary_disentanglers=true)
-    if vary_disentanglers
-        uenv = environment_disentangler(h, layer, rho)
-    else
-        # TODO We could save some subleading computations by not running the whole machinery
-        # when uenv .== 0, but this implementation is much simpler.
-        uenv = zero(layer.disentangler)
-    end
-    wenv = environment_isometry(h, layer, rho)
+function gradient(layer::BinaryLayer, env::BinaryLayer; isometrymanifold=:grassmann,
+                  metric=:euclidean)
     u, w = layer
+    uenv, wenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
     # TODO Where exactly does this factor of 2 come from again? The conjugate part?
@@ -291,46 +284,28 @@ end
 # # # Optimization
 
 """
-Loop over the tensors of the layer, optimizing each one in turn to minimize the expecation
-value of `h`. `rho` is the density matrix right above this layer.
-
-Three parameters are expected to be in the dictionary `pars`:
-    :layer_iters, for how many times to loop over the tensors within a layer,
-    :disentangler_iters, for how many times to loop over the disentangler,
-    :isometry_iters, for how many times to loop over the isometry.
+Compute the environments of all the tensors in the layer, and return them as a Layer.
 """
-function minimize_expectation_ev(h, layer::BinaryLayer, rho, pars; vary_disentanglers=true)
-    gradnorm_u, gradnorm_w = 0.0, 0.0
-    for i in 1:pars[:layer_iters]
-        if vary_disentanglers
-            for j in 1:pars[:disentangler_iters]
-                layer, gradnorm_u = minimize_expectation_ev_disentangler(h, layer, rho)
-            end
-        end
-        for j in 1:pars[:isometry_iters]
-            layer, gradnorm_w = minimize_expectation_ev_isometry(h, layer, rho)
-        end
+function environment(layer::BinaryLayer, op, rho; vary_disentanglers=true)
+    if vary_disentanglers
+        env_u = environment_disentangler(op, layer, rho)
+    else
+        env_u = zero(layer.disentangler)
     end
-    # We use the last values of gradnorms for u and w to compute this. That's the closest
-    # thing to having the gradient norm at the endpoint.
-    gradnorm = sqrt(gradnorm_u^2 + gradnorm_w^2)
-    return layer, gradnorm
+    env_w = environment_isometry(op, layer, rho)
+    return BinaryLayer(env_u, env_w)
 end
 
 """
-Return a new layer, where the disentangler has been changed to the locally optimal one to
-minimize the expectation of a threesite operator `h`.
+Return a new layer that minimizes the expectation value with respect to the environment
+`env`.
 """
-function minimize_expectation_ev_disentangler(h, layer::BinaryLayer, rho)
-    uold, wold = layer
-    env = environment_disentangler(h, layer, rho)
-    U, S, Vt = tsvd(env, (1,2), (3,4))
-    u = U * Vt
-    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
-    uoldenv = uold' * env
-    @tensor crossterm[] := uoldenv[1 2; 3 4] * uoldenv[3 4; 1 2]
-    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
-    return BinaryLayer(u, wold), gradnorm
+function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer, pars;
+                                 vary_disentanglers=true)
+    u = (vary_disentanglers ? projectisometric(env.disentangler; alg=Polar())
+         : layer.disentangler)
+    w = projectisometric(env.isometry; alg=Polar())
+    return BinaryLayer(u, w)
 end
 
 """
@@ -392,22 +367,6 @@ end
 function environment_disentangler(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_disentangler(h, layer, rho)
-end
-
-"""
-Return a new layer, where the isometry has been changed to the locally optimal one to
-minimize the expectation of a threesite operator `h`.
-"""
-function minimize_expectation_ev_isometry(h, layer::BinaryLayer, rho)
-    uold, wold = layer
-    env = environment_isometry(h, layer, rho)
-    U, S, Vt = tsvd(env, (1,2), (3,))
-    w = U * Vt
-    # Compute the Stiefel manifold norm of the gradient. Used as a convergence measure.
-    woldenv = wold' * env
-    @tensor crossterm[] := woldenv[1; 2] * woldenv[2; 1]
-    gradnorm = sqrt(abs(norm(env)^2 - real(TensorKit.scalar(crossterm))))
-    return BinaryLayer(uold, w), gradnorm
 end
 
 """

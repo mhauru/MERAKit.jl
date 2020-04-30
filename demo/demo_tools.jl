@@ -214,7 +214,7 @@ function make_normalization_function(c, block_size)
     normalization(x::Number, ::Val{:energy}) = (x + c) / block_size
     normalization(x::Number, ::Val{:gradient}) = x / block_size
     normalization(x::Number) = normalization(x, Val(:energy))
-    normalization(x::GenericMERA) = tensorwise_scale(x, 1 / block_size)
+    normalization(x) = tensorwise_scale(x, 1 / block_size)
     return normalization
 end
 
