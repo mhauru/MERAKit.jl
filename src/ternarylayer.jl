@@ -133,6 +133,21 @@ function gradient(layer::TernaryLayer, env::TernaryLayer; isometrymanifold=:gras
     return TernaryLayer(ugrad, wgrad)
 end
 
+function precondition_tangent(layer::TernaryLayer, tan::TernaryLayer, rho)
+    u, w = layer
+    utan, wtan = tan
+    @tensor rho_wl[-1; -11] := rho[-1 1; -11 1]
+    @tensor rho_wr[-1; -11] := rho[1 -1; 1 -11]
+    rho_w = (rho_wl + rho_wr) / 2.0
+    @tensor(rho_u[-1 -2; -11 -12] :=
+            w'[12; 1 2 -11] * w'[22; -12 3 4] *
+            rho[11 21; 12 22] *
+            w[1 2 -1; 11] * w[-2 3 4; 21])
+    utan_prec = precondition_tangent(utan, rho_u)
+    wtan_prec = precondition_tangent(wtan, rho_w)
+    return TernaryLayer(utan_prec, wtan_prec)
+end
+
 # # # Invariants
 
 """

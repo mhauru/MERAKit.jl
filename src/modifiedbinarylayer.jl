@@ -328,6 +328,25 @@ function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer; isometry
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
 end
 
+function precondition_tangent(layer::ModifiedBinaryLayer, tan::ModifiedBinaryLayer, rho)
+    u, wl, wr = layer
+    utan, wltan, wrtan = tan
+    @tensor rho_wl_mid[-1; -11] := rho.mid[-1 1; -11 1]
+    @tensor rho_wl_gap[-1; -11] := rho.gap[1 -1; 1 -11]
+    rho_wl = (rho_wl_mid + rho_wl_gap) / 2.0
+    @tensor rho_wr_mid[-1; -11] := rho.mid[1 -1; 1 -11]
+    @tensor rho_wr_gap[-1; -11] := rho.gap[-1 1; -11 1]
+    rho_wr = (rho_wr_mid + rho_wr_gap) / 2.0
+    @tensor(rho_u[-1 -2; -11 -12] :=
+            wl'[12; 1 -11] * wr'[22; -12 2] *
+            rho.mid[11 21; 12 22] *
+            wl[1 -1; 11] * wr[-2 2; 21])
+    utan_prec = precondition_tangent(utan, rho_u)
+    wltan_prec = precondition_tangent(wltan, rho_wl)
+    wrtan_prec = precondition_tangent(wrtan, rho_wr)
+    return ModifiedBinaryLayer(utan_prec, wltan_prec, wrtan_prec)
+end
+
 # # # Invariants
 
 """

@@ -29,6 +29,7 @@ function parse_pars()
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
                     , "--metric", arg_type=Symbol, default=:canonical
+                    , "--precondition", arg_type=Bool, default=false
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
                     , "--scale_invariant_eps", arg_type=Float64, default=1e-6
@@ -62,6 +63,7 @@ function main()
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
                     :metric => pars[:metric],
+                    :precondition => pars[:precondition],
                     :gradient_delta => 1e-15,
                     :maxiter => 500,
                     :isometries_only_iters => 0,

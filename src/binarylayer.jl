@@ -132,6 +132,25 @@ function gradient(layer::BinaryLayer, env::BinaryLayer; isometrymanifold=:grassm
     return BinaryLayer(ugrad, wgrad)
 end
 
+function precondition_tangent(layer::BinaryLayer, tan::BinaryLayer, rho)
+    u, w = layer
+    utan, wtan = tan
+    @tensor rho_wl[-1; -11] := rho[-1 1 2; -11 1 2]
+    @tensor rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
+    @tensor rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
+    rho_w = (rho_wl + rho_wm + rho_wr) / 3.0
+    @tensor rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
+    @tensor rho_twosite_r[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
+    rho_twosite = (rho_twosite_l + rho_twosite_r) / 2.0
+    @tensor(rho_u[-1 -2; -11 -12] :=
+            w'[12; 1 -11] * w'[22; -12 2] *
+            rho_twosite[11 21; 12 22] *
+            w[1 -1; 11] * w[-2 2; 21])
+    utan_prec = precondition_tangent(utan, rho_u)
+    wtan_prec = precondition_tangent(wtan, rho_w)
+    return BinaryLayer(utan_prec, wtan_prec)
+end
+
 # # # Invariants
 
 """

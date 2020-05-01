@@ -233,7 +233,7 @@ version = "0.3.2"
 
 [[TensorKitManifolds]]
 deps = ["LinearAlgebra", "Strided", "TensorKit"]
-git-tree-sha1 = "5cac4e08fd9591cb727a76a7cea0da669861c060"
+git-tree-sha1 = "a9d1145d053a2a2bf41080f68d6292c4765b4f35"
 repo-rev = "master"
 repo-url = "https://github.com/mhauru/TensorKitManifolds.jl"
 uuid = "11fa318c-39cb-4a83-b1ed-cdc7ba1e3684"

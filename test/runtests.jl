@@ -311,7 +311,7 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-function test_optimization(meratype, spacetype, method)
+function test_optimization(meratype, spacetype, method, precondition=false)
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
@@ -331,6 +331,7 @@ function test_optimization(meratype, spacetype, method)
                 :retraction => :cayley,
                 :transport => :cayley,
                 :metric => :canonical,
+                :precondition => precondition,
                 :lbfgs_m => 8,
                 :ls_epsilon => 1e-6,
                 :verbosity => 0,
@@ -372,7 +373,7 @@ function test_gradient_and_retraction(meratype, spacetype, alg, metric)
     eye = id(V)
 
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :isometrymanifold => :grassmann, :metric => metric)
+                :isometrymanifold => :grassmann, :metric => metric, :precondition => false)
 
     fg(x) = (expect(ham, x), gradient(ham, x, pars; metric=metric))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
@@ -419,7 +420,7 @@ function test_transport(meratype, spacetype, alg, metric)
     hams = [ham + ham' for ham in hams]
 
     pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :isometrymanifold => :grassmann, :metric => metric)
+                :isometrymanifold => :grassmann, :metric => metric, :precondition => false)
 
     g1, g2, g3 = [gradient(ham, m, pars; metric=metric) for ham in hams]
     angle_pre = inner(m, g2, g3; metric=metric)
@@ -477,32 +478,32 @@ end
 end
 
 # Manifold operations
-@testset "Stiefel gradient and retraction, Cayley transform, canonical metric" begin
+@testset "Gradient and retraction, Cayley transform, canonical metric" begin
     test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
                         :cayley, :canonical)
 end
-@testset "Stiefel gradient and retraction, Cayley transform, Euclidean metric" begin
+@testset "Gradient and retraction, Cayley transform, Euclidean metric" begin
     test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
                         :cayley, :euclidean)
 end
-@testset "Stiefel gradient and retraction, exponential, canonical metric" begin
+@testset "Gradient and retraction, exponential, canonical metric" begin
     test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
                         :exp, :canonical)
 end
-@testset "Stiefel gradient and retraction, exponential, Euclidean metric" begin
+@testset "Gradient and retraction, exponential, Euclidean metric" begin
     test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
                         :exp, :euclidean)
 end
-@testset "Stiefel transport, cayley transform, canonical metric" begin
+@testset "Transport, cayley transform, canonical metric" begin
     test_with_all_types(test_transport, meratypes, spacetypes, :cayley, :canonical)
 end
-@testset "Stiefel transport, cayley transform, Euclidean metric" begin
+@testset "Transport, cayley transform, Euclidean metric" begin
     test_with_all_types(test_transport, meratypes, spacetypes, :cayley, :euclidean)
 end
-@testset "Stiefel transport, exponential, canonical metric" begin
+@testset "Transport, exponential, canonical metric" begin
     test_with_all_types(test_transport, meratypes, spacetypes, :exp, :canonical)
 end
-@testset "Stiefel transport, exponential, Euclidean metric" begin
+@testset "Transport, exponential, Euclidean metric" begin
     test_with_all_types(test_transport, meratypes, spacetypes, :exp, :euclidean)
 end
 
@@ -512,4 +513,8 @@ end
 end
 @testset "Optimization LBFGS" begin
     test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs), meratypes, spacetypes)
+end
+@testset "Optimization LBFGS with preconditioning" begin
+    test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs, true),
+                        meratypes, spacetypes)
 end

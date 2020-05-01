@@ -1031,6 +1031,20 @@ function gradient(h, m::T, pars; vary_disentanglers=true, kwargs...) where T <: 
     return g
 end
 
+function precondition_tangent(m::T, tan::T, pars) where T <: GenericMERA
+    nt = num_translayers(m)
+    tanlayers_prec = []
+    for l in 1:nt+1
+        layer = get_layer(m, l)
+        tanlayer = get_layer(tan, l)
+        rho = densitymatrix(m, l+1, pars)
+        tanlayer_prec = precondition_tangent(layer, tanlayer, rho)
+        push!(tanlayers_prec, tanlayer_prec)
+    end
+    tan_prec = T(tanlayers_prec)
+    return tan_prec
+end
+
 function TensorKitManifolds.retract(m::T, mtan::T, alpha::Real; kwargs...
                                    ) where T <: GenericMERA
     layers, layers_tan = zip([retract(l, ltan, alpha; kwargs...)
@@ -1066,6 +1080,12 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
     scale(vec, beta) = tensorwise_scale(vec, beta)
     add(vec1, vec2, beta) = tensorwise_sum(vec1, scale(vec2, beta))
     linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])
+    if pars[:precondition]
+        precondition(x, g) = precondition_tangent(x, g, pars)
+    else
+        # The default that does nothing.
+        precondition = OptimKit._precondition
+    end
 
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang
@@ -1096,7 +1116,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
         throw(ArgumentError(msg))
     end
     res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
-                   inner=innr, transport! = trnsprt!, isometrictransport=true)
+                   inner=innr, transport! = trnsprt!, isometrictransport=true,
+                   precondition=precondition)
     m, expectation, normgrad, normgradhistory = res
     if pars[:verbosity] > 0
         @info("Gradient optimization done. Expectation = $(expectation).")

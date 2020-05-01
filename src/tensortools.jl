@@ -257,3 +257,66 @@ function manifoldmodule(s::Symbol)
     end
     return manifold
 end
+
+"""
+Precondition the tangent vector `X` at `W` using the preconditioned metric with the
+positive definite tensor `rho`, i.e. Tr[X' Y rho].
+"""
+function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap)
+    W, A, Z = X.W, X.A, X.Z
+    E, U = eigh(rho)
+    Einv = inv(sqrt(E^2 + precondition_regconst(rho)^2*id(domain(E))))
+    rhoinv = U * Einv * U'
+    Z_prec = projectcomplement!(Z * rhoinv, W)
+    A_prec = projectantihermitian!(symmetric_sylvester(E, U, 2*A))
+    return Stiefel.StiefelTangent(W, A_prec, Z_prec)
+end
+
+function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensorMap)
+    W, Z = X.W, X.Z
+    E, U = eigh(rho)
+    Einv = inv(sqrt(E^2 + precondition_regconst(rho)^2*id(domain(E))))
+    rhoinv = U * Einv * U'
+    Z_prec = projectcomplement!(Z * rhoinv, W)
+    return Grassmann.GrassmannTangent(W, Z_prec)
+end
+
+function precondition_tangent(X::Unitary.UnitaryTangent, rho::AbstractTensorMap)
+    W, A = X.W, X.A
+    E, U = eigh(rho)
+    Einv = inv(sqrt(E^2 + precondition_regconst(rho)^2*id(domain(E))))
+    rhoinv = U * Einv * U'
+    A_prec = projectantihermitian!(symmetric_sylvester(E, U, 2*A))
+    return Unitary.UnitaryTangent(W, A_prec)
+end
+
+"""
+The regularisation constant to use when inverting the density matrix in preconditioning.
+"""
+precondition_regconst(X) = sqrt(eps(real(float(one(eltype(X))))))
+
+"""
+Solve the Sylvester equation A X + X A = C, where we know A = A' and the arguments E and U
+are the eigenvalue decomposition of A.
+"""
+function symmetric_sylvester(E::AbstractArray, U::AbstractArray, C::AbstractArray)
+    temp1 = typeof(C)(undef, size(C))
+    temp2 = typeof(C)(undef, size(C))
+    mul!(temp1, U', C)
+    mul!(temp2, temp1, U)
+    for i in CartesianIndices(temp2)
+        temp2[i] /= sqrt((E[i[1]] + E[i[2]])^2 + precondition_regconst(E)^2)
+    end
+    mul!(temp1, U, temp2)
+    mul!(temp2, temp1, U')
+    return temp2
+end
+
+function symmetric_sylvester(E::AbstractTensorMap, U::AbstractTensorMap,
+                             C::AbstractTensorMap)
+    cod = domain(C)
+    dom = codomain(C)
+    sylAB(c) = symmetric_sylvester(diag(block(E, c)), block(U, c), block(C, c))
+    data = TensorKit.SectorDict(c => sylAB(c) for c in blocksectors(cod ← dom))
+    return TensorMap(data, cod ← dom)
+end
