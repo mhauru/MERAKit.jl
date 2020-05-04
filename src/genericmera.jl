@@ -844,7 +844,7 @@ default_pars = Dict(:method => :lbfgs,
                     :maxiter => 2000,
                     :scale_invariant_sum_depth => 50,
                     :scale_invariant_sum_tol => 1e-13,
-                    :layer_iters => 1,
+                    :ev_layer_iters => 1,
                     :ls_epsilon => 1e-6,
                     :lbfgs_m => 8,
                     :cg_flavor => :HagerZhang,
@@ -964,7 +964,7 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
 
         for l in lowest_depth:nt+1
             env, layer = nothing, nothing
-            for i in 1:pars[:layer_iters]
+            for i in 1:pars[:ev_layer_iters]
                 env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
                 layer = get_layer(m, l)
                 new_layer = minimize_expectation_ev(layer, env, pars;
