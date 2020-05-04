@@ -322,18 +322,8 @@ function test_optimization(meratype, spacetype, method, precondition=false)
                 :gradient_delta => 1e-4,
                 :maxiter => 500,
                 :isometries_only_iters => 30,
-                :scale_invariant_sum_depth => 50,
                 :scale_invariant_sum_tol => 1e-8,
-                :layer_iters => 1,
-                :disentangler_iters => 1,
-                :isometry_iters => 1,
-                :isometrymanifold => :grassmann,
-                :retraction => :cayley,
-                :transport => :cayley,
-                :metric => :canonical,
                 :precondition => precondition,
-                :lbfgs_m => 8,
-                :ls_epsilon => 1e-6,
                 :verbosity => 0,
                 :densitymatrix_eigsolve_pars => Dict(
                                                      :tol => 1e-8,
@@ -372,8 +362,8 @@ function test_gradient_and_retraction(meratype, spacetype, alg, metric)
     ham = ham + ham'
     eye = id(V)
 
-    pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :isometrymanifold => :grassmann, :metric => metric, :precondition => false)
+    pars = Dict(:metric => metric, :precondition => false)
+    pars = merge(MERA.default_pars, pars)
 
     fg(x) = (expect(ham, x), gradient(ham, x, pars; metric=metric))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
@@ -419,8 +409,8 @@ function test_transport(meratype, spacetype, alg, metric)
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
 
-    pars = Dict(:scale_invariant_sum_tol => 1e-12, :scale_invariant_sum_depth => 10,
-                :isometrymanifold => :grassmann, :metric => metric, :precondition => false)
+    pars = Dict(:metric => metric, :precondition => false)
+    pars = merge(MERA.default_pars, pars)
 
     g1, g2, g3 = [gradient(ham, m, pars; metric=metric) for ham in hams]
     angle_pre = inner(m, g2, g3; metric=metric)
@@ -512,7 +502,8 @@ end
     test_with_all_types((mt, st) -> test_optimization(mt, st, :ev), meratypes, spacetypes)
 end
 @testset "Optimization LBFGS" begin
-    test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs), meratypes, spacetypes)
+    test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs, false),
+                        meratypes, spacetypes)
 end
 @testset "Optimization LBFGS with preconditioning" begin
     test_with_all_types((mt, st) -> test_optimization(mt, st, :lbfgs, true),

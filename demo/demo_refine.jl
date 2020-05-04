@@ -58,21 +58,14 @@ function main()
     block_size = pars[:block_size]
     reps = pars[:reps]
     scale_invariant_eps = pars[:scale_invariant_eps]
-    opt_pars = Dict(:method => pars[:method],
+    opt_pars = Dict(:maxiter => 500,
+                    :method => pars[:method],
                     :isometrymanifold => pars[:isometrymanifold],
                     :retraction => pars[:retraction],
                     :transport => pars[:transport],
                     :metric => pars[:metric],
                     :precondition => pars[:precondition],
-                    :gradient_delta => 1e-15,
-                    :maxiter => 500,
-                    :isometries_only_iters => 0,
-                    :scale_invariant_sum_depth => 50,
                     :scale_invariant_sum_tol => scale_invariant_eps,
-                    :layer_iters => 1,
-                    :disentangler_iters => 1,
-                    :isometry_iters => 1,
-                    :ls_epsilon => 1e-6,
                     :lbfgs_m => pars[:lbfgs_m],
                     :cg_flavor => pars[:cg_flavor],
                     :verbosity => pars[:verbosity],

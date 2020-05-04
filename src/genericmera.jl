@@ -833,7 +833,32 @@ end
 
 # # # Optimization
 
+default_pars = Dict(:method => :lbfgs,
+                    :isometrymanifold => :grassmann,
+                    :retraction => :exp,
+                    :transport => :exp,
+                    :metric => :euclidean,
+                    :precondition => true,
+                    :gradient_delta => 1e-14,
+                    :isometries_only_iters => 0,
+                    :maxiter => 2000,
+                    :scale_invariant_sum_depth => 50,
+                    :scale_invariant_sum_tol => 1e-13,
+                    :layer_iters => 1,
+                    :ls_epsilon => 1e-6,
+                    :lbfgs_m => 8,
+                    :cg_flavor => :HagerZhang,
+                    :verbosity => 2,
+                    :densitymatrix_eigsolve_pars => Dict(
+                                                         :tol => 1e-13,
+                                                         :krylovdim => 4,
+                                                         :verbosity => 0,
+                                                         :maxiter => 20,
+                                                        ),
+                   )
+
 function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
+    pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
     # disentanglers, with pars[:isometries_only_iters] as the maximum iteration count,
