@@ -361,7 +361,7 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     # Check that the dimensions are such that isometricity can hold.
     for v in layer
         codom, dom = fuse(codomain(v)), fuse(domain(v))
-        allmatch = allmatch && min(dom, codom) == dom
+        allmatch = allmatch && infinum(dom, codom) == dom
     end
     return allmatch
 end

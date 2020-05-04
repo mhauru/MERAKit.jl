@@ -49,7 +49,7 @@ function random_layerspaces(T, meratype, n, dlow=3, dhigh=6)
         # If a layer from V_prev to V would be of such a dimension that it couldn't be
         # isometric, try generating another V until success. Since V = V_prev is a valid
         # choice, this will eventually terminate.
-        while min(V_prev_fusion, V) != V
+        while infinum(V_prev_fusion, V) != V
             V = random_space(T, dlow, dhigh)
         end
         push!(spaces, V)
@@ -78,7 +78,7 @@ function random_internalspaces(extspaces, meratype)
         # Check that we didn't accidentally make the isometric part non-isometric. If we
         # did, just make Vint = Vext.
         Vint_fusion = fuse(reduce(⊗, repeat([Vint], width)))
-        min(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
+        infinum(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
         push!(intspaces, Vint)
     end
     return intspaces
