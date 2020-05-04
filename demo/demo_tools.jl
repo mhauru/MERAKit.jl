@@ -96,24 +96,11 @@ function block_op(op::SquareTensorMap{1}, num_sites)
 end
 
 """
-Normalize an operator by subtracting a constant so that it's spectrum is negative
-semidefinite. Return the normalized operator and the constant that was subtracted.
-"""
-function normalize_H(H)
-    c = maximum(convert(Array, eigh(H)[1]))
-    eye = isomorphism(codomain(H), domain(H))
-    H = H - eye*c
-    return H, c
-end
-
-"""
 Return the local Hamiltonian term for the XXZ model: J_xy*XX + J_xy*YY + J_z*ZZ.
 `symmetry` should be "none" or "group", and determmines whether the Hamiltonian should be an
 explicitly U(1) symmetric TensorMap or a dense one. `block_size` determines how many sites
-to block together, and should be a power of 2. The Hamiltonian is normalized with an
-additive constant to be negative semidefinite. Because of the normalization and blocking, a
-second return value holds a function that, given an expectation value or gradient for the
-Hamiltonian, returns the actual energy or its gradient..
+to block together, and should be a power of 2. If sites are blocked, then the Hamiltonian is
+divided by a constant to make the energy per site be the same as for the original.
 """
 function build_H_XXZ(J_xy, J_z; symmetry="none", block_size=1)
     if symmetry == "U1" || symmetry == "group"
@@ -137,20 +124,17 @@ function build_H_XXZ(J_xy, J_z; symmetry="none", block_size=1)
     end
     H = J_xy*XXplusYY + J_z*ZZ
     H = block_op(H, block_size)
-    H, c = normalize_H(H)
-    normalization = make_normalization_function(c, block_size)
-    return H, normalization
+    H = H / block_size
+    return H
 end
 
 """
 Return the local Hamiltonian term for the Ising model: -XX - h*Z
 `symmetry` should be "none", "group", or "anyon" and determmines whether the Hamiltonian
 should be an explicitly Z2 symmetric or anyonic TensorMap, or a dense one. `block_size`
-determines how many sites to block together, and should be a power of 2. The Hamiltonian is
-normalized with an additive constant to be negative semidefinite. Because of the
-normalization and blocking, a second return value holds a function that, given an
-expectation value or gradient for the Hamiltonian, returns the actual energy or its
-gradient.
+determines how many sites to block together, and should be a power of 2. If sites are
+blocked, then the Hamiltonian is divided by a constant to make the energy per site be the
+same as for the original.
 """
 function build_H_Ising(h=1.0; symmetry="none", block_size=1)
     if symmetry == "Z2"
@@ -188,9 +172,8 @@ function build_H_Ising(h=1.0; symmetry="none", block_size=1)
         error("Unknown symmetry $symmetry")
     end
     H = block_op(H, block_size)
-    H, c = normalize_H(H)
-    normalization = make_normalization_function(c, block_size)
-    return H, normalization
+    H = H / block_size
+    return H
 end
 
 """
@@ -203,19 +186,6 @@ function build_magop(;block_size=1)
     X.data .= [0.0 1.0; 1.0 0.0]
     magop = block_op(X, block_size)
     return magop
-end
-
-"""
-Given the normalization and block_size constants used in creating a Hamiltonian, make a
-function that takes in either energies or energy gradients for the normalized Hamiltonian,
-and returns the actual energy or gradient.
-"""
-function make_normalization_function(c, block_size)
-    normalization(x::Number, ::Val{:energy}) = (x + c) / block_size
-    normalization(x::Number, ::Val{:gradient}) = x / block_size
-    normalization(x::Number) = normalization(x, Val(:energy))
-    normalization(x) = tensorwise_scale(x, 1 / block_size)
-    return normalization
 end
 
 # # # Functions for reading and writing to disk.
@@ -268,7 +238,7 @@ each one, and optimize a bit too see how much it helps bring down the energy. Ch
 symmetry sector that benefits the energy the most. Return the expanded and slightly
 optimized MERA.
 """
-function expand_best_sector(m, i, chi, h, normalization, opt_pars)
+function expand_best_sector(m, i, chi, h, opt_pars)
     V = inputspace(m, i)
     d = dim(V)
     expanded_meras = Dict()
@@ -287,10 +257,10 @@ function expand_best_sector(m, i, chi, h, normalization, opt_pars)
         expand_bonddim!(ms, i, Dict(s => chi_s); check_invar=!istop)
         expand_internal_bonddim!(ms, i+1, Dict(s => chi_s))
         # Just to make the MERA isometric again, after expanding bond dimensions.
-        ms = minimize_expectation!(ms, h, isometrisation_pars; normalization=normalization)
+        ms = minimize_expectation!(ms, h, isometrisation_pars)
         msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
         @info(msg)
-        ms = minimize_expectation!(ms, h, opt_pars; normalization=normalization)
+        ms = minimize_expectation!(ms, h, opt_pars)
         expanded_meras[s] = ms
     end
     expanded_meras_array = collect(expanded_meras)
@@ -365,10 +335,10 @@ function get_optimized_mera(datafolder, model, pars)
     @info("Did not find $filename on disk, generating it.")
     # Build the Hamiltonian.
     if model == "XXZ"
-        h, normalization = build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
-                                       block_size=block_size)
+        h = build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
+                        block_size=block_size)
     elseif model == "Ising"
-        h, normalization = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
+        h = build_H_Ising(pars[:h]; symmetry=symmetry, block_size=block_size)
     else
         msg = "Unknown model: $(model)"
         throw(ArgumentError(msg))
@@ -393,10 +363,9 @@ function get_optimized_mera(datafolder, model, pars)
         # dimensions go through all the different stages, which is necessary for instance
         # because pars[:initial_opt_pars] typically involves a starting part where
         # disentanglers are not optimized, and we want to apply that here too.
-        m = minimize_expectation!(m, h, pars[:initial_opt_pars];
-                                  normalization=normalization)
-        m = minimize_expectation!(m, h, pars[:mid_opt_pars]; normalization=normalization)
-        m = minimize_expectation!(m, h, pars[:final_opt_pars]; normalization=normalization)
+        m = minimize_expectation!(m, h, pars[:initial_opt_pars])
+        m = minimize_expectation!(m, h, pars[:mid_opt_pars])
+        m = minimize_expectation!(m, h, pars[:final_opt_pars])
     else
         # The bond dimensions requested is larger than the smallest that makes sense to do.
         # Get the MERA with a bond dimension one smaller to use as a starting point, expand
@@ -406,9 +375,9 @@ function get_optimized_mera(datafolder, model, pars)
         m = get_optimized_mera(datafolder, model, prevpars)
         # Expand the bond dimension of each layer in turn.
         for i in 1:num_translayers(m)
-            m = expand_best_sector(m, i, chi, h, normalization, pars[:initial_opt_pars])
+            m = expand_best_sector(m, i, chi, h, pars[:initial_opt_pars])
             opt_pars = i == num_translayers(m) ? pars[:final_opt_pars] : pars[:mid_opt_pars]
-            m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
+            m = minimize_expectation!(m, h, opt_pars)
         end
     end
 

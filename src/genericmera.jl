@@ -143,10 +143,6 @@ end
 
 densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatrices(m))
 
-# Function that returns its first argument. Used as a default value for the energy
-# normalization function.
-noop_firstarg(args...) = args[1]
-
 # # # Storage of density matrices, ascended operators, and environments
 
 # The storage formats for density matrices, operators, and environments are a little
@@ -915,11 +911,7 @@ The optimization proceeds by looping over layers and optimizing each in turn, st
 the bottom, and repeating this until convergence is reached.
 
 The keyword argument `lowest_depth` sets the lowest layer in the MERA that the optimization
-is allowed to change, by default `lowest=1` so all layers are optimized. They keyword
-argument `normalization` is a function that takes in the expectation value of `h` and
-returns another number that is the actual quantity of interest (because `h` may for instance
-be the Hamiltonian but with a changed normalization).  It is only used for printing log
-messages, and doesn't affect the optimization.
+is allowed to change, by default `lowest=1` so all layers are optimized.
 
 The argument `pars` is a dictionary with symbols as keys, that lists values for different
 parameters for how to do the optimization. They all need to be specified by the user, and
@@ -945,11 +937,10 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop_firstarg,
-                                  vary_disentanglers=true)
+function minimize_expectation_ev!(m, h, pars; lowest_depth=1, vary_disentanglers=true)
     nt = num_translayers(m)
     rhos = densitymatrices(m, pars)
-    expectation = normalization(expect(h, m, pars))
+    expectation = expect(h, m, pars)
     rhos_maxchange = Inf
     gradnorm = Inf
     counter = 0
@@ -975,15 +966,13 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, normalization=noop
             # gradient. This isn't quite the gradient at the end point, which is what we
             # would want, but close enough.
             gradnorm_sq += gradient_normsq(layer, env;
-                                           normalization=normalization,
                                            isometrymanifold=pars[:isometrymanifold],
                                            metric=pars[:metric])
         end
 
-        gradnorm = normalization(sqrt(gradnorm_sq), Val(:gradient))
+        gradnorm = sqrt(gradnorm_sq)
         rhos = densitymatrices(m, pars)
         expectation = expect(h, m, pars)
-        expectation = normalization(expectation)
         if old_rhos !== nothing
             rho_diffs = [norm(r - or) for (r, or) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
@@ -1085,8 +1074,7 @@ function TensorKitManifolds.transport!(mvec::T, m::T, mtan::T, alpha::Real, mend
     return T(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=noop_firstarg,
-                                    vary_disentanglers=true)
+function minimize_expectation_grad!(m, h, pars; lowest_depth=1, vary_disentanglers=true)
     if lowest_depth != 1
         # TODO Could implement this. It's not hard, just haven't seen the need.
         msg = "lowest_depth != 1 has not been implemented for gradient optimization."
@@ -1094,8 +1082,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, normalization=no
     end
 
     function fg(x)
-        f = normalization(expect(h, x, pars))
-        g = normalization(gradient(h, x, pars; vary_disentanglers=vary_disentanglers))
+        f = expect(h, x, pars)
+        g = gradient(h, x, pars; vary_disentanglers=vary_disentanglers)
         return f, g
     end
 

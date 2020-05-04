@@ -85,12 +85,12 @@ function main()
 
     # Build the Hamiltonian.
     if model == "Ising"
-        h, normalization = DemoTools.build_H_Ising(pars[:h]; symmetry=symmetry,
-                                                   block_size=block_size)
+        h = DemoTools.build_H_Ising(pars[:h]; symmetry=symmetry,
+                                    block_size=block_size)
         symmetry == "none" && (magop = DemoTools.build_magop(block_size=block_size))
     elseif model == "XXZ"
-        h, normalization = DemoTools.build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
-                                                 block_size=block_size)
+        h = DemoTools.build_H_XXZ(pars[:J_xy], pars[:J_z]; symmetry=symmetry,
+                                  block_size=block_size)
     else
         msg = "Unknown model $(model)."
         throw(ArgumentError(msg))
@@ -126,10 +126,10 @@ function main()
     starttime = time()
     for rep in 1:reps
         @info("Starting rep #$(rep).")
-        m = minimize_expectation!(m, h, opt_pars; normalization=normalization)
+        m = minimize_expectation!(m, h, opt_pars)
         DemoTools.store_mera(path_ref, m)
 
-        energy = normalization(expect(h, m))
+        energy = expect(h, m)
         rhoees = densitymatrix_entropies(m)
         do_magnetisation && (magnetization = expect(magop, remove_symmetry(m)))
         scaldims = scalingdimensions(m)
