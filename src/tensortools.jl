@@ -216,8 +216,8 @@ end
 function gershgorin_bounds(a::Array{S, 2}) where {S}
     nonhermiticity = norm(a - a')/norm(a)
     if nonhermiticity > 1e-12
-        msg = "Can't compute gershgorin_bounds for a non-Hermitian operator (non-hermiticity = $(nonhermiticity))."
-        throw(ArgumentError(msg))
+        msg = "Computing gershgorin_bounds, ignoring non-hermiticity of $(nonhermiticity)."
+        @warn(msg)
     end
     discs = gershgorin_discs(a)
     lb = minimum(real(c) - r for (c, r) in discs)
