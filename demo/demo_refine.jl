@@ -24,12 +24,12 @@ function parse_pars()
                     , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--datasuffix", arg_type=String, default=""
-                    , "--method", arg_type=Symbol, default=:ev
+                    , "--method", arg_type=Symbol, default=:lbfgs
                     , "--isometrymanifold", arg_type=Symbol, default=:grassmann
                     , "--retraction", arg_type=Symbol, default=:cayley
                     , "--transport", arg_type=Symbol, default=:cayley
-                    , "--metric", arg_type=Symbol, default=:canonical
-                    , "--precondition", arg_type=Bool, default=false
+                    , "--metric", arg_type=Symbol, default=:euclidean
+                    , "--precondition", arg_type=Bool, default=true
                     , "--lbfgs-m", arg_type=Int, default=8
                     , "--cg-flavor", arg_type=Symbol, default=:HagerZhang
                     , "--scale_invariant_eps", arg_type=Float64, default=1e-6
