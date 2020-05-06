@@ -81,12 +81,12 @@ function main()
     # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
     # but not all.
     pars[:mid_opt_pars] = copy(pars[:initial_opt_pars])
-    pars[:mid_opt_pars][:maxiter] = 50
+    pars[:mid_opt_pars][:maxiter] = 100
     pars[:mid_opt_pars][:isometry_iters] = 0
     # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
     pars[:final_opt_pars] = copy(pars[:initial_opt_pars])
     pars[:final_opt_pars][:gradient_delta] = 1e-7
-    pars[:final_opt_pars][:maxiter] = 300
+    pars[:final_opt_pars][:maxiter] = 1000
     pars[:final_opt_pars][:isometry_iters] = 0
 
     # Get the Hamiltonian.
