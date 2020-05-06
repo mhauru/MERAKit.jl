@@ -252,6 +252,12 @@ function LinearAlgebra.lmul!(a::Number, op::ModifiedBinaryOp)
     return op
 end
 
+function BLAS.axpby!(a::Number, X::ModifiedBinaryOp, b::Number, Y::ModifiedBinaryOp)
+    axpby!(a, X.mid, b, Y.mid)
+    axpby!(a, X.gap, b, Y.gap)
+    return Y
+end
+
 function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::ModifiedBinaryOp)
     axpy!(a, X.mid, Y.mid)
     axpy!(a, X.gap, Y.gap)

@@ -322,15 +322,14 @@ function test_optimization(meratype, spacetype, method, precondition=false)
                 :gradient_delta => 1e-4,
                 :maxiter => 500,
                 :isometries_only_iters => 30,
-                :scale_invariant_sum_tol => 1e-8,
                 :precondition => precondition,
                 :verbosity => 0,
-                :densitymatrix_eigsolve_pars => Dict(
-                                                     :tol => 1e-8,
-                                                     :krylovdim => 4,
-                                                     :verbosity => 0,
-                                                     :maxiter => 20,
-                                                    ),
+                :scaleinvariant_krylovoptions => Dict(
+                                                      :tol => 1e-8,
+                                                      :krylovdim => 4,
+                                                      :verbosity => 0,
+                                                      :maxiter => 20,
+                                                     ),
                )
 
     op = particle_number_operator(spacetype)

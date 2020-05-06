@@ -27,10 +27,11 @@ struct GenericMERA{T}
     stored_densitymatrices::Vector
     stored_operators::Dict{Any, Vector}
     stored_environments::Dict{Any, Vector{Union{Nothing, T}}}
-    # previous_fixedpoint_densitymatrix will only ever store one value, but we store it in a
-    # Vector, since that matches with the rest of the storage format and keeps GenericMERA
-    # immutable.
+    # previous_fixedpoint_densitymatrix and previous_operatorsum will only ever store one
+    # value, but we store them in a Vector, since that matches with the rest of the storage
+    # format and keeps GenericMERA immutable.
     previous_fixedpoint_densitymatrix::Vector
+    previous_operatorsum::Vector
     # Prevent the creation of GenericMERA{T} objects when T is not a subtype of Layer.
     function GenericMERA{T}(layers) where T <: Layer
         num_layers = length(layers)
@@ -38,8 +39,9 @@ struct GenericMERA{T}
         stored_operators = Dict{Any, Vector}()
         stored_environments = Dict{Any, Vector{Union{Nothing, T}}}()
         previous_fixedpoint_densitymatrix = Any[nothing]
+        previous_operatorsum = Any[nothing]
         new(collect(layers), stored_densitymatrices, stored_operators, stored_environments,
-            previous_fixedpoint_densitymatrix)
+            previous_fixedpoint_densitymatrix, previous_operatorsum)
     end
 end
 
@@ -388,7 +390,7 @@ function expand_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
-        # Pad the stored previous_fixedpoint_densitymatrix as well, when padding the scale
+        # Pad the stored scale invariant initial guesses as well, when padding the scale
         # invariant isometries.
         old_rho = m.previous_fixedpoint_densitymatrix[1]
         if old_rho !== nothing
@@ -397,6 +399,14 @@ function expand_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
                 old_rho = pad_with_zeros_to(old_rho, i => V, (i+width) => V')
             end
             m.previous_fixedpoint_densitymatrix[1] = old_rho
+        end
+        old_opsum = m.previous_operatorsum[1]
+        if old_opsum !== nothing
+            width = causal_cone_width(typeof(m))
+            for i in 1:width
+                old_opsum = pad_with_zeros_to(old_opsum, i => V, (i+width) => V')
+            end
+            m.previous_operatorsum[1] = old_opsum
         end
     elseif depth > num_translayers(m)
             msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
@@ -575,7 +585,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
     end
-    eigsolve_pars = get(pars, :densitymatrix_eigsolve_pars, Dict())
+    eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, Dict())
     vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
     rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
@@ -669,12 +679,8 @@ it orthogonal to the dominant eigenoperator of the ascending superoperator (typi
 identity). This component converges to a finite number like a geometric series, since all
 non-dominant eigenvalues of the ascending superoperator are smaller than 1.
 
-To approximate the converging series, we use a finite number of terms. The maximum number of
-terms included is pars[:scale_invariant_sum_depth] and the relative error tolerance after
-which we truncate is pas[:scale_invariant_sum_tol].
-
-This function uses `ascended_operator` to get the operators at each layer, which means that
-it makes use of the cache.
+To approximate the converging series, we use an iterative Krylov solver. The options for the
+solver should be in a dictionary pars[:scaleinvariant_krylovoptions].
 """
 function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     nt = num_translayers(m)
@@ -682,50 +688,27 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
-    # opsum will be the cumulative variable that holds the terms of the series summed up so
-    # far.
-    opsum = TensorMap(zeros, eltype(m), domain(fp) ← domain(fp))
-    op_l = opsum
-    factor = zero(eltype(m))
-    l = 1
-    while l <= pars[:scale_invariant_sum_depth]
-        # Store the old values of op_l and factor, before we overwrite them.
-        old_op = op_l
-        old_factor = factor
-        # Get the next term in the series, with the contribution along fp subtracted.
-        op_l = ascended_operator(m, op, nt+l)
-        inner = dot(fp, op_l)
-        op_l = op_l - inner*fp
-        # Add one more term to opsum.
-        opsum = opsum + op_l
-        # factor is the scalar that minimizes |op_l - factor * old_op|.
-        old_norm = dot(old_op, old_op)
-        factor = old_norm == 0.0 ? 0.0 : dot(old_op, op_l) / old_norm
-        # We know that eventually the sum should turn into a geometric series, once op_l
-        # is close enough to the dominant eigenvector of the ascending superoperator
-        # (dominant after the fp contribution has been removed). Thus we can estimate the
-        # the whole series as
-        # opsum + sum_{i=1}^inf factor^i op_l = opsum + factor/(1-factor) * op_l.
-        # We compute the change to this that has been caused by adding one more term to
-        # opsum and updating old_op -> op_l and old_factor -> factor.
-        change = norm(old_op*old_factor/(1-old_factor) - op_l/(1-factor))
-        # Once this change is small enough, we say we've converged.
-        if change < pars[:scale_invariant_sum_tol]
-            break
-        else
-            l += 1
-        end
+    function f(x)
+        x = ascend(x, m; startscale=nt+1, endscale=nt+2)
+        x = x - fp * dot(fp, x)
+        return x
     end
-    # Finally, we add the residual geometric series to the part we've already summed up
-    # term-by-term, to form our final estimate of the value of the series.
-    if factor == 1
-        msg = "factor in scale_invariant_operator_sum is exactly 1.0, something went wrong."
-        @warn(msg)
-    else
-        opsum = opsum + op_l * factor/(1 - factor)
+    op_top = ascended_operator(m, op, nt+1)
+    x0 = op_top
+    old_opsum = m.previous_operatorsum[1]
+    if old_opsum !== nothing && space(x0) == space(old_opsum)
+        x0 = old_opsum
     end
+    linsolve_pars = get(pars, :scaleinvariant_krylovoptions, Dict())
+    one_ = one(eltype(m))
+    opsum, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
+    # We know the result should always be Hermitian.
+    opsum = (opsum + opsum') / 2.0
+    m.previous_operatorsum[1] = opsum
+    # We are not interested in the component along fp.
+    opsum = opsum - fp * dot(fp, opsum)
     if :verbosity in keys(pars) && pars[:verbosity] > 3
-        msg = "Used $(l) superoperator invocations to build the scale invariant operator sum."
+        msg = "Used $(info.numops) superoperator invocations to find the scale invariant operator sum."
         @info(msg)
     end
     return opsum
@@ -838,19 +821,17 @@ default_pars = Dict(:method => :lbfgs,
                     :gradient_delta => 1e-14,
                     :isometries_only_iters => 0,
                     :maxiter => 2000,
-                    :scale_invariant_sum_depth => 50,
-                    :scale_invariant_sum_tol => 1e-13,
                     :ev_layer_iters => 1,
                     :ls_epsilon => 1e-6,
                     :lbfgs_m => 8,
                     :cg_flavor => :HagerZhang,
                     :verbosity => 2,
-                    :densitymatrix_eigsolve_pars => Dict(
-                                                         :tol => 1e-13,
-                                                         :krylovdim => 4,
-                                                         :verbosity => 0,
-                                                         :maxiter => 20,
-                                                        ),
+                    :scaleinvariant_krylovoptions => Dict(
+                                                          :tol => 1e-13,
+                                                          :krylovdim => 4,
+                                                          :verbosity => 0,
+                                                          :maxiter => 20,
+                                                         ),
                    )
 
 function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
@@ -925,14 +906,6 @@ have no default values. The different parameters are:
      over consecutive iterations falls below pars[:densitymatrix_delta], the optimization
      terminates. Change is measured as Frobenius norm of the difference. Note that this is
      much more demanding than convergence in just the expectation value.
-    :scale_invariant_sum_depth, how deep into the scale invariant layer to go when computing
-     the ascended version of `h` to use for optimizing the scale invariant layer. Should in
-     principle be infinite, but the error goes down exponentially, so in practice 10 is
-     often plenty.
-    :scale_invariant_sum_tol, relative error tolerance that sets when to stop ascending into
-     the scale invariant part. If adding one more term from one more layer makes a difference
-     below this threshold, we truncate the series, even if scale_invariant_sum_depth has not
-     yet been reached.
     Other parameters may be required depending on the type of MERA. See documentation for
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.

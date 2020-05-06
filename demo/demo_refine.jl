@@ -65,16 +65,15 @@ function main()
                     :transport => pars[:transport],
                     :metric => pars[:metric],
                     :precondition => pars[:precondition],
-                    :scale_invariant_sum_tol => scale_invariant_eps,
                     :lbfgs_m => pars[:lbfgs_m],
                     :cg_flavor => pars[:cg_flavor],
                     :verbosity => pars[:verbosity],
-                    :densitymatrix_eigsolve_pars => Dict(
-                                                         :tol => scale_invariant_eps,
-                                                         :krylovdim => 4,
-                                                         :verbosity => 0,
-                                                         :maxiter => 20,
-                                                        ),
+                    :scaleinvariant_krylovoptions => Dict(
+                                                          :tol => scale_invariant_eps,
+                                                          :krylovdim => 4,
+                                                          :verbosity => 0,
+                                                          :maxiter => 20,
+                                                         ),
                    )
 
     logstr = "Running demo_refine.jl with"
