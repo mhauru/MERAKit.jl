@@ -128,7 +128,14 @@ function gradient(layer::BinaryLayer, env::BinaryLayer; isometrymanifold=:grassm
     # of the Stiefel manifold point u or w.
     # TODO Where exactly does this factor of 2 come from again? The conjugate part?
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
-    wgrad = manifoldmodule(isometrymanifold).project!(2*wenv, w; metric=metric)
+    if isometrymanifold === :stiefel
+        wgrad = Stiefel.project!(2*wenv, w; metric=metric)
+    elseif isometrymanifold === :grassmann
+        wgrad = Grassmann.project!(2*wenv, w)
+    else
+        msg = "Unknown isometrymanifold $(isometrymanifold)"
+        throw(ArgumentError(msg))
+    end
     return BinaryLayer(ugrad, wgrad)
 end
 

@@ -46,7 +46,8 @@ end
 
 function TensorKitManifolds.inner(l::T, l1::T, l2::T; metric=:euclidean
                                  ) where T <: SimpleLayer
-    return sum((inner(t...; metric=metric) for t in zip(l, l1, l2)))
+    get_metric(t) = isa(t[end], Stiefel.StiefelTangent) ? metric : :euclidean
+    return sum(inner(t...; metric=get_metric(t)) for t in zip(l, l1, l2))
 end
 
 function TensorKitManifolds.retract(l::T, ltan::T, alpha::Real; alg=:exp

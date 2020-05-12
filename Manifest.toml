@@ -224,15 +224,15 @@ version = "0.3.5"
 
 [[TensorKit]]
 deps = ["HalfIntegers", "LRUCache", "LinearAlgebra", "Strided", "TensorOperations", "TupleTools", "WignerSymbols"]
-git-tree-sha1 = "1dfed067477cee62c57799996431d2752e94cb30"
+git-tree-sha1 = "6534b81717c0a30aa0844fb3d3fee41425e12b8b"
 repo-rev = "master"
 repo-url = "https://github.com/mhauru/TensorKit.jl"
 uuid = "07d1fe3e-3e46-537d-9eac-e9e13d0d4cec"
-version = "0.4.0"
+version = "0.4.3"
 
 [[TensorKitManifolds]]
 deps = ["LinearAlgebra", "TensorKit"]
-git-tree-sha1 = "28c668a5f87db9d9fc11aae7630664663a42b202"
+git-tree-sha1 = "a9f8a4a6418bb9aa4d59cee61b8fccaf871cf0dd"
 repo-rev = "master"
 repo-url = "https://github.com/mhauru/TensorKitManifolds.jl"
 uuid = "11fa318c-39cb-4a83-b1ed-cdc7ba1e3684"
