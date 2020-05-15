@@ -834,7 +834,8 @@ default_pars = Dict(:method => :lbfgs,
                                                          ),
                    )
 
-function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
+function minimize_expectation!(m, h, pars; finalize! = OptimKit._finalize!,
+                               vary_disentanglers=true, kwargs...)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
@@ -843,42 +844,17 @@ function minimize_expectation!(m, h, pars; vary_disentanglers=true, kwargs...)
     if vary_disentanglers && pars[:isometries_only_iters] > 0
         temp_pars = deepcopy(pars)
         temp_pars[:maxiter] = pars[:isometries_only_iters]
-        m = minimize_expectation!(m, h, temp_pars; vary_disentanglers=false, kwargs...)
+        m = minimize_expectation!(m, h, temp_pars; finalize! = OptimKit._finalize!, vary_disentanglers=false, kwargs...)
     end
-    # We'll be calling many functions (;vary_disentanglers=vary_disentanglers, kwargs...),
-    # so make that easier by having :vary_disentanglers in kwargs.
-    kwargs = Dict{Symbol, Any}(kwargs...)
-    kwargs[:vary_disentanglers] = vary_disentanglers
 
     method = pars[:method]
     if method in (:cg, :conjugategradient, :gd, :gradientdescent, :lbfgs)
-        return minimize_expectation_grad!(m, h, pars; kwargs...)
+        return minimize_expectation_grad!(m, h, pars; vary_disentanglers=vary_disentanglers,
+                                          finalize! = finalize!, kwargs...)
     elseif method == :ev || method == :evenblyvidal
-        return minimize_expectation_ev!(m, h, pars; kwargs...)
+        return minimize_expectation_ev!(m, h, pars; vary_disentanglers=vary_disentanglers,
+                                        finalize! = finalize!, kwargs...)
     else
-        # Check if pars[:method] if of a format e.g. :lbfgs200ev100. If yes, then keep
-        # running 200 iters of LBFGS and 100 iters of EV, alternating, until we've in total
-        # run at least pars[:maxiters], or converged.
-        expr = r"([a-z]+)([0-9]+)([a-z]+)([0-9]+)"
-        regexp = match(expr, String(pars[:method]))
-        if regexp !== nothing
-            caps = regexp.captures
-            i = 1
-            total_iters = 0
-            while true
-                method = Symbol(caps[i])
-                iters = parse(Int, caps[i+1])
-                temp_pars = deepcopy(pars)
-                temp_pars[:method] = method
-                temp_pars[:maxiter] = iters
-                m = minimize_expectation!(m, h, temp_pars; kwargs...)
-                i += 2
-                i+1 > length(caps) && (i = 1)  # Go back to the first method.
-                total_iters += iters
-                total_iters >= pars[:maxiter] && break
-            end
-            return m
-        end
         msg = "Unknown optimization method $(method)."
         throw(ArgumentError(msg))
     end
@@ -910,7 +886,8 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m, h, pars; lowest_depth=1, vary_disentanglers=true)
+function minimize_expectation_ev!(m, h, pars; finalize! = OptimKit._finalize!,
+                                  lowest_depth=1, vary_disentanglers=true)
     nt = num_translayers(m)
     rhos = densitymatrices(m, pars)
     expectation = expect(h, m, pars)
@@ -950,6 +927,9 @@ function minimize_expectation_ev!(m, h, pars; lowest_depth=1, vary_disentanglers
             rho_diffs = [norm(r - or) for (r, or) in zip(rhos, old_rhos)]
             rhos_maxchange = maximum(rho_diffs)
         end
+        # The nothing is for the gradient, which we don't use, but OptimKit's format of
+        # finalize! expects.
+        m = finalize!(m, expectation, nothing, counter)[1]
         if pars[:verbosity] >= 2
             @info(@sprintf("E-V: iter %4d: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
                            counter, expectation, gradnorm, rhos_maxchange))
@@ -1047,7 +1027,8 @@ function TensorKitManifolds.transport!(mvec::T, m::T, mtan::T, alpha::Real, mend
     return T(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; lowest_depth=1, vary_disentanglers=true)
+function minimize_expectation_grad!(m, h, pars; finalize! = OptimKit._finalize!,
+                                    lowest_depth=1, vary_disentanglers=true)
     if lowest_depth != 1
         # TODO Could implement this. It's not hard, just haven't seen the need.
         msg = "lowest_depth != 1 has not been implemented for gradient optimization."
@@ -1073,6 +1054,8 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, vary_disentangle
         precondition = OptimKit._precondition
     end
 
+    algkwargs = Dict(:maxiter => pars[:maxiter], :linesearch => linesearch,
+                     :verbosity => pars[:verbosity], :gradtol => pars[:gradient_delta])
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang
             flavor = HagerZhang()
@@ -1088,22 +1071,18 @@ function minimize_expectation_grad!(m, h, pars; lowest_depth=1, vary_disentangle
             msg = "Unknown conjugate gradient flavor $(pars[:cg_flavor])"
             throw(ArgumentError(msg))
         end
-        alg = ConjugateGradient(; flavor=flavor, maxiter=pars[:maxiter],
-                                linesearch=linesearch, verbosity=pars[:verbosity],
-                                gradtol=pars[:gradient_delta])
+        alg = ConjugateGradient(; flavor=flavor, algkwargs...)
     elseif pars[:method] == :gd || pars[:method] == :gradientdescent
-        alg = GradientDescent(; maxiter=pars[:maxiter], linesearch=linesearch,
-                              verbosity=pars[:verbosity], gradtol=pars[:gradient_delta])
+        alg = GradientDescent(; algkwargs...)
     elseif pars[:method] == :lbfgs
-        alg = LBFGS(pars[:lbfgs_m]; maxiter=pars[:maxiter], linesearch=linesearch,
-                    verbosity=pars[:verbosity], gradtol=pars[:gradient_delta])
+        alg = LBFGS(pars[:lbfgs_m]; algkwargs...)
     else
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))
     end
     res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
                    inner=innr, transport! = trnsprt!, isometrictransport=true,
-                   precondition=precondition)
+                   precondition=precondition, finalize! = finalize!)
     m, expectation, normgrad, normgradhistory = res
     if pars[:verbosity] > 0
         @info("Gradient optimization done. Expectation = $(expectation).")

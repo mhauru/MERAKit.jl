@@ -16,7 +16,7 @@ function parse_pars()
                     , "--threads", arg_type=Int, default=1  # For BLAS parallelization
                     , "--chi", arg_type=Int, default=8  # Bond dimension
                     , "--layers", arg_type=Int, default=3
-                    , "--reps", arg_type=Int, default=1000
+                    , "--checkpoint_frequency", arg_type=Int, default=1000
                     , "--symmetry", arg_type=String, default="none"  # "none" or "group"
                     , "--block_size", arg_type=Int, default=2  # Block two sites to start
                     , "--h", arg_type=Float64, default=1.0  # External field of Ising
@@ -56,9 +56,9 @@ function main()
         pars[:symmetry] = symmetry
     end
     block_size = pars[:block_size]
-    reps = pars[:reps]
+    checkpoint_frequency = pars[:checkpoint_frequency]
     scale_invariant_eps = pars[:scale_invariant_eps]
-    opt_pars = Dict(:maxiter => 500,
+    opt_pars = Dict(:maxiter => typemax(Int),
                     :method => pars[:method],
                     :isometrymanifold => pars[:isometrymanifold],
                     :retraction => pars[:retraction],
@@ -119,30 +119,30 @@ function main()
     # Computing the magnetisation of the Ising model only makes sense if Z2 symmetry isn't
     # explicitly enforced.
     do_magnetisation = model == "Ising" && symmetry == "none"
-    # Keep repeatedly optimizing this MERA by doing maxiter iterations, storing
-    # the state, and then starting again, until `reps*maxiter` iterations have
-    # been done in total.
-    starttime = time()
-    for rep in 1:reps
-        @info("Starting rep #$(rep).")
-        m = minimize_expectation!(m, h, opt_pars)
+    # Keep optimizing this MERA, storing the state and printing some extra information every
+    # `checkpoint_frequency` iterations.
+    checkpointtime = time()
+
+    function finalize!(m, expectation, g, repnum)
+        repnum % checkpoint_frequency != 0 && (return m, expectation, g)
         DemoTools.store_mera(path_ref, m)
 
         energy = expect(h, m)
         rhoees = densitymatrix_entropies(m)
         do_magnetisation && (magnetization = expect(magop, remove_symmetry(m)))
         scaldims = scalingdimensions(m)
+        old_checkpointtime = checkpointtime
+        checkpointtime = time()
+        timetaken = (checkpointtime - old_checkpointtime) / 60.0
 
-        @info("Done with bond dimension $(chi).")
-        @info("Energy numerical: $energy")
-        model == "Ising" && @info("Energy exact:     $(-4/pi)")
         do_magnetisation && @info("Magnetization: $(magnetization)")
         @info("rho ees: $rhoees")
         @info("Scaling dimensions: $scaldims")
-        endtime = time()
-        timetaken = (endtime - starttime) / 60.0
         @info("Time passed: $(timetaken) mins")
+        return m, expectation, g
     end
+
+    m = minimize_expectation!(m, h, opt_pars; finalize! = finalize!)
 end
 
 main()
