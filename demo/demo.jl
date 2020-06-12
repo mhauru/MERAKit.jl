@@ -23,8 +23,8 @@ function parse_pars()
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--method", arg_type=Symbol, default=:lbfgs
                     , "--isometrymanifold", arg_type=Symbol, default=:grassmann
-                    , "--retraction", arg_type=Symbol, default=:cayley
-                    , "--transport", arg_type=Symbol, default=:cayley
+                    , "--retraction", arg_type=Symbol, default=:exp
+                    , "--transport", arg_type=Symbol, default=:exp
                     , "--metric", arg_type=Symbol, default=:euclidean
                     , "--precondition", arg_type=Bool, default=true
                     , "--lbfgs-m", arg_type=Int, default=8
