@@ -182,7 +182,7 @@ git-tree-sha1 = "2a8bb5784a24c5cb3a040b59a3868a37f9595442"
 repo-rev = "master"
 repo-url = "https://github.com/mhauru/OptimKit.jl"
 uuid = "77e91f04-9b3b-57a6-a776-40b61faaebe0"
-version = "0.0.0"
+version = "0.1.0+"
 
 [[OrderedCollections]]
 git-tree-sha1 = "12ce190210d278e12644bcadf5b21cbdcf225cd3"
@@ -314,6 +314,6 @@ version = "1.1.0"
 
 [[Zlib_jll]]
 deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "2f6c3e15e20e036ee0a0965879b31442b7ec50fa"
+git-tree-sha1 = "64b39656c75e67f85b4ac2b336c54674a39f599d"
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.11+9"
+version = "1.2.11+11"
