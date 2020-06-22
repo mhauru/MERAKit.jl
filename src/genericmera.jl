@@ -844,7 +844,7 @@ function minimize_expectation!(m, h, pars; finalize! = OptimKit._finalize!,
     if vary_disentanglers && pars[:isometries_only_iters] > 0
         temp_pars = deepcopy(pars)
         temp_pars[:maxiter] = pars[:isometries_only_iters]
-        m = minimize_expectation!(m, h, temp_pars; finalize! = OptimKit._finalize!, vary_disentanglers=false, kwargs...)
+        m = minimize_expectation!(m, h, temp_pars; finalize! = finalize!, vary_disentanglers=false, kwargs...)
     end
 
     method = pars[:method]
