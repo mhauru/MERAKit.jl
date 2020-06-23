@@ -26,11 +26,15 @@
 #  |  u  |
 #  | / \ |
 
-struct ModifiedBinaryLayer <: SimpleLayer
-    disentangler
-    isometry_left
-    isometry_right
+struct ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType} <: SimpleLayer
+    disentangler::DisType
+    isometry_left::IsoLeftType
+    isometry_right::IsoRightType
 end
+
+# Given an instance of a type like ModifiedBinaryLayer{TensorMap, TensorMap, TensorMap},
+# return the unparametrised type ModifiedBinaryLayer.
+layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 
 ModifiedBinaryMERA = GenericMERA{ModifiedBinaryLayer}
 
@@ -78,7 +82,7 @@ function set_isometry_right!(m::ModifiedBinaryMERA, wr, depth; kwargs...)
     return set_layer!(m, (u, wl, wr), depth; kwargs...)
 end
 
-causal_cone_width(::Type{ModifiedBinaryLayer}) = 2
+causal_cone_width(::Type{<:ModifiedBinaryLayer}) = 2
 
 outputspace(layer::ModifiedBinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::ModifiedBinaryLayer) = space(layer.isometry_left, 3)'

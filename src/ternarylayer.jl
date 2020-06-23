@@ -18,10 +18,14 @@
 #  +-------+
 #  1| 2| 3|
 
-struct TernaryLayer <: SimpleLayer
-    disentangler
-    isometry
+struct TernaryLayer{DisType, IsoType} <: SimpleLayer
+    disentangler::DisType
+    isometry::IsoType
 end
+
+# Given an instance of a type like TernaryLayer{TensorMap, TensorMap, TensorMap},
+# return the unparametrised type TernaryLayer.
+layertype(::TernaryLayer) = TernaryLayer
 
 TernaryMERA = GenericMERA{TernaryLayer}
 
@@ -55,7 +59,7 @@ function set_isometry!(m::TernaryMERA, w, depth; kwargs...)
     return set_layer!(m, (u, w), depth; kwargs...)
 end
 
-causal_cone_width(::Type{TernaryLayer}) = 2
+causal_cone_width(::Type{<:TernaryLayer}) = 2
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'

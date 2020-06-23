@@ -18,10 +18,14 @@
 #  +------+
 #  1|   2|
 
-struct BinaryLayer <: SimpleLayer
-    disentangler
-    isometry
+struct BinaryLayer{DisType, IsoType} <: SimpleLayer
+    disentangler::DisType
+    isometry::IsoType
 end
+
+# Given an instance of a type like BinaryLayer{TensorMap, TensorMap, TensorMap},
+# return the unparametrised type BinaryLayer.
+layertype(::BinaryLayer) = BinaryLayer
 
 BinaryMERA = GenericMERA{BinaryLayer}
 
@@ -55,7 +59,7 @@ function set_isometry!(m::BinaryMERA, w, depth; kwargs...)
     return set_layer!(m, (u, w), depth; kwargs...)
 end
 
-causal_cone_width(::Type{BinaryLayer}) = 3
+causal_cone_width(::Type{<:BinaryLayer}) = 3
 
 outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
