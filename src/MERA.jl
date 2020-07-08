@@ -14,11 +14,12 @@ export TernaryLayer, BinaryLayer, ModifiedBinaryLayer
 export SquareTensorMap
 export ascend, descend
 export remove_symmetry
+export layertype
 export get_layer, get_disentangler, get_isometry, num_translayers
 export outputspace, inputspace, internalspace
 export causal_cone_width, scalefactor
 export densitymatrix, densitymatrices, densitymatrix_entropies
-export random_MERA
+export random_MERA, randomlayer
 export scalingdimensions
 export replace_layer, release_transitionlayer, expand_bonddim, expand_internal_bonddim
 export expect

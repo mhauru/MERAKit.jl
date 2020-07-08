@@ -134,14 +134,14 @@ it is the identity or the product of two single-site isometries, depending on if
 supposed to be unitary or isometric. `T` is the data type for the tensors, by default
 `ComplexF64`.
 """
-function randomlayer(::Type{ModifiedBinaryLayer}, Vin, Vout, Vint=Vout;
-                     random_disentangler=false, T=ComplexF64)
-    wl = randomisometry(Vout ⊗ Vint, Vin, T)
+function randomlayer(::Type{ModifiedBinaryLayer}, T, Vin, Vout, Vint=Vout;
+                     random_disentangler=false)
+    wl = randomisometry(T, Vout ⊗ Vint, Vin)
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
     # any way).
     wr = deepcopy(permute(wl, (2,1), (3,)))
-    u = initialize_disentangler(Vout, Vint, random_disentangler, T)
+    u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 

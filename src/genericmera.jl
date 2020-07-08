@@ -410,19 +410,11 @@ parameters passed to the constructor for each layer, e.g. additional intralayer 
 dimension. Also passed to the constructor for individual layers will be any additional
 keyword arguments, but these will all be the same for each layer.
 """
-function random_MERA(::Type{T}, Vs, Ws=nothing; kwargs...) where T <: GenericMERA
-    num_layers = length(Vs)
-    layers = []
-    for i in 1:num_layers
-        V = Vs[i]
-        Vnext = (i < num_layers ? Vs[i+1] : V)
-        if Ws === nothing
-            layer = randomlayer(layertype(T), Vnext, V; kwargs...)
-        else
-            layer = randomlayer(layertype(T), Vnext, V, Ws[i]; kwargs...)
-        end
-        push!(layers, layer)
-    end
+function random_MERA(::Type{T}, Tel, Vouts, Vints=Vouts; kwargs...) where T <: GenericMERA
+    L = layertype(T)
+    Vins = tuple(Vouts[2:end]..., Vouts[end])
+    layers = tuple((randomlayer(L, Tel, Vin, Vout, Vint; kwargs...)
+                    for (Vin, Vout, Vint) in zip(Vins, Vouts, Vints))...)
     m = GenericMERA(layers)
     return m
 end

@@ -357,7 +357,7 @@ function get_optimized_mera(datafolder, model, pars)
         V_phys = space(h, 1)
         Vs = tuple(V_phys, repeat([V_virt], layers-1)...)
         T = eltype(h)
-        m = random_MERA(meratype, Vs; random_disentangler=false, T=T)
+        m = random_MERA(meratype, T, Vs; random_disentangler=false)
         # We run all three stages of the optimization for the initial bond dimensions as
         # well. This doesn't really make sense by itself, but it ensures that all bond
         # dimensions go through all the different stages, which is necessary for instance

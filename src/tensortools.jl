@@ -11,7 +11,7 @@ Given two vector spaces, create an isometric/unitary TensorMap from one to the o
 is done by creating a random Gaussian tensor and SVDing it. If `symmetry_permutation` is
 given, symmetrise the random tensor over this permutation before doing the SVD.
 """
-function randomisometry(Vout, Vin, T=ComplexF64; symmetry_permutation=nothing)
+function randomisometry(T, Vout, Vin; symmetry_permutation=nothing)
     temp = TensorMap(randn, T, Vout ← Vin)
     if symmetry_permutation !== nothing
         temp = temp + permute(temp, symmetry_permutation...)
@@ -26,15 +26,15 @@ Create a 2-to-2 disentangler, from `Vin ⊗ Vin` to `Vout ⊗ Vout`. The argumen
 `T` set whether the disentangler should be a random isometry or the identity, and what its
 element type should be.
 """
-function initialize_disentangler(Vout, Vin, random, T)
+function initialize_disentangler(T, Vout, Vin, random)
     if random
-        u = randomisometry(Vout ⊗ Vout, Vin ⊗ Vin, T)
+        u = randomisometry(T, Vout ⊗ Vout, Vin ⊗ Vin)
     else
         if Vin == Vout
             u = isomorphism(Vout ⊗ Vout, Vin ⊗ Vin)
             T <: Complex && (u = complex(u))
         else
-            uhalf = randomisometry(Vout, Vin, T)
+            uhalf = randomisometry(T, Vout, Vin)
             u = uhalf ⊗ uhalf
         end
     end

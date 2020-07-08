@@ -108,10 +108,10 @@ it is the identity or the product of two single-site isometries, depending on if
 supposed to be unitary or isometric. `T` is the data type for the tensors, by default
 `ComplexF64`.
 """
-function randomlayer(::Type{TernaryLayer}, Vin, Vout, Vint=Vout; random_disentangler=false,
-                     T=ComplexF64)
-    w = randomisometry(Vint ⊗ Vout ⊗ Vint, Vin, T)
-    u = initialize_disentangler(Vout, Vint, random_disentangler, T)
+function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint=Vout;
+                     random_disentangler=false)
+    w = randomisometry(T, Vint ⊗ Vout ⊗ Vint, Vin)
+    u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return TernaryLayer(u, w)
 end
 
