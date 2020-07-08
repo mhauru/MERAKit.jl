@@ -101,9 +101,10 @@ layertype(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = LayerType
 Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
 
 """
-The ratio by which the number of sites changes when go down by a layer.
+The ratio by which the number of sites changes when one descends by one layer.
 """
 scalefactor(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = scalefactor(LayerType)
+scalefactor(::Type{GenericMERA{M, LayerType} where M}) where {LayerType} = scalefactor(LayerType)
 
 """
 Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.

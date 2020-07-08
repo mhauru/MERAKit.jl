@@ -46,6 +46,7 @@ end
 The ratio by which the number of sites changes when go down through this layer.
 """
 scalefactor(::Type{<:TernaryLayer}) = 3
+scalefactor(::Type{TernaryMERA}) = scalefactor(TernaryLayer)
 
 get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry

@@ -60,6 +60,7 @@ end
 The ratio by which the number of sites changes when go down through this layer.
 """
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
+scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
 
 get_disentangler(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry_left(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).isometry_left
