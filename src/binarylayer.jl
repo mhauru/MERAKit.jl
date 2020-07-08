@@ -23,11 +23,12 @@ struct BinaryLayer{DisType, IsoType} <: SimpleLayer
     isometry::IsoType
 end
 
+BinaryMERA{N} = GenericMERA{N, T} where T <: BinaryLayer
+
 # Given an instance of a type like BinaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type BinaryLayer.
 layertype(::BinaryLayer) = BinaryLayer
-
-BinaryMERA = GenericMERA{BinaryLayer}
+layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)
@@ -44,7 +45,7 @@ end
 """
 The ratio by which the number of sites changes when you go down through this layer.
 """
-scalefactor(::Type{BinaryMERA}) = 2
+scalefactor(::Type{<:BinaryLayer}) = 2
 
 get_disentangler(m::BinaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry(m::BinaryMERA, depth) = get_layer(m, depth).isometry
@@ -130,7 +131,8 @@ function gradient(layer::BinaryLayer, env::BinaryLayer; isometrymanifold=:grassm
     uenv, wenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    # TODO Where exactly does this factor of 2 come from again? The conjugate part?
+    # The factor of two is from the partial_x + i partial_y derivative of the cost function,
+    # and how it depends on both v and v^dagger.
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
     if isometrymanifold === :stiefel
         wgrad = Stiefel.project!(2*wenv, w; metric=metric)

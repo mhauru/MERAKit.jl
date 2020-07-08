@@ -20,12 +20,12 @@ export causal_cone_width, scalefactor
 export densitymatrix, densitymatrices, densitymatrix_entropies
 export random_MERA
 export scalingdimensions
-export release_transitionlayer!, expand_bonddim!, expand_internal_bonddim!
+export replace_layer, release_transitionlayer, expand_bonddim, expand_internal_bonddim
 export expect
-export minimize_expectation!
+export minimize_expectation
 export pseudoserialize, depseudoserialize
 export projectisometric, projectisometric!
-export reset_storage!, reset_operator_storage!
+export reset_storage, reset_operator_storage!
 export tensorwise_sum, tensorwise_scale
 export gradient, retract, transport!, inner
 

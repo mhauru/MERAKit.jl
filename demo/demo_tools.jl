@@ -10,7 +10,7 @@ using JLD2
 using MERA
 
 export setlogger
-export expect, minimize_expectation!, densitymatrix_entropies, scalingdimensions, remove_symmetry
+export expect, minimize_expectation, densitymatrix_entropies, scalingdimensions, remove_symmetry
 export load_mera, store_mera
 export build_H_Ising, build_H_XXZ, build_magop
 export get_optimized_mera
@@ -254,13 +254,13 @@ function expand_best_sector(m, i, chi, h, opt_pars)
         ds = dim(V, s)
         chi_s = ds + (chi - d)
         istop = (i == num_translayers(ms))
-        expand_bonddim!(ms, i, Dict(s => chi_s); check_invar=!istop)
-        expand_internal_bonddim!(ms, i+1, Dict(s => chi_s))
+        ms = expand_bonddim(ms, i, Dict(s => chi_s); check_invar=!istop)
+        ms = expand_internal_bonddim(ms, i+1, Dict(s => chi_s))
         # Just to make the MERA isometric again, after expanding bond dimensions.
-        ms = minimize_expectation!(ms, h, isometrisation_pars)
+        ms = minimize_expectation(ms, h, isometrisation_pars)
         msg = "Expanded layer $i to bond dimenson $chi_s in sector $s."
         @info(msg)
-        ms = minimize_expectation!(ms, h, opt_pars)
+        ms = minimize_expectation(ms, h, opt_pars)
         expanded_meras[s] = ms
     end
     expanded_meras_array = collect(expanded_meras)
@@ -363,9 +363,9 @@ function get_optimized_mera(datafolder, model, pars)
         # dimensions go through all the different stages, which is necessary for instance
         # because pars[:initial_opt_pars] typically involves a starting part where
         # disentanglers are not optimized, and we want to apply that here too.
-        m = minimize_expectation!(m, h, pars[:initial_opt_pars])
-        m = minimize_expectation!(m, h, pars[:mid_opt_pars])
-        m = minimize_expectation!(m, h, pars[:final_opt_pars])
+        m = minimize_expectation(m, h, pars[:initial_opt_pars])
+        m = minimize_expectation(m, h, pars[:mid_opt_pars])
+        m = minimize_expectation(m, h, pars[:final_opt_pars])
     else
         # The bond dimensions requested is larger than the smallest that makes sense to do.
         # Get the MERA with a bond dimension one smaller to use as a starting point, expand
@@ -377,7 +377,7 @@ function get_optimized_mera(datafolder, model, pars)
         for i in 1:num_translayers(m)
             m = expand_best_sector(m, i, chi, h, pars[:initial_opt_pars])
             opt_pars = i == num_translayers(m) ? pars[:final_opt_pars] : pars[:mid_opt_pars]
-            m = minimize_expectation!(m, h, opt_pars)
+            m = minimize_expectation(m, h, opt_pars)
         end
     end
 

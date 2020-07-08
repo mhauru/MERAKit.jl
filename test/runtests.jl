@@ -191,7 +191,7 @@ function test_expand_bonddim(meratype, spacetype)
             expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         end
         newdims = Dict(s => dim(V, s) + 1 for s in expandable_sectors)
-        m = expand_bonddim!(m, i, newdims)
+        m = expand_bonddim(m, i, newdims)
     end
     new_expectation = expect(randomop, m)
     @test new_expectation ≈ expectation
@@ -203,7 +203,7 @@ function test_expand_bonddim(meratype, spacetype)
         newdims = Dict(s => dim(V, s) < dim(Vout, s) ? dim(V, s) + 1 : dim(V, s)
                        for s in sectors(V)
                       )
-        m = expand_internal_bonddim!(m, i, newdims)
+        m = expand_internal_bonddim(m, i, newdims)
     end
     new_expectation = expect(randomop, m)
     @test new_expectation ≈ expectation
@@ -222,7 +222,7 @@ function test_release_layer(meratype, spacetype)
     randomop = TensorMap(randn, ComplexF64, V ← V)
     randomop = (randomop + randomop')/2
     expectation = expect(randomop, m)
-    m = release_transitionlayer!(m)
+    m = release_transitionlayer(m)
     new_expectation = expect(randomop, m)
     @test new_expectation ≈ expectation
 end
@@ -260,11 +260,11 @@ function test_reset_storage(meratype, spacetype)
     randomop = (randomop + randomop')/2
     expectation_orig = expect(randomop, m)
 
-    reset_storage!(m, 2)
+    m = replace_layer(m, get_layer(m, 2), 2)
     expectation_reset = expect(randomop, m)
     @test expectation_orig ≈ expectation_reset
 
-    reset_storage!(m)
+    m = reset_storage(m)
     expectation_reset = expect(randomop, m)
     @test expectation_orig ≈ expectation_reset
 
@@ -340,7 +340,7 @@ function test_optimization(meratype, spacetype, method, precondition=false)
     spaces = (V, spaces...)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, spaces, intspaces)
-    m = minimize_expectation!(m, ham, pars)
+    m = minimize_expectation(m, ham, pars)
     expectation = expect(ham, m)
     @test abs(expectation + 1.0) < eps
 end
@@ -462,7 +462,7 @@ end
 @testset "Reset storage" begin
     test_with_all_types(test_reset_storage, meratypes, spacetypes)
 end
-@testset "Reset projectisometric" begin
+@testset "Projectisometric" begin
     test_with_all_types(test_projectisometric, meratypes, spacetypes)
 end
 

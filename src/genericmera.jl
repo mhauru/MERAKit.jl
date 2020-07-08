@@ -10,6 +10,24 @@ collection of tensors, the orders and shapes of which depend on the type.
 """
 abstract type Layer end
 
+mutable struct MERACache{N, LayerType}
+    densitymatrices::Vector
+    operators::Dict
+    environments::Dict
+    previous_fixedpoint_densitymatrix
+    previous_operatorsum
+
+    function MERACache{N, LayerType}() where {N, LayerType <: Layer}
+        densitymatrices = Vector{Any}(repeat([nothing], N))
+        operators = Dict()
+        environments = Dict()
+        previous_fixedpoint_densitymatrix = nothing
+        previous_operatorsum = nothing
+        new(densitymatrices, operators, environments,
+            previous_fixedpoint_densitymatrix, previous_operatorsum)
+    end
+end
+
 """
 A GenericMERA is a collection of Layers. The type of these layers then determines whether
 the MERA is binary, ternary, etc.
@@ -22,27 +40,53 @@ A few notes on conventions and terminology:
 - Each layer is thought of as a linear map from its top, or input space to its bottom, or
 output space.
 """
-struct GenericMERA{T}
-    layers::Vector{T}
-    stored_densitymatrices::Vector
-    stored_operators::Dict{Any, Vector}
-    stored_environments::Dict{Any, Vector{Union{Nothing, T}}}
-    # previous_fixedpoint_densitymatrix and previous_operatorsum will only ever store one
-    # value, but we store them in a Vector, since that matches with the rest of the storage
-    # format and keeps GenericMERA immutable.
-    previous_fixedpoint_densitymatrix::Vector
-    previous_operatorsum::Vector
-    # Prevent the creation of GenericMERA{T} objects when T is not a subtype of Layer.
-    function GenericMERA{T}(layers) where T <: Layer
-        num_layers = length(layers)
-        stored_densitymatrices = Vector{Any}(repeat([nothing], num_layers))
-        stored_operators = Dict{Any, Vector}()
-        stored_environments = Dict{Any, Vector{Union{Nothing, T}}}()
-        previous_fixedpoint_densitymatrix = Any[nothing]
-        previous_operatorsum = Any[nothing]
-        new(collect(layers), stored_densitymatrices, stored_operators, stored_environments,
-            previous_fixedpoint_densitymatrix, previous_operatorsum)
+struct GenericMERA{N, LayerType <: Layer}
+    layers::NTuple{N, LayerType}
+    cache::MERACache{N, LayerType}
+
+    function GenericMERA{N, T}(layers::NTuple{N}, cache::MERACache{N}) where {N, T}
+        LayerType = eltype(typeof(layers))
+        # Note that this prevents the creation of types like GenericMERA{3, SimpleLayer}:
+        # The second type parameter must be exactly the element type of layers, specified at
+        # the lowest, concrete level. This is intentional, to avoid accidentally creating
+        # unnecessarily abstract types that would hamper to inference.
+        @assert T == LayerType && isconcretetype(T)
+        cache::MERACache{N, LayerType}
+        return new{N, LayerType}(layers, cache)
     end
+end
+
+function GenericMERA(layers::NTuple{N}, cache::MERACache{N}) where {N}
+    LayerType = eltype(typeof(layers))
+    cache::MERACache{N, LayerType}
+    return GenericMERA{N, LayerType}(layers, cache)
+end
+
+function GenericMERA(layers::NTuple{N}) where {N}
+    LayerType = eltype(typeof(layers))
+    cache = MERACache{N, LayerType}()
+    return GenericMERA(layers, cache)
+end
+
+GenericMERA(layers) = GenericMERA(tuple(layers...))
+
+function GenericMERA{N, LayerType}(layers::NTuple{N}) where {N, LayerType}
+    T = eltype(typeof(layers))
+    cache = MERACache{N, T}()
+    return GenericMERA{N, LayerType}(layers, cache)
+end
+
+function GenericMERA{N, LayerType}(layers) where {N, LayerType}
+    return GenericMERA{N, LayerType}(tuple(layers...))
+end
+
+function (::Type{GenericMERA{M, T} where M})(layers::NTuple{N}) where {N, T}
+    LayerType = eltype(typeof(layers))
+    return GenericMERA(layers)
+end
+
+function (::Type{GenericMERA{M, LayerType} where M})(layers) where {LayerType}
+    return (GenericMERA where {N})(tuple(layers...))
 end
 
 # # # Basic utility functions
@@ -50,27 +94,30 @@ end
 """
 Return the type of the layers of `m`.
 """
-layertype(m::T) where {T <: GenericMERA} = layertype(T)
-layertype(::Type{GenericMERA{T}}) where {T <: Layer} = T
+layertype(m::GenericMERA{N, LayerType}) where {N, LayerType} = LayerType
+layertype(::Type{GenericMERA{N, LayerType} where N}) where {LayerType} = LayerType
+layertype(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = LayerType
 
 Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
 
 """
 The ratio by which the number of sites changes when go down by a layer.
 """
-scalefactor(::Type{GenericMERA{T}}) where T = scalefactor(T)
+scalefactor(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = scalefactor(LayerType)
 
 """
 Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.
 Return that width.
 """
-causal_cone_width(::Type{GenericMERA{T}}) where T <: Layer = causal_cone_width(T)
+function causal_cone_width(::Type{T}) where {T <: GenericMERA}
+    return causal_cone_width(layertype(T))
+end
 
 """
 Return the number of transition layers, i.e. layers below the scale invariant one, in the
 MERA.
 """
-num_translayers(m::GenericMERA) = length(m.layers)-1
+num_translayers(m::GenericMERA{N, LayerType}) where {N, LayerType} = N-1
 
 """
 Return the layer at the given depth. 1 is the lowest layer, i.e. the one with physical
@@ -80,30 +127,27 @@ get_layer(m::GenericMERA, depth) = (depth > num_translayers(m) ?
                                     m.layers[end] : m.layers[depth])
 
 """
-Set, in-place, one of the layers of the MERA to a new, given value. If check_invar=true,
-check that the indices match afterwards.
+Replace one of the layers of a MERA with a new one. If check_invar=true, check that the
+indices match afterwards.
 """
-function set_layer!(m::GenericMERA, layer, depth; check_invar=true)
-    depth > num_translayers(m) ? (m.layers[end] = layer) : (m.layers[depth] = layer)
-    m = reset_storage!(m, depth)
-    check_invar && space_invar(m)
-    return m
+function replace_layer(m::GenericMERA, layer, depth; check_invar=true)
+    index = min(num_translayers(m)+1, depth)
+    new_layers = Base.setindex(m.layers, layer, index)
+    new_cache = replace_layer(m.cache, depth)
+    new_m = GenericMERA(new_layers, new_cache)
+    check_invar && space_invar(new_m)
+    return new_m
 end
 
 """
 Add one more transition layer at the top of the MERA, by taking the lowest of the scale
 invariant one and releasing it to vary independently.
 """
-function release_transitionlayer!(m::GenericMERA)
-    layer = get_layer(m, Inf)
-    layer = copy(layer)
-    push!(m.layers, layer)
-    density_matrix = m.stored_densitymatrices[end]
-    push!(m.stored_densitymatrices, density_matrix)
-    for (k, v) in m.stored_environments
-        push!(v, nothing)
-    end
-    return m
+function release_transitionlayer(m::GenericMERA{N, LayerType}) where {N, LayerType}
+    new_layers = (m.layers..., m.layers[end])
+    new_cache = release_transitionlayer(m.cache)
+    new_m = GenericMERA(new_layers, new_cache)
+    return new_m
 end
 
 """
@@ -164,45 +208,72 @@ densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatr
 # (into the scale invariant part).
 
 """
-Reset stored density matrices and ascended operators, so that they will be recomputed when
-they are needed. By default all are reset. If the optional argument `depth` is given, only
-ones invalidated by changing the layer at `depth` are removed.
+Reset cached operators, so that they will be recomputed when
+they are needed.
 """
-function reset_storage!(m::GenericMERA, depth)
-    depth = Int(min(num_translayers(m)+1, depth))
-    m.stored_densitymatrices[1:depth] .= nothing
-    for (k, v) in m.stored_operators
+reset_storage(m::GenericMERA) = GenericMERA(m.layers, typeof(m.cache)())
+
+function Base.copy!(dst::MERACache, src::MERACache)
+    dst.densitymatrices = copy(src.densitymatrices)
+    dst.operators = Dict()
+    dst.environments = Dict()
+    for (k, v) in src.operators
+        dst.operators[k] = copy(v)
+    end
+    for (k, v) in src.environments
+        dst.environments[k] = copy(v)
+    end
+    dst.previous_operatorsum = src.previous_operatorsum
+    dst.previous_fixedpoint_densitymatrix = src.previous_fixedpoint_densitymatrix
+    return dst
+end
+
+Base.copy(c::MERACache) = copy!(typeof(c)(), c)
+
+"""
+Create a new MERACache that has all the stored pieces removed that are invalidated by
+changing the layer at `depth`.
+"""
+function replace_layer(c::MERACache{N}, depth) where N
+    c = copy(c)
+    depth = Int(min(N, depth))
+    c.densitymatrices[1:depth] .= nothing
+    for (k, v) in c.operators
         last_index = min(depth, length(v))
-        m.stored_operators[k] = v[1:last_index]
+        c.operators[k] = v[1:last_index]
     end
     # Changing anything always invalidates all environments, since they depend on things
     # both above and below.
-    reset_environment_storage!(m)
-    return m
+    reset_environment_storage!(c)
+    return c
 end
 
-function reset_storage!(m::GenericMERA)
-    m.stored_densitymatrices[:] .= nothing
-    reset_operator_storage!(m)
-    reset_environment_storage!(m)
-    return m
+function release_transitionlayer(c::MERACache{N, LayerType}) where {N, LayerType}
+    new_c = MERACache{N+1, LayerType}()
+    copy!(new_c, c)
+    density_matrix = new_c.densitymatrices[end]
+    push!(new_c.densitymatrices, density_matrix)
+    for (k, v) in new_c.environments
+        push!(v, nothing)
+    end
+    return new_c
 end
 
 """
 Return whether the density matrix at given depth is already in store.
 """
-function has_densitymatrix_stored(m::GenericMERA, depth)
-    depth = Int(min(num_translayers(m)+1, depth))
-    rho = m.stored_densitymatrices[depth]
+function has_densitymatrix_stored(c::MERACache{N}, depth) where N
+    depth = Int(min(N, depth))
+    rho = c.densitymatrices[depth]
     return rho !== nothing
 end
 
 """
 Return the density matrix at given depth, assuming it's in store.
 """
-function get_stored_densitymatrix(m::GenericMERA, depth)
-    depth = Int(min(num_translayers(m)+1, depth))
-    rho = m.stored_densitymatrices[depth]
+function get_stored_densitymatrix(c::MERACache{N}, depth) where N
+    depth = Int(min(N, depth))
+    rho = c.densitymatrices[depth]
     if rho === nothing
         msg = "Density matrix at depth $(depth) not in storage."
         throw(ArgumentError(msg))
@@ -213,42 +284,42 @@ end
 """
 Store the density matrix at given depth.
 """
-function set_stored_densitymatrix!(m::GenericMERA, density_matrix, depth)
-    m.stored_densitymatrices[depth] = density_matrix
-    return m
+function set_stored_densitymatrix!(c::MERACache, density_matrix, depth)
+    c.densitymatrices[depth] = density_matrix
+    return c
 end
 
 """
 Return the stored ascended versions of `op`. Initialize storage for `op` if necessary.
 """
-function operator_storage(m::GenericMERA, op)
-    if !(op in keys(m.stored_operators))
-        m.stored_operators[op] = Vector{Any}([op])
+function operator_storage!(c::MERACache, op)
+    if !(op in keys(c.operators))
+        c.operators[op] = Vector{Any}([op])
     end
-    return m.stored_operators[op]
+    return c.operators[op]
 end
 
 """
 Return whether the operator `op` ascended to `depth` is already in store.
 """
-function has_operator_stored(m::GenericMERA, op, depth)
-    storage = operator_storage(m, op)
+function has_operator_stored(c::MERACache, op, depth)
+    storage = operator_storage!(c, op)
     return length(storage) >= depth
 end
 
 """
 Return the operator `op` ascended to a given depth, assuming it's in store.
 """
-function get_stored_operator(m::GenericMERA, op, depth)
-    storage = operator_storage(m, op)
+function get_stored_operator(c::MERACache, op, depth)
+    storage = operator_storage!(c, op)
     return storage[depth]
 end
 
 """
 Store `opasc`, the operator `op` ascended to a given depth.
 """
-function set_stored_operator!(m::GenericMERA, opasc, op, depth)
-    storage = operator_storage(m, op)
+function set_stored_operator!(c::MERACache, opasc, op, depth)
+    storage = operator_storage!(c, op)
     if length(storage) < depth-1
         msg = "Can't store an ascended operator if the lower versions of it aren't in storage already."
         throw(ArgumentError(msg))
@@ -257,14 +328,15 @@ function set_stored_operator!(m::GenericMERA, opasc, op, depth)
     else
         storage[depth] = opasc
     end
-    return m
+    return c
 end
 
+# TODO reset_storage is not mutating, but these are. Be consisent.
 """
 Reset storage for a given operator.
 """
 function reset_operator_storage!(m::GenericMERA, op)
-    delete!(m.stored_operators, op)
+    delete!(m.cache.operators, op)
     return m
 end
 
@@ -272,7 +344,7 @@ end
 Reset storage for all operators.
 """
 function reset_operator_storage!(m::GenericMERA)
-    ops = keys(m.stored_operators)
+    ops = keys(m.cache.operators)
     for op in ops
         reset_operator_storage!(m, op)
     end
@@ -282,19 +354,18 @@ end
 """
 Return the environments related to `op`. Initialize storage for `op` if necessary.
 """
-function environment_storage(m::GenericMERA{T}, op) where T
-    if !(op in keys(m.stored_environments))
-        num_layers = length(m.layers)
-        m.stored_environments[op] = repeat(Union{Nothing, T}[nothing], num_layers)
+function environment_storage!(c::MERACache{N}, op) where N
+    if !(op in keys(c.environments))
+        c.environments[op] = repeat(Any[nothing], N)
     end
-    return m.stored_environments[op]
+    return c.environments[op]
 end
 
 """
 Return whether the environment related to `op` at `depth` is already in store.
 """
-function has_environment_stored(m::GenericMERA, op, depth)
-    storage = environment_storage(m, op)
+function has_environment_stored(c::MERACache, op, depth)
+    storage = environment_storage!(c, op)
     return storage[depth] !== nothing
 end
 
@@ -302,29 +373,29 @@ end
 Return the environment related to `op` at `depth`. Return `nothing` is this environment is
 not in store.
 """
-function get_stored_environment(m::GenericMERA, op, depth)
-    storage = environment_storage(m, op)
+function get_stored_environment(c::MERACache, op, depth)
+    storage = environment_storage!(c, op)
     return storage[depth]
 end
 
 """
 Store `env`, the environments related to `op` at `depth`.
 """
-function set_stored_environment!(m::GenericMERA, env, op, depth)
-    storage = environment_storage(m, op)
+function set_stored_environment!(c::MERACache, env, op, depth)
+    storage = environment_storage!(c, op)
     storage[depth] = env
-    return m
+    return c
 end
 
 """
 Reset storage for environments.
 """
-function reset_environment_storage!(m::GenericMERA)
-    ops = keys(m.stored_environments)
+function reset_environment_storage!(c::MERACache)
+    ops = keys(c.environments)
     for op in ops
-        delete!(m.stored_environments, op)
+        delete!(c.environments, op)
     end
-    return m
+    return c
 end
 
 # # # Generating random MERAs
@@ -351,7 +422,7 @@ function random_MERA(::Type{T}, Vs, Ws=nothing; kwargs...) where T <: GenericMER
         end
         push!(layers, layer)
     end
-    m = T(layers)
+    m = GenericMERA(layers)
     return m
 end
 
@@ -364,6 +435,9 @@ Each subtype of `Layer` should have its own method for this function.
 """
 function randomlayer end
 
+# TODO Should the numbering be changed, so that the bond at `depth` would be the
+# output bond of layer `depth`, instead of input? Would maybe be more consistent.
+# TODO Should the newdims Dict thing be replace with just a vector space?
 """
 Expand the bond dimension of the MERA at the given depth. `depth=1` is the first virtual
 level, just above the first layer of the MERA, and the numbering grows from there. The new
@@ -376,43 +450,47 @@ the individual tensors. This is however of no consequence, since the MERA as a s
 exactly the same. A round of optimization on the MERA will restore isometricity of each
 tensor.
 """
-function expand_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
+function expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
+    if depth > num_translayers(m)
+        msg = "expand_bonddim called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
+        throw(ArgumentError(msg))
+    end
     V = inputspace(m, depth)
     V = expand_vectorspace(V, newdims)
-
     layer = get_layer(m, depth)
     layer = expand_inputspace(layer, V)
-    set_layer!(m, layer, depth; check_invar=false)
-
     next_layer = get_layer(m, depth+1)
     next_layer = expand_outputspace(next_layer, V)
     if depth == num_translayers(m)
         # next_layer is the scale invariant part, so we need to change its top
         # index too since we changed the bottom.
         next_layer = expand_inputspace(next_layer, V)
-        # Pad the stored scale invariant initial guesses as well, when padding the scale
-        # invariant isometries.
-        old_rho = m.previous_fixedpoint_densitymatrix[1]
-        if old_rho !== nothing
-            width = causal_cone_width(typeof(m))
-            for i in 1:width
-                old_rho = pad_with_zeros_to(old_rho, i => V, (i+width) => V')
-            end
-            m.previous_fixedpoint_densitymatrix[1] = old_rho
-        end
-        old_opsum = m.previous_operatorsum[1]
-        if old_opsum !== nothing
-            width = causal_cone_width(typeof(m))
-            for i in 1:width
-                old_opsum = pad_with_zeros_to(old_opsum, i => V, (i+width) => V')
-            end
-            m.previous_operatorsum[1] = old_opsum
-        end
-    elseif depth > num_translayers(m)
-            msg = "expand_bonddim! called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
-            throw(ArgumentError(msg))
     end
-    set_layer!(m, next_layer, depth+1; check_invar=check_invar)
+    m = replace_layer(m, layer, depth; check_invar=false)
+    m = replace_layer(m, next_layer, depth+1; check_invar=check_invar)
+    expand_bonddim!(m.cache, depth, V)
+    return m
+end
+
+function expand_bonddim!(c::MERACache{N, LayerType}, depth, V) where {N, LayerType}
+    depth < N && return c
+    width = causal_cone_width(LayerType)
+    # Pad the stored scale invariant initial guesses.
+    old_rho = m.previous_fixedpoint_densitymatrix[1]
+    if old_rho !== nothing
+        for i in 1:width
+            old_rho = pad_with_zeros_to(old_rho, i => V, (i+width) => V')
+        end
+        m.previous_fixedpoint_densitymatrix[1] = old_rho
+    end
+    old_opsum = m.previous_operatorsum[1]
+    if old_opsum !== nothing
+        for i in 1:width
+            old_opsum = pad_with_zeros_to(old_opsum, i => V, (i+width) => V')
+        end
+        m.previous_operatorsum[1] = old_opsum
+    end
+    return c
 end
 
 """
@@ -429,12 +507,13 @@ tensor.
 Note that not all MERAs have an internal bond dimension, and some may have several, so this
 function will not make sense for all MERA types.
 """
-function expand_internal_bonddim!(m::GenericMERA, depth, newdims; check_invar=true)
+function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
     V = internalspace(m, depth)
     V = expand_vectorspace(V, newdims)
     layer = get_layer(m, depth)
     layer = expand_internalspace(layer, V)
-    set_layer!(m, layer, depth; check_invar=check_invar)
+    m = replace_layer(m, layer, depth; check_invar=check_invar)
+    return m
 end
 
 """
@@ -455,7 +534,7 @@ function expand_outputspace end
 Given a MERA which may possibly be built of symmetry preserving TensorMaps, return another
 MERA that has the symmetry structure stripped from it, and all tensors are dense.
 """
-remove_symmetry(m::T) where T <: GenericMERA = T(map(remove_symmetry, m.layers))
+remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
 
 # # # Pseudo(de)serialization
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
@@ -474,8 +553,9 @@ pseudoserialize(m::T) where T <: GenericMERA = (repr(T), map(pseudoserialize, m.
 """
 Reconstruct a MERA given the output of `pseudoserialize`.
 """
-depseudoserialize(::Type{T}, args) where T <: GenericMERA = T([depseudoserialize(d...)
-                                                               for d in args])
+function depseudoserialize(::Type{T}, args) where T <: GenericMERA
+    return GenericMERA([depseudoserialize(d...) for d in args])
+end
 
 # Implementations for pseudoserialize(l::T) and depseudoserialize(::Type{T}, args...) should
 # be written for each T <: Layer. They can make use of the (de)pseudoserialize methods for
@@ -489,7 +569,7 @@ other. If not, throw an ArgumentError. If yes, return true. This relies on two c
 `space_invar_intralayer` for checking indices within a layer and `space_invar_interlayer`
 for checking indices between layers. These should be implemented for each subtype of Layer.
 """
-function space_invar(m::GenericMERA{T}) where T
+function space_invar(m::GenericMERA)
     layer = get_layer(m, 1)
     # We go to num_translayers(m)+2, to check that the scale invariant layer is consistent
     # with itself.
@@ -501,7 +581,7 @@ function space_invar(m::GenericMERA{T}) where T
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_intralayer has no method for type $(T). We recommend writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_intralayer has no method for type $(layertype(m)). We recommend writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
 
@@ -511,7 +591,7 @@ function space_invar(m::GenericMERA{T}) where T
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_interlayer has no method for type $(T). We recommend writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_interlayer has no method for type $(layertype(m)). We recommend writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
         layer = next_layer
@@ -581,7 +661,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
     x0 = thermal_densitymatrix(m, Inf)
-    old_rho = m.previous_fixedpoint_densitymatrix[1]
+    old_rho = m.cache.previous_fixedpoint_densitymatrix
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
     end
@@ -601,7 +681,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
         end
         rho = real(rho)
     end
-    m.previous_fixedpoint_densitymatrix[1] = rho
+    m.cache.previous_fixedpoint_densitymatrix = rho
     if :verbosity in keys(pars) && pars[:verbosity] > 3
         msg = "Used $(info.numops) superoperator invocations to find the fixed point density matrix."
         @info(msg)
@@ -628,8 +708,8 @@ This method stores every density matrix in memory as it computes them, and fetch
 there if the same one is requested again.
 """
 function densitymatrix(m::GenericMERA, depth, pars=Dict())
-    if has_densitymatrix_stored(m, depth)
-        rho = get_stored_densitymatrix(m, depth)
+    if has_densitymatrix_stored(m.cache, depth)
+        rho = get_stored_densitymatrix(m.cache, depth)
     else
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
@@ -639,7 +719,7 @@ function densitymatrix(m::GenericMERA, depth, pars=Dict())
             rho = descend(rho_above, m; endscale=depth, startscale=depth+1)
         end
         # Store this density matrix for future use.
-        set_stored_densitymatrix!(m, rho, depth)
+        set_stored_densitymatrix!(m.cache, rho, depth)
     end
     return rho
 end
@@ -661,13 +741,13 @@ in memory and fetches it from there if them same operator is requested again.
 function ascended_operator(m::GenericMERA, op, depth)
     # Note that if depth=1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
-    if has_operator_stored(m, op, depth)
-        opasc = get_stored_operator(m, op, depth)
+    if has_operator_stored(m.cache, op, depth)
+        opasc = get_stored_operator(m.cache, op, depth)
     else
         op_below = ascended_operator(m, op, depth-1)
         opasc = ascend(op_below, m; endscale=depth, startscale=depth-1)
         # Store this density matrix for future use.
-        set_stored_operator!(m, opasc, op, depth)
+        set_stored_operator!(m.cache, opasc, op, depth)
     end
     return opasc
 end
@@ -695,7 +775,7 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     end
     op_top = ascended_operator(m, op, nt+1)
     x0 = op_top
-    old_opsum = m.previous_operatorsum[1]
+    old_opsum = m.cache.previous_operatorsum
     if old_opsum !== nothing && space(x0) == space(old_opsum)
         x0 = old_opsum
     end
@@ -704,7 +784,7 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     opsum, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
     # We know the result should always be Hermitian.
     opsum = (opsum + opsum') / 2.0
-    m.previous_operatorsum[1] = opsum
+    m.cache.previous_operatorsum = opsum
     # We are not interested in the component along fp.
     opsum = opsum - fp * dot(fp, opsum)
     if :verbosity in keys(pars) && pars[:verbosity] > 3
@@ -719,8 +799,8 @@ Return the environment related to `op` at `depth`. This function uses the cache 
 environment and retrieve it from storage if it is already there.
 """
 function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
-    if has_environment_stored(m, op, depth)
-        env = get_stored_environment(m, op, depth)
+    if has_environment_stored(m.cache, op, depth)
+        env = get_stored_environment(m.cache, op, depth)
     else
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
@@ -731,7 +811,7 @@ function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
         rho_above = densitymatrix(m, depth+1, pars)
         layer = get_layer(m, depth)
         env = environment(layer, op_below, rho_above; vary_disentanglers=vary_disentanglers)
-        set_stored_environment!(m, env, op, depth)
+        set_stored_environment!(m.cache, env, op, depth)
     end
     return env
 end
@@ -834,8 +914,8 @@ default_pars = Dict(:method => :lbfgs,
                                                          ),
                    )
 
-function minimize_expectation!(m, h, pars; finalize! = OptimKit._finalize!,
-                               vary_disentanglers=true, kwargs...)
+function minimize_expectation(m, h, pars; finalize! = OptimKit._finalize!,
+                              vary_disentanglers=true, kwargs...)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
@@ -844,16 +924,16 @@ function minimize_expectation!(m, h, pars; finalize! = OptimKit._finalize!,
     if vary_disentanglers && pars[:isometries_only_iters] > 0
         temp_pars = deepcopy(pars)
         temp_pars[:maxiter] = pars[:isometries_only_iters]
-        m = minimize_expectation!(m, h, temp_pars; finalize! = finalize!, vary_disentanglers=false, kwargs...)
+        m = minimize_expectation(m, h, temp_pars; finalize! = finalize!, vary_disentanglers=false, kwargs...)
     end
 
     method = pars[:method]
     if method in (:cg, :conjugategradient, :gd, :gradientdescent, :lbfgs)
-        return minimize_expectation_grad!(m, h, pars; vary_disentanglers=vary_disentanglers,
-                                          finalize! = finalize!, kwargs...)
+        return minimize_expectation_grad(m, h, pars; vary_disentanglers=vary_disentanglers,
+                                         finalize! = finalize!, kwargs...)
     elseif method == :ev || method == :evenblyvidal
-        return minimize_expectation_ev!(m, h, pars; vary_disentanglers=vary_disentanglers,
-                                        finalize! = finalize!, kwargs...)
+        return minimize_expectation_ev(m, h, pars; vary_disentanglers=vary_disentanglers,
+                                       finalize! = finalize!, kwargs...)
     else
         msg = "Unknown optimization method $(method)."
         throw(ArgumentError(msg))
@@ -886,8 +966,8 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev!(m, h, pars; finalize! = OptimKit._finalize!,
-                                  lowest_depth=1, vary_disentanglers=true)
+function minimize_expectation_ev(m, h, pars; finalize! = OptimKit._finalize!,
+                                 lowest_depth=1, vary_disentanglers=true)
     nt = num_translayers(m)
     rhos = densitymatrices(m, pars)
     expectation = expect(h, m, pars)
@@ -910,7 +990,7 @@ function minimize_expectation_ev!(m, h, pars; finalize! = OptimKit._finalize!,
                 layer = get_layer(m, l)
                 new_layer = minimize_expectation_ev(layer, env, pars;
                                                     vary_disentanglers=vary_disentanglers)
-                set_layer!(m, new_layer, l)
+                m = replace_layer(m, new_layer, l)
             end
             # We use the latest env and the corresponding layer to compute the norm of the
             # gradient. This isn't quite the gradient at the end point, which is what we
@@ -959,7 +1039,7 @@ end
 
 # # # Gradient optimization
 
-function istangent(m::T, mtan::T) where T <: GenericMERA
+function istangent(m::GenericMERA, mtan::GenericMERA)
     n = max(num_translayers(m), num_translayers(mtan)) + 1
     return all([istangent(get_layer(m, i), get_layer(mtan, i)) for i in 1:n])
 end
@@ -971,18 +1051,18 @@ end
 function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
     layers = [tensorwise_sum(get_layer(m1, i), get_layer(m2, i)) for i in 1:n]
-    return T(layers)
+    return GenericMERA(layers)
 end
 
-function TensorKitManifolds.inner(m::T, m1::T, m2::T; metric=:euclidean
-                                 ) where T <: GenericMERA
+function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
+                                  metric=:euclidean)
     n = max(num_translayers(m1), num_translayers(m2)) + 1
     res = sum([inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i); metric=metric)
                for i in 1:n])
     return res
 end
 
-function gradient(h, m::T, pars; vary_disentanglers=true, kwargs...) where T <: GenericMERA
+function gradient(h, m::GenericMERA, pars; vary_disentanglers=true, kwargs...)
     kwargs = Dict{Symbol, Any}(kwargs)
     :metric ∉ keys(kwargs) && (kwargs[:metric] = pars[:metric])
     :isometrymanifold ∉ keys(kwargs) && (kwargs[:isometrymanifold] = pars[:isometrymanifold])
@@ -994,11 +1074,12 @@ function gradient(h, m::T, pars; vary_disentanglers=true, kwargs...) where T <: 
         grad = gradient(layer, env; kwargs...)
         push!(layers, grad)
     end
-    g = T(layers)
+    g = GenericMERA(layers)
     return g
 end
 
-function precondition_tangent(m::T, tan::T, pars) where T <: GenericMERA
+function precondition_tangent(m::T1, tan::T2, pars) where {T1 <: GenericMERA,
+                                                           T2 <: GenericMERA}
     nt = num_translayers(m)
     tanlayers_prec = []
     for l in 1:nt+1
@@ -1008,27 +1089,31 @@ function precondition_tangent(m::T, tan::T, pars) where T <: GenericMERA
         tanlayer_prec = precondition_tangent(layer, tanlayer, rho)
         push!(tanlayers_prec, tanlayer_prec)
     end
-    tan_prec = T(tanlayers_prec)
+    tan_prec = T2(tanlayers_prec)
     return tan_prec
 end
 
-function TensorKitManifolds.retract(m::T, mtan::T, alpha::Real; kwargs...
-                                   ) where T <: GenericMERA
+function TensorKitManifolds.retract(m::T1, mtan::T2, alpha::Real; kwargs...
+                                   ) where {T1 <: GenericMERA, T2 <: GenericMERA}
     layers, layers_tan = zip([retract(l, ltan, alpha; kwargs...)
                               for (l, ltan) in zip(m.layers, mtan.layers)]...)
-    return T(layers), T(layers_tan)
+    # TODO The following two lines just work around a compiler bug in Julia < 1.6.
+    layers = tuple(layers...)
+    layers_tan = tuple(layers_tan...)
+    return T1(layers), T2(layers_tan)
 end
 
-function TensorKitManifolds.transport!(mvec::T, m::T, mtan::T, alpha::Real, mend::T;
-                                       kwargs...) where T <: GenericMERA
+function TensorKitManifolds.transport!(mvec::T2, m::T1, mtan::T2, alpha::Real, mend::T1;
+                                       kwargs...) where {T1 <: GenericMERA, T2 <:
+                                                         GenericMERA}
     layers = [transport!(lvec, l, ltan, alpha, lend; kwargs...)
               for (lvec, l, ltan, lend)
               in zip(mvec.layers, m.layers, mtan.layers, mend.layers)]
-    return T(layers)
+    return T2(layers)
 end
 
-function minimize_expectation_grad!(m, h, pars; finalize! = OptimKit._finalize!,
-                                    lowest_depth=1, vary_disentanglers=true)
+function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!,
+                                   lowest_depth=1, vary_disentanglers=true)
     if lowest_depth != 1
         # TODO Could implement this. It's not hard, just haven't seen the need.
         msg = "lowest_depth != 1 has not been implemented for gradient optimization."

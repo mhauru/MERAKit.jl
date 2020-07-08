@@ -23,11 +23,12 @@ struct TernaryLayer{DisType, IsoType} <: SimpleLayer
     isometry::IsoType
 end
 
+TernaryMERA{N} = GenericMERA{N, T} where T <: TernaryLayer
+
 # Given an instance of a type like TernaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type TernaryLayer.
 layertype(::TernaryLayer) = TernaryLayer
-
-TernaryMERA = GenericMERA{TernaryLayer}
+layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
@@ -44,7 +45,7 @@ end
 """
 The ratio by which the number of sites changes when go down through this layer.
 """
-scalefactor(::Type{TernaryMERA}) = 3
+scalefactor(::Type{<:TernaryLayer}) = 3
 
 get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry
@@ -131,7 +132,8 @@ function gradient(layer::TernaryLayer, env::TernaryLayer; isometrymanifold=:gras
     uenv, wenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    # TODO Where exactly does this factor of 2 come from again? The conjugate part?
+    # The factor of two is from the partial_x + i partial_y derivative of the cost function,
+    # and how it depends on both v and v^dagger.
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
     if isometrymanifold === :stiefel
         wgrad = Stiefel.project!(2*wenv, w; metric=metric)

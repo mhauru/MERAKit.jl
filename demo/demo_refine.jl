@@ -142,7 +142,7 @@ function main()
         return m, expectation, g
     end
 
-    m = minimize_expectation!(m, h, opt_pars; finalize! = finalize!)
+    m = minimize_expectation(m, h, opt_pars; finalize! = finalize!)
 end
 
 main()

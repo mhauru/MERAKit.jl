@@ -32,11 +32,12 @@ struct ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType} <: SimpleLayer
     isometry_right::IsoRightType
 end
 
+ModifiedBinaryMERA{N} = GenericMERA{N, T} where T <: ModifiedBinaryLayer
+
 # Given an instance of a type like ModifiedBinaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
-
-ModifiedBinaryMERA = GenericMERA{ModifiedBinaryLayer}
+layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, 1)
@@ -58,7 +59,7 @@ end
 """
 The ratio by which the number of sites changes when go down through this layer.
 """
-scalefactor(::Type{ModifiedBinaryMERA}) = 2
+scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
 
 get_disentangler(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).disentangler
 get_isometry_left(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).isometry_left
@@ -158,6 +159,7 @@ struct ModifiedBinaryOp{T}
 end
 
 ModifiedBinaryOp(op::AbstractTensorMap) = ModifiedBinaryOp(op, op)
+ModifiedBinaryOp(op::ModifiedBinaryOp) = op  # makes some method signatures simpler to write
 Base.convert(::Type{ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
 
 Base.iterate(op::ModifiedBinaryOp) = (op.mid, 1)
@@ -204,6 +206,9 @@ end
 TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
 TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
 TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
+
+# TODO This whole thing is very messy and ad hoc, with the interplay of TensorMaps and
+# ModifiedBinaryOps.
 
 # Pass element-wise arithmetic down onto the AbstractTensorMaps. Promote AbstractTensorMaps
 # to ModifiedBinaryOps if necessary.
@@ -262,10 +267,26 @@ function BLAS.axpby!(a::Number, X::ModifiedBinaryOp, b::Number, Y::ModifiedBinar
     return Y
 end
 
+function BLAS.axpby!(a::Number, X::AbstractTensorMap, b::Number, Y::ModifiedBinaryOp)
+    return axpby!(a, ModifiedBinaryOp(X), b, Y)
+end
+
+function BLAS.axpby!(a::Number, X::ModifiedBinaryOp, b::Number, Y::AbstractTensorMap)
+    return axpby!(a, X, b, ModifiedBinaryOp(Y))
+end
+
 function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::ModifiedBinaryOp)
     axpy!(a, X.mid, Y.mid)
     axpy!(a, X.gap, Y.gap)
     return Y
+end
+
+function BLAS.axpy!(a::Number, X::AbstractTensorMap, Y::ModifiedBinaryOp)
+    return axpy!(a, ModifiedBinaryOp(X), Y)
+end
+
+function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::AbstractTensorMap)
+    return axpy!(a, X, ModifiedBinaryOp(Y))
 end
 
 function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::ModifiedBinaryOp, B::ModifiedBinaryOp,
@@ -285,6 +306,22 @@ function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::Number, B::ModifiedBinaryOp)
     mul!(C.mid, A, B.mid)
     mul!(C.gap, A, B.gap)
     return C
+end
+
+function LinearAlgebra.mul!(C::AbstractTensorMap, A::ModifiedBinaryOp, B::Number)
+    return mul!(ModifiedBinaryOp(C), A, B)
+end
+
+function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::AbstractTensorMap, B::Number)
+    return mul!(C, ModifiedBinaryOp(A), B)
+end
+
+function LinearAlgebra.mul!(C::AbstractTensorMap, A::Number, B::ModifiedBinaryOp)
+    return mul!(ModifiedBinaryOp(C), A, B)
+end
+
+function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::Number, B::AbstractTensorMap)
+    return mul!(C, A, ModifiedBinaryOp(B))
 end
 
 LinearAlgebra.tr(op::ModifiedBinaryOp) = (tr(op.mid) + tr(op.gap)) / 2.0
@@ -331,7 +368,8 @@ function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer; isometry
     uenv, wlenv, wrenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
-    # TODO Where exactly does this factor of 2 come from again? The conjugate part?
+    # The factor of two is from the partial_x + i partial_y derivative of the cost function,
+    # and how it depends on both v and v^dagger.
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
     if isometrymanifold === :stiefel
         wlgrad = Stiefel.project!(2*wlenv, wl; metric=metric)

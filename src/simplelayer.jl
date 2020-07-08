@@ -59,6 +59,9 @@ function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Re
                                     alg=:exp)
     ts_and_ttans = [retract(t..., alpha; alg=alg) for t in zip(l, ltan)]
     ts, ttans = zip(ts_and_ttans...)
+    # TODO The following two lines just work around a compiler bug in Julia < 1.6.
+    ts = tuple(ts...)
+    ttans = tuple(ttans...)
     return layertype(l)(ts...), layertype(l)(ttans...)
 end
 
