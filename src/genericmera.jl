@@ -621,11 +621,13 @@ function ascend(op, m::GenericMERA; endscale=num_translayers(m)+1, startscale=1)
     if endscale < startscale
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
-        op = ascend(op, m; endscale=endscale-1, startscale=startscale)
+        op_pre = ascend(op, m; endscale=endscale-1, startscale=startscale)
         layer = get_layer(m, endscale-1)
-        op = ascend(op, layer)
+        op_asc = ascend(op_pre, layer)
+    else
+        op_asc = convert(operatortype(typeof(m)), op)
     end
-    return op
+    return op_asc
 end
 
 """
@@ -639,11 +641,13 @@ function descend(op, m::GenericMERA; endscale=1, startscale=num_translayers(m)+1
     if endscale > startscale
         throw(ArgumentError("endscale > startscale"))
     elseif endscale < startscale
-        op = descend(op, m; endscale=endscale+1, startscale=startscale)
+        op_pre = descend(op, m; endscale=endscale+1, startscale=startscale)
         layer = get_layer(m, endscale)
-        op = descend(op, layer)
+        op_desc = descend(op_pre, layer)
+    else
+        op_desc = convert(operatortype(typeof(m)), op)
     end
-    return op
+    return op_desc
 end
 
 """
@@ -687,11 +691,11 @@ Return the thermal density matrix for the indices right below the layer at `dept
 an initial guess for the fixed-point density matrix.
 """
 function thermal_densitymatrix(m::GenericMERA, depth)
-    V = inputspace(m, Inf)
     width = causal_cone_width(typeof(m))
-    eye = id(Matrix{eltype(m)}, V)
-    rho = ⊗(repeat([eye], width)...)
-    return rho
+    V = inputspace(m, depth)^width
+    rho_tensor = id(Matrix{eltype(m)}, V)
+    rho_op = convert(operatortype(typeof(m)), rho_tensor)
+    return rho_op
 end
 
 """
@@ -1032,18 +1036,14 @@ end
 
 # # # Gradient optimization
 
-function istangent(m::GenericMERA, mtan::GenericMERA)
-    n = max(num_translayers(m), num_translayers(mtan)) + 1
-    return all([istangent(get_layer(m, i), get_layer(mtan, i)) for i in 1:n])
-end
-
 function tensorwise_scale(m::T, alpha) where T <: GenericMERA
-    return T([tensorwise_scale(l, alpha) for l in m.layers])
+    t = tuple((tensorwise_scale(l, alpha) for l in m.layers)...)
+    return GenericMERA(t)
 end
 
 function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    layers = [tensorwise_sum(get_layer(m1, i), get_layer(m2, i)) for i in 1:n]
+    layers = (tensorwise_sum(get_layer(m1, i), get_layer(m2, i)) for i in 1:n)
     return GenericMERA(layers)
 end
 
@@ -1055,18 +1055,15 @@ function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericME
     return res
 end
 
-function gradient(h, m::GenericMERA, pars; vary_disentanglers=true, kwargs...)
-    kwargs = Dict{Symbol, Any}(kwargs)
-    :metric ∉ keys(kwargs) && (kwargs[:metric] = pars[:metric])
-    :isometrymanifold ∉ keys(kwargs) && (kwargs[:isometrymanifold] = pars[:isometrymanifold])
+function gradient(h, m::GenericMERA, pars; vary_disentanglers=true)
     nt = num_translayers(m)
-    layers = []
-    for l in 1:nt+1
-        layer = get_layer(m, l)
-        env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
-        grad = gradient(layer, env; kwargs...)
-        push!(layers, grad)
-    end
+    layers = (begin
+                  layer = get_layer(m, l)
+                  env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
+                  grad = gradient(layer, env; metric=pars[:metric],
+                                  isometrymanifold=pars[:isometrymanifold])
+              end
+              for l in 1:nt+1)
     g = GenericMERA(layers)
     return g
 end

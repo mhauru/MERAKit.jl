@@ -1,5 +1,6 @@
 using Test
 using TensorKit
+using TensorKitManifolds
 using LinearAlgebra
 using MERA
 using Logging
@@ -91,20 +92,67 @@ Test type stability, and type stability only, of various methods.
 """
 function test_type_stability(meratype, spacetype)
     layers = 4
+    width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     V1, V2 = spaces[1:2]
-    l1 = @inferred randomlayer(L, ComplexF64, V2, V1, intspaces[1];
-                               random_disentangler=false)
+    Vend = spaces[end]
+    randomop1 = TensorMap(randn, ComplexF64, V1 ← V1)
+    randomop1 = randomop1 + randomop1'
+    randomop1 = convert(MERA.operatortype(meratype),
+                       MERA.expand_support(randomop1, causal_cone_width(meratype)))
+    randomop2 = TensorMap(randn, ComplexF64, V1 ← V1)
+    randomop2 = randomop2 + randomop2'
+    randomop2 = convert(MERA.operatortype(meratype),
+                       MERA.expand_support(randomop2, causal_cone_width(meratype)))
+    randomrho1 = TensorMap(randn, ComplexF64, Vend ← Vend)
+    randomrho1 = randomrho1' + randomrho1'
+    randomrho1 = convert(MERA.operatortype(meratype),
+                       MERA.expand_support(randomrho1, causal_cone_width(meratype)))
+    randomrho2 = TensorMap(randn, ComplexF64, V2 ← V2)
+    randomrho2 = randomrho2' + randomrho2'
+    randomrho2 = convert(MERA.operatortype(meratype),
+                         MERA.expand_support(randomrho2, causal_cone_width(meratype)))
+
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     nt = @inferred num_translayers(m)
-    width = @inferred causal_cone_width(meratype)
+    l1 = @inferred randomlayer(L, ComplexF64, V2, V1, intspaces[1];
+                               random_disentangler=false)
+
     @inferred replace_layer(m, l1, 1)
     @inferred release_transitionlayer(m)
     @inferred projectisometric(m)
-    @inferred outputspace(m, 1)
-    @inferred inputspace(m, 1)
+    @inferred outputspace(m, Inf)
+    @inferred inputspace(m, Inf)
+    @inferred MERA.environment(l1, randomop1, randomrho2)
+
+    @inferred ascend(randomop1, m)
+    # TODO This probably doesn't work because the cache isn't type specific.
+    #@inferred ascended_operator(m, randomop1, 1)
+    @inferred descend(randomrho1, m)
+    # TODO The problem here is that the width of the causal cone is only seen at
+    # runtime and thus thermal_densitymatrix isn't type stable and hence none of its
+    # descendants are.
+    #@inferred MERA.thermal_densitymatrix(m, Inf)
+    #@inferred MERA.fixedpoint_densitymatrix(m)
+    #@inferred densitymatrix(m, 1)
+
+    # TODO Finish this part, and add @inferred checks for more functions, optimally all
+    # functions that can reasonably be expected to be type stable.
+    #pars = Dict(:metric => :euclidean, :precondition => false)
+    #pars = merge(MERA.default_pars, pars)
+    #mtan1 = gradient(randomop1, m, pars)
+    #mtan2 = gradient(randomop2, m, pars)
+    #ltan1 = get_layer(mtan1, 1)
+    #ltan2 = get_layer(mtan2, 1)
+    #@inferred (x -> tuple(ltan1...))(:a)
+    #@inferred MERA.tensorwise_scale(ltan1, 0.1)
+    #@inferred MERA.tensorwise_sum(ltan1, ltan2)
+    #@inferred inner(l1, ltan1, ltan2)
+    #@inferred MERA.tensorwise_scale(mtan1, 0.1)
+    #@inferred MERA.tensorwise_sum(mtan1, mtan2)
+    #@inferred inner(m, mtan1, mtan2)
 end
 
 """
@@ -387,7 +435,7 @@ function test_gradient_and_retraction(meratype, spacetype, alg, metric)
     pars = Dict(:metric => metric, :precondition => false)
     pars = merge(MERA.default_pars, pars)
 
-    fg(x) = (expect(ham, x), gradient(ham, x, pars; metric=metric))
+    fg(x) = (expect(ham, x), gradient(ham, x, pars))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
     add!(vec1, vec2, beta) = tensorwise_sum(vec1, scale!(vec2, beta))
 
@@ -434,7 +482,7 @@ function test_transport(meratype, spacetype, alg, metric)
     pars = Dict(:metric => metric, :precondition => false)
     pars = merge(MERA.default_pars, pars)
 
-    g1, g2, g3 = [gradient(ham, m, pars; metric=metric) for ham in hams]
+    g1, g2, g3 = [gradient(ham, m, pars) for ham in hams]
     angle_pre = inner(m, g2, g3; metric=metric)
     # Transport g2 and g3 along the retraction by g1, by distance alpha.
     alpha = 2.7

@@ -40,21 +40,11 @@ layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
-Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, 1)
-function Base.iterate(layer::ModifiedBinaryLayer, state)
-    state == 1 && return (layer.isometry_left, 2)
-    state == 2 && return (layer.isometry_right, 3)
-    return nothing
-end
+Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
+Base.iterate(layer::ModifiedBinaryLayer, ::Val{1}) = (layer.isometry_left, Val(2))
+Base.iterate(layer::ModifiedBinaryLayer, ::Val{2}) = (layer.isometry_right, Val(3))
+Base.iterate(layer::ModifiedBinaryLayer, ::Val{3}) = nothing
 Base.length(layer::ModifiedBinaryLayer) = 3
-Base.firstindex(layer::ModifiedBinaryLayer) = 1
-Base.lastindex(layer::ModifiedBinaryLayer) = 3
-function Base.getindex(layer::ModifiedBinaryLayer, i)
-    i == 1 && return layer.disentangler
-    i == 2 && return layer.isometry_left
-    i == 3 && return layer.isometry_right
-    throw(BoundsError(layer, i))
-end
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -159,9 +149,12 @@ struct ModifiedBinaryOp{T}
     gap::T
 end
 
-ModifiedBinaryOp(op::AbstractTensorMap) = ModifiedBinaryOp(op, op)
+ModifiedBinaryOp(op::T) where T = ModifiedBinaryOp{T}(op, op)
 ModifiedBinaryOp(op::ModifiedBinaryOp) = op  # makes some method signatures simpler to write
 Base.convert(::Type{ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
+
+operatortype(::Type{<:ModifiedBinaryLayer}) = ModifiedBinaryOp
+operatortype(::Type{<:ModifiedBinaryMERA}) = operatortype(ModifiedBinaryLayer)
 
 Base.iterate(op::ModifiedBinaryOp) = (op.mid, 1)
 Base.iterate(op::ModifiedBinaryOp, state) = state == 1 ? (op.gap, 2) : nothing
@@ -363,8 +356,8 @@ function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
-function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer; isometrymanifold=:grassmann,
-                  metric=:euclidean)
+function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
+                  isometrymanifold=:grassmann, metric=:euclidean)
     u, wl, wr = layer
     uenv, wlenv, wrenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
@@ -440,201 +433,252 @@ end
 
 # # # Ascending and descending superoperators
 
-"""
-Ascend a threesite `op` from the bottom of the given layer to the top.
-"""
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer, pos=:avg
-               ) where T <: SquareTensorMap{2}
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                    ) where T <: SquareTensorMap{2}
     u, wl, wr = layer
     op_mid, op_gap = op
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                wl[7 8; -300] * wr[10 1; -400] *
-                u[6 5; 8 10] *
-                op_gap[3 4; 7 6] *
-                u'[2 9; 4 5] *
-                wl'[-100; 3 2] * wr'[-200; 9 1]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                wl[1 10; -300] * wr[8 7; -400] *
-                u[5 6; 10 8] *
-                op_gap[4 3; 6 7] *
-                u'[9 2; 5 4] *
-                wl'[-100; 1 9] * wr'[-200; 2 3]
-               )
-    elseif in(pos, (:middle, :m, :M))
-        # Cost: 4X^6 + 2X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                wl[12 23; -300] * wr[21 11; -400] *
-                u[3 4; 23 21] *
-                op_mid[1 2; 3 4] *
-                u'[24 22; 1 2] *
-                wl'[-100; 12 24] * wr'[-200; 22 11]
-               )
-    elseif in(pos, (:between, :b, :B))
-        # Cost: 2X^6 + 2X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                wr[12 23; -300] * wl[21 11; -400] *
-                op_mid[24 22; 23 21] *
-                wr'[-100; 12 24] * wl'[-200; 22 11]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = ascend(op, layer, :left)
-        r = ascend(op, layer, :right)
-        m = ascend(op, layer, :middle)
-        b = ascend(op, layer, :between)
-        scaled_op_mid = (l+r+m) / 2.0
-        scaled_op_gap = b / 2.0
-        scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
-    else
-        throw(ArgumentError("Unknown position (should be :l, :r, :m, :b, or :avg)."))
-    end
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            wl[7 8; -300] * wr[10 1; -400] *
+            u[6 5; 8 10] *
+            op_gap[3 4; 7 6] *
+            u'[2 9; 4 5] *
+            wl'[-100; 3 2] * wr'[-200; 9 1]
+           )
     return scaled_op
 end
 
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                     ) where T <: SquareTensorMap{2}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            wl[1 10; -300] * wr[8 7; -400] *
+            u[5 6; 10 8] *
+            op_gap[4 3; 6 7] *
+            u'[9 2; 5 4] *
+            wl'[-100; 1 9] * wr'[-200; 2 3]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                   ) where T <: SquareTensorMap{2}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 4X^6 + 2X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            wl[12 23; -300] * wr[21 11; -400] *
+            u[3 4; 23 21] *
+            op_mid[1 2; 3 4] *
+            u'[24 22; 1 2] *
+            wl'[-100; 12 24] * wr'[-200; 22 11]
+           )
+    return scaled_op
+end
+
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                       ) where T <: SquareTensorMap{2}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^6 + 2X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            wr[12 23; -300] * wl[21 11; -400] *
+            op_mid[24 22; 23 21] *
+            wr'[-100; 12 24] * wl'[-200; 22 11]
+           )
+    return scaled_op
+end
 
 """
-Ascend a threesite `op` from the bottom of the given layer to the top.
+Ascend a two-site `op` from the bottom of the given layer to the top.
 """
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer, pos=:avg
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+               ) where T <: SquareTensorMap{2}
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    b = ascend_between(op, layer)
+    scaled_op_mid = (l+r+m) / 2.0
+    scaled_op_gap = b / 2.0
+    scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
+    return scaled_op
+end
+
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                    ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            wl[7 8; -300] * wr[10 1; -400] *
+            u[6 5; 8 10] *
+            op_gap[3 4; 7 6 -1000] *
+            u'[2 9; 4 5] *
+            wl'[-100; 3 2] * wr'[-200; 9 1]
+           )
+    return scaled_op
+end
+
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                     ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            wl[1 10; -300] * wr[8 7; -400] *
+            u[5 6; 10 8] *
+            op_gap[4 3; 6 7 -1000] *
+            u'[9 2; 5 4] *
+            wl'[-100; 1 9] * wr'[-200; 2 3]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                   ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 4X^6 + 2X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            wl[12 23; -300] * wr[21 11; -400] *
+            u[3 4; 23 21] *
+            op_mid[1 2; 3 4 -1000] *
+            u'[24 22; 1 2] *
+            wl'[-100; 12 24] * wr'[-200; 22 11]
+           )
+    return scaled_op
+end
+
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                       ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^6 + 2X^5
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            wr[12 23; -300] * wl[21 11; -400] *
+            op_mid[24 22; 23 21 -1000] *
+            wr'[-100; 12 24] * wl'[-200; 22 11]
+           )
+    return scaled_op
+end
+
+"""
+Ascend a two-site `op` from the bottom of the given layer to the top.
+"""
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
                ) where {S1, T <: AbstractTensorMap{S1,2,3}}
     u, wl, wr = layer
     op_mid, op_gap = op
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                wl[7 8; -300] * wr[10 1; -400] *
-                u[6 5; 8 10] *
-                op_gap[3 4; 7 6 -1000] *
-                u'[2 9; 4 5] *
-                wl'[-100; 3 2] * wr'[-200; 9 1]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                wl[1 10; -300] * wr[8 7; -400] *
-                u[5 6; 10 8] *
-                op_gap[4 3; 6 7 -1000] *
-                u'[9 2; 5 4] *
-                wl'[-100; 1 9] * wr'[-200; 2 3]
-               )
-    elseif in(pos, (:middle, :m, :M))
-        # Cost: 4X^6 + 2X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                wl[12 23; -300] * wr[21 11; -400] *
-                u[3 4; 23 21] *
-                op_mid[1 2; 3 4 -1000] *
-                u'[24 22; 1 2] *
-                wl'[-100; 12 24] * wr'[-200; 22 11]
-               )
-    elseif in(pos, (:between, :b, :B))
-        # Cost: 2X^6 + 2X^5
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                wr[12 23; -300] * wl[21 11; -400] *
-                op_mid[24 22; 23 21 -1000] *
-                wr'[-100; 12 24] * wl'[-200; 22 11]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = ascend(op, layer, :left)
-        r = ascend(op, layer, :right)
-        m = ascend(op, layer, :middle)
-        b = ascend(op, layer, :between)
-        scaled_op_mid = (l+r+m) / 2.0
-        scaled_op_gap = b / 2.0
-        scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
-    else
-        throw(ArgumentError("Unknown position (should be :l, :r, :m, :b, or :avg)."))
-    end
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    b = ascend_between(op, layer)
+    scaled_op_mid = (l+r+m) / 2.0
+    scaled_op_gap = b / 2.0
+    scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
     return scaled_op
 end
 
-function ascend(op::SquareTensorMap{2}, layer::ModifiedBinaryLayer, pos=:avg)
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+               ) where {T <: SquareTensorMap{1}}
+    op = expand_support(op, causal_cone_width(ModifiedBinaryLayer))
+    return ascend(op, layer)
+end
+
+function ascend(op::T, layer::ModifiedBinaryLayer
+               ) where {S1, T <: Union{SquareTensorMap{1},
+                                       SquareTensorMap{2},
+                                       AbstractTensorMap{S1,2,3}}}
     op = ModifiedBinaryOp(op)
-    return ascend(op, layer, pos)
+    return ascend(op, layer)
 end
 
-function ascend(op::SquareTensorMap{1}, layer::ModifiedBinaryLayer, pos=:avg)
-    op = ModifiedBinaryOp(expand_support(op, causal_cone_width(ModifiedBinaryLayer)))
-    return ascend(op, layer, pos)
-end
-
-function ascend(op::AbstractTensorMap{S1,2,3}, layer::ModifiedBinaryLayer, pos=:avg
-               ) where {S1}
-    op = ModifiedBinaryOp(op)
-    return ascend(op, layer, pos)
-end
-
-"""
-Decend a threesite `rho` from the top of the given layer to the bottom.
-"""
-function descend(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer, pos=:avg)
+function descend_left(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     rho_mid, rho_gap = rho
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[5 6; -400 7] *
-                wl'[4; -300 5] * wr'[2; 6 1] *
-                rho_mid[9 3; 4 2] *
-                wl[-100 10; 9] * wr[8 1; 3] *
-                u[-200 7; 10 8]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^7 + 3X^6 + 1X^5
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[6 5; 7 -300] *
-                wl'[2; 1 6] * wr'[4; 5 -400] *
-                rho_mid[3 9; 2 4] *
-                wl[1 8; 3] * wr[10 -200; 9] *
-                u[7 -100; 8 10]
-               )
-    elseif in(pos, (:middle, :m, :M))
-        # Cost: 4X^6 + 2X^5
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[9 10; -300 -400] *
-                wl'[5; 4 9] * wr'[2; 10 1] *
-                rho_mid[6 3; 5 2] *
-                wl[4 7; 6] * wr[8 1; 3] *
-                u[-100 -200; 7 8]
-               )
-    elseif in(pos, (:between, :b, :B))
-        # Cost: 2X^6 + 2X^5
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                wr'[5; 4 -300] * wl'[2; -400 1] *
-                rho_gap[6 3; 5 2] *
-                wr[4 -100; 6] * wl[-200 1; 3]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = descend(rho, layer, :l)
-        r = descend(rho, layer, :r)
-        m = descend(rho, layer, :m)
-        b = descend(rho, layer, :b)
-        scaled_rho_mid = (m + b) / 2.0
-        scaled_rho_gap = (l + r) / 2.0
-        scaled_rho = ModifiedBinaryOp(scaled_rho_mid, scaled_rho_gap)
-    else
-        throw(ArgumentError("Unknown position (should be :l, :r, or :avg)."))
-    end
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[5 6; -400 7] *
+            wl'[4; -300 5] * wr'[2; 6 1] *
+            rho_mid[9 3; 4 2] *
+            wl[-100 10; 9] * wr[8 1; 3] *
+            u[-200 7; 10 8]
+           )
     return scaled_rho
 end
 
-function descend(op::AbstractTensorMap, layer::ModifiedBinaryLayer, pos=:avg)
-    return descend(ModifiedBinaryOp(op), layer, pos)
+function descend_right(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
+    u, wl, wr = layer
+    rho_mid, rho_gap = rho
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[6 5; 7 -300] *
+            wl'[2; 1 6] * wr'[4; 5 -400] *
+            rho_mid[3 9; 2 4] *
+            wl[1 8; 3] * wr[10 -200; 9] *
+            u[7 -100; 8 10]
+           )
+    return scaled_rho
+end
+
+function descend_mid(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
+    u, wl, wr = layer
+    rho_mid, rho_gap = rho
+    # Cost: 4X^6 + 2X^5
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[9 10; -300 -400] *
+            wl'[5; 4 9] * wr'[2; 10 1] *
+            rho_mid[6 3; 5 2] *
+            wl[4 7; 6] * wr[8 1; 3] *
+            u[-100 -200; 7 8]
+           )
+    return scaled_rho
+end
+
+function descend_between(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
+    u, wl, wr = layer
+    rho_mid, rho_gap = rho
+    # Cost: 2X^6 + 2X^5
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            wr'[5; 4 -300] * wl'[2; -400 1] *
+            rho_gap[6 3; 5 2] *
+            wr[4 -100; 6] * wl[-200 1; 3]
+           )
+    return scaled_rho
+end
+
+"""
+Decend a two-site `rho` from the top of the given layer to the bottom.
+"""
+function descend(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
+    u, wl, wr = layer
+    rho_mid, rho_gap = rho
+    l = descend_left(rho, layer)
+    r = descend_right(rho, layer)
+    m = descend_mid(rho, layer)
+    b = descend_between(rho, layer)
+    scaled_rho_mid = (m + b) / 2.0
+    scaled_rho_gap = (l + r) / 2.0
+    scaled_rho = ModifiedBinaryOp(scaled_rho_mid, scaled_rho_gap)
+    return scaled_rho
+end
+
+function descend(op::AbstractTensorMap, layer::ModifiedBinaryLayer)
+    return descend(ModifiedBinaryOp(op), layer)
 end
 
 # # # Optimization
@@ -646,7 +690,8 @@ function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers=tru
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else
-        env_u = zero(layer.disentangler)
+        # The adjoint is just for type stability.
+        env_u = zero(layer.disentangler')'
     end
     env_wl = environment_isometry_left(op, layer, rho)
     env_wr = environment_isometry_right(op, layer, rho)

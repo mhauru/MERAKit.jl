@@ -39,20 +39,20 @@ end
 # with a better implementation, because l1 and l2 can not be restricted to be of the exact
 # same, fully parametrized type.
 
-function tensorwise_sum(l1::SimpleLayer, l2::SimpleLayer)
-    return layertype(l1)(map(sum, zip(l1, l2))...)
-end
-
 function tensorwise_scale(layer::SimpleLayer, alpha::Number)
     return layertype(layer)((t*alpha for t in layer)...)
+end
+
+function tensorwise_sum(l1::SimpleLayer, l2::SimpleLayer)
+    return layertype(l1)((t1+t2 for (t1, t2) in zip(l1, l2))...)
 end
 
 # # # Manifold functions
 
 function TensorKitManifolds.inner(l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer;
                                   metric=:euclidean)
-    get_metric(t) = isa(t[end], Stiefel.StiefelTangent) ? metric : :euclidean
-    return sum(inner(t...; metric=get_metric(t)) for t in zip(l, l1, l2))
+    get_metric(t) = isa(t, Stiefel.StiefelTangent) ? metric : :euclidean
+    return sum(inner(t, t1, t2; metric=get_metric(t1)) for (t, t1, t2) in zip(l, l1, l2))
 end
 
 function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;

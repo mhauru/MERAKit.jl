@@ -12,7 +12,7 @@ using Logging
 export GenericMERA, TernaryMERA, BinaryMERA, ModifiedBinaryMERA
 export TernaryLayer, BinaryLayer, ModifiedBinaryLayer
 export SquareTensorMap
-export ascend, descend
+export ascend, ascended_operator, descend
 export remove_symmetry
 export layertype
 export get_layer, get_disentangler, get_isometry, num_translayers

@@ -2,6 +2,19 @@
 # To be `included` in MERA.jl.
 
 """
+Given the `IndexSpace` type, number of codomain and domain indices, and storage type
+(typically `Matrix{M} where M <: Number`), return the corresponding concrete `TensorMap`
+type.
+"""
+function tensortype(T::IndexSpace, N1, N2, A)
+    G = sectortype(T)
+    D = G === Trivial ? A : TensorKit.SectorDict{G, A}
+    F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, TupleTools.StaticLength{N1}())
+    F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, TupleTools.StaticLength{N2}())
+    return TensorMap{T, N1, N2, G, D, F1, F2}
+end
+
+"""
 A TensorMap from N indices to N indices.
 """
 SquareTensorMap{N} = AbstractTensorMap{S1, N, N} where {S1}
@@ -64,6 +77,21 @@ function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
     end
     return op
 end
+
+#function expand_support(op::SquareTensorMap{N}, ::Val{M}) where {N, M}
+#    V = space(op, 1)
+#    eye = id(V)
+#    op_support = N
+#    if N >= M
+#        return op
+#    else
+#        opeye = op ⊗ eye
+#        eyeop = eye ⊗ op
+#        op_expanded = (opeye + eyeop)/2
+#        return expand_support(op_expanded, Val(M))
+#    end
+#end
+
 
 """Strip a real ElementarySpace of its symmetry structure."""
 remove_symmetry(V::ElementarySpace{ℝ}) = CartesianSpace(dim(V))

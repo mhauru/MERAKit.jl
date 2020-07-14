@@ -30,17 +30,13 @@ TernaryMERA{N} = GenericMERA{N, T} where T <: TernaryLayer
 layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
+operatortype(::Type{<:TernaryLayer}) = AbstractTensorMap
+operatortype(::Type{<:TernaryMERA}) = operatortype(TernaryLayer)
+
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
 Base.iterate(layer::TernaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
 Base.length(layer::TernaryLayer) = 2
-Base.firstindex(layer::TernaryLayer) = 1
-Base.lastindex(layer::TernaryLayer) = 2
-function Base.getindex(layer::TernaryLayer, i)
-    i == 1 && return layer.disentangler
-    i == 2 && return layer.isometry
-    throw(BoundsError(layer, i))
-end
 
 """
 The ratio by which the number of sites changes when go down through this layer.
@@ -210,49 +206,56 @@ function ascending_superop_onesite(layer::TernaryLayer)
     return superop
 end
 
+function ascend_left(op::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w[51 52 53; -300 ] * w[54 11 12; -400] *
+            u[41 42; 53 54] *
+            op[31 32; 52 41] *
+            u'[21 55; 32 42] *
+            w'[-100; 51 31 21] * w'[-200; 55 11 12]
+           )
+    return scaled_op
+end
+
+function ascend_right(op::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w[11 12 65; -300] * w[63 61 62; -400] *
+            u[51 52; 65 63] *
+            op[31 41; 52 61] *
+            u'[64 21; 51 31] *
+            w'[-100; 11 12 64] * w'[-200; 21 41 62]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 6X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w[31 32 41; -300] * w[51 21 22; -400] *
+            u[1 2; 41 51] *
+            op[11 12; 1 2] *
+            u'[42 52; 11 12] *
+            w'[-100; 31 32 42] * w'[-200; 52 21 22]
+           )
+    return scaled_op
+end
+
 """
 Ascend a twosite `op` from the bottom of the given layer to the top.
 """
-function ascend(op::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
-    u, w = layer
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                w[51 52 53; -300 ] * w[54 11 12; -400] *
-                u[41 42; 53 54] *
-                op[31 32; 52 41] *
-                u'[21 55; 32 42] *
-                w'[-100; 51 31 21] * w'[-200; 55 11 12]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                w[11 12 65; -300] * w[63 61 62; -400] *
-                u[51 52; 65 63] *
-                op[31 41; 52 61] *
-                u'[64 21; 51 31] *
-                w'[-100; 11 12 64] * w'[-200; 21 41 62]
-               )
-    elseif in(pos, (:middle, :mid, :m, :M))
-        # Cost: 6X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400] :=
-                w[31 32 41; -300] * w[51 21 22; -400] *
-                u[1 2; 41 51] *
-                op[11 12; 1 2] *
-                u'[42 52; 11 12] *
-                w'[-100; 31 32 42] * w'[-200; 52 21 22]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = ascend(op, layer, :l)
-        r = ascend(op, layer, :r)
-        m = ascend(op, layer, :m)
-        scaled_op = (l+r+m)/3.
-    else
-        throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
-    end
+function ascend(op::SquareTensorMap{2}, layer::TernaryLayer)
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    scaled_op = (l+r+m)/3.
     return scaled_op
 end
 
@@ -260,100 +263,116 @@ end
 # network contractions? @ncon could do it, but Jutho's testing says it's significantly
 # slower. This is only used for diagonalizing in charge sectors, so having tensors with
 # non-trivial charge would also solve this.
-"""
-Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
-"""
-function ascend(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer, pos=:avg) where {S1}
+function ascend_left(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
     u, w = layer
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                w[51 52 53; -300] * w[54 11 12; -400] *
-                u[41 42; 53 54] *
-                op[31 32; 52 41 -1000] *
-                u'[21 55; 32 42] *
-                w'[-100; 51 31 21] * w'[-200; 55 11 12]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                w[11 12 65; -300] * w[63 61 62; -400] *
-                u[51 52; 65 63] *
-                op[31 41; 52 61 -1000] *
-                u'[64 21; 51 31] *
-                w'[-100; 11 12 64] * w'[-200; 21 41 62]
-               )
-    elseif in(pos, (:middle, :mid, :m, :M))
-        # Cost: 6X^6
-        @tensor(
-                scaled_op[-100 -200; -300 -400 -1000] :=
-                w[31 32 41; -300] * w[51 21 22; -400] *
-                u[1 2; 41 51] *
-                op[11 12; 1 2 -1000] *
-                u'[42 52; 11 12] *
-                w'[-100; 31 32 42] * w'[-200; 52 21 22]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = ascend(op, layer, :l)
-        r = ascend(op, layer, :r)
-        m = ascend(op, layer, :m)
-        scaled_op = (l+r+m)/3.
-    else
-        throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
-    end
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            w[51 52 53; -300] * w[54 11 12; -400] *
+            u[41 42; 53 54] *
+            op[31 32; 52 41 -1000] *
+            u'[21 55; 32 42] *
+            w'[-100; 51 31 21] * w'[-200; 55 11 12]
+           )
     return scaled_op
 end
 
-function ascend(op::SquareTensorMap{1}, layer::TernaryLayer, pos=:avg)
+function ascend_right(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            w[11 12 65; -300] * w[63 61 62; -400] *
+            u[51 52; 65 63] *
+            op[31 41; 52 61 -1000] *
+            u'[64 21; 51 31] *
+            w'[-100; 11 12 64] * w'[-200; 21 41 62]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+    u, w = layer
+    # Cost: 6X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000] :=
+            w[31 32 41; -300] * w[51 21 22; -400] *
+            u[1 2; 41 51] *
+            op[11 12; 1 2 -1000] *
+            u'[42 52; 11 12] *
+            w'[-100; 31 32 42] * w'[-200; 52 21 22]
+           )
+    return scaled_op
+end
+
+"""
+Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
+"""
+function ascend(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+    u, w = layer
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    scaled_op = (l+r+m)/3.
+    return scaled_op
+end
+
+function ascend(op::SquareTensorMap{1}, layer::TernaryLayer)
     op = expand_support(op, causal_cone_width(TernaryLayer))
-    return ascend(op, layer, pos)
+    return ascend(op, layer)
+end
+
+function descend_left(rho::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[61 62; -400 63] *
+            w'[51; 52 -300 61] * w'[21; 62 11 12] *
+            rho[42 22; 51 21] *
+            w[52 -100 41; 42] * w[31 11 12; 22] *
+            u[-200 63; 41 31]
+           )
+    return scaled_rho
+end
+
+function descend_right(rho::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[62 61; 63 -300] *
+            w'[21; 11 12 62] * w'[51; 61 -400 52] *
+            rho[22 42; 21 51] *
+            w[11 12 41; 22] * w[31 -200 52; 42] *
+            u[63 -100; 41 31]
+           )
+    return scaled_rho
+end
+
+function descend_mid(rho::SquareTensorMap{2}, layer::TernaryLayer)
+    u, w = layer
+    # Cost: 6X^6
+    @tensor(
+            scaled_rho[-100 -200; -300 -400] :=
+            u'[61 62; -300 -400] *
+            w'[21; 11 12 61] * w'[41; 62 31 32] *
+            rho[22 42; 21 41] *
+            w[11 12 51; 22] * w[52 31 32; 42] *
+            u[-100 -200; 51 52]
+           )
+    return scaled_rho
 end
 
 """
 Decend a twosite `rho` from the top of the given layer to the bottom.
 """
-function descend(rho::SquareTensorMap{2}, layer::TernaryLayer, pos=:avg)
+function descend(rho::SquareTensorMap{2}, layer::TernaryLayer)
     u, w = layer
-    if in(pos, (:left, :l, :L))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[61 62; -400 63] *
-                w'[51; 52 -300 61] * w'[21; 62 11 12] *
-                rho[42 22; 51 21] *
-                w[52 -100 41; 42] * w[31 11 12; 22] *
-                u[-200 63; 41 31]
-               )
-    elseif in(pos, (:right, :r, :R))
-        # Cost: 2X^8 + 2X^7 + 2X^6
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[62 61; 63 -300] *
-                w'[21; 11 12 62] * w'[51; 61 -400 52] *
-                rho[22 42; 21 51] *
-                w[11 12 41; 22] * w[31 -200 52; 42] *
-                u[63 -100; 41 31]
-               )
-    elseif in(pos, (:middle, :mid, :m, :M))
-        # Cost: 6X^6
-        @tensor(
-                scaled_rho[-100 -200; -300 -400] :=
-                u'[61 62; -300 -400] *
-                w'[21; 11 12 61] * w'[41; 62 31 32] *
-                rho[22 42; 21 41] *
-                w[11 12 51; 22] * w[52 31 32; 42] *
-                u[-100 -200; 51 52]
-               )
-    elseif in(pos, (:a, :avg, :average))
-        l = descend(rho, layer, :l)
-        r = descend(rho, layer, :r)
-        m = descend(rho, layer, :m)
-        scaled_rho = (l+r+m)/3.
-    else
-        throw(ArgumentError("Unknown position (should be :m, :l, :r, or :avg)."))
-    end
+    l = descend_left(rho, layer)
+    r = descend_right(rho, layer)
+    m = descend_mid(rho, layer)
+    scaled_rho = (l+r+m)/3.
     return scaled_rho
 end
 
@@ -366,7 +385,8 @@ function environment(layer::TernaryLayer, op, rho; vary_disentanglers=true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else
-        env_u = zero(layer.disentangler)
+        # The adjoint is just for type stability.
+        env_u = zero(layer.disentangler')'
     end
     env_w = environment_isometry(op, layer, rho)
     return TernaryLayer(env_u, env_w)
