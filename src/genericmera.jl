@@ -81,7 +81,6 @@ function GenericMERA{N, LayerType}(layers) where {N, LayerType}
 end
 
 function (::Type{GenericMERA{M, T} where M})(layers::NTuple{N}) where {N, T}
-    LayerType = eltype(typeof(layers))
     return GenericMERA(layers)
 end
 
