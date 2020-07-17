@@ -704,9 +704,7 @@ This method stores every density matrix in memory as it computes them, and fetch
 there if the same one is requested again.
 """
 function densitymatrix(m::GenericMERA, depth, pars=Dict())
-    if has_densitymatrix_stored(m.cache, depth)
-        rho = get_stored_densitymatrix(m.cache, depth)
-    else
+    if !has_densitymatrix_stored(m.cache, depth)
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
             rho = fixedpoint_densitymatrix(m, pars)
@@ -717,7 +715,7 @@ function densitymatrix(m::GenericMERA, depth, pars=Dict())
         # Store this density matrix for future use.
         set_stored_densitymatrix!(m.cache, rho, depth)
     end
-    return rho
+    return get_stored_densitymatrix(m.cache, depth)
 end
 
 """
@@ -737,15 +735,13 @@ in memory and fetches it from there if them same operator is requested again.
 function ascended_operator(m::GenericMERA, op, depth)
     # Note that if depth=1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
-    if has_operator_stored(m.cache, op, depth)
-        opasc = get_stored_operator(m.cache, op, depth)
-    else
+    if !has_operator_stored(m.cache, op, depth)
         op_below = ascended_operator(m, op, depth-1)
         opasc = ascend(op_below, m; endscale=depth, startscale=depth-1)
         # Store this density matrix for future use.
         set_stored_operator!(m.cache, opasc, op, depth)
     end
-    return opasc
+    return get_stored_operator(m.cache, op, depth)
 end
 
 """
@@ -795,9 +791,7 @@ Return the environment related to `op` at `depth`. This function uses the cache 
 environment and retrieve it from storage if it is already there.
 """
 function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
-    if has_environment_stored(m.cache, op, depth)
-        env = get_stored_environment(m.cache, op, depth)
-    else
+    if !has_environment_stored(m.cache, op, depth)
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
         else
@@ -809,7 +803,7 @@ function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
         env = environment(layer, op_below, rho_above; vary_disentanglers=vary_disentanglers)
         set_stored_environment!(m.cache, env, op, depth)
     end
-    return env
+    return get_stored_environment(m.cache, op, depth)
 end
 
 # # # Extracting CFT data
