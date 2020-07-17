@@ -39,17 +39,18 @@ end
 """
 Generate vector spaces for a MERA of `meratype`, with `n` layers, and `T` vector space type.
 """
-function random_layerspaces(T, meratype, n, dlow=3, dhigh=6)
+function random_layerspaces(::Type{T}, ::Type{meratype}, n, dlow=3, dhigh=6
+                           ) where {T, meratype}
     width = causal_cone_width(meratype)
     V = random_space(T, dlow, dhigh)
     spaces = tuple(V, (begin
                            V_prev = V
                            V_prev_fusion = fuse(reduce(⊗, repeat([V_prev], width)))
                            V = random_space(T, dlow, dhigh)
-                           # If a layer from V_prev to V would be of such a dimension that it
-                           # couldn't be isometric, try generating another V until success.
-                           # Since V = V_prev is a valid choice, this will eventually
-                           # terminate.
+                           # If a layer from V_prev to V would be of such a dimension that
+                           # it couldn't be isometric, try generating another V until
+                           # success.  Since V = V_prev is a valid choice, this will
+                           # eventually terminate.
                            while infinum(V_prev_fusion, V) != V
                                V = random_space(T, dlow, dhigh)
                            end
@@ -63,7 +64,7 @@ end
 Generate vector spaces for the layer-internal indices of a MERA of `meratype`, that has
 `extspaces` as its interlayer spaces.
 """
-function random_internalspaces(extspaces, meratype)
+function random_internalspaces(extspaces, ::Type{meratype}) where {meratype}
     width = (meratype == TernaryMERA ? 3 :
              meratype in (BinaryMERA, ModifiedBinaryMERA) ? 2 : nothing)
     intspaces = tuple((begin
@@ -90,7 +91,8 @@ end
 """
 Test type stability, and type stability only, of various methods.
 """
-function test_type_stability(meratype, spacetype)
+function test_type_stability(::Type{meratype}, ::Type{spacetype}
+                            ) where {meratype, spacetype}
     layers = 4
     width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
@@ -101,15 +103,15 @@ function test_type_stability(meratype, spacetype)
     randomop1 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop1 = randomop1 + randomop1'
     randomop1 = convert(MERA.operatortype(meratype),
-                       MERA.expand_support(randomop1, causal_cone_width(meratype)))
+                        MERA.expand_support(randomop1, causal_cone_width(meratype)))
     randomop2 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop2 = randomop2 + randomop2'
     randomop2 = convert(MERA.operatortype(meratype),
-                       MERA.expand_support(randomop2, causal_cone_width(meratype)))
+                        MERA.expand_support(randomop2, causal_cone_width(meratype)))
     randomrho1 = TensorMap(randn, ComplexF64, Vend ← Vend)
     randomrho1 = randomrho1' + randomrho1'
     randomrho1 = convert(MERA.operatortype(meratype),
-                       MERA.expand_support(randomrho1, causal_cone_width(meratype)))
+                         MERA.expand_support(randomrho1, causal_cone_width(meratype)))
     randomrho2 = TensorMap(randn, ComplexF64, V2 ← V2)
     randomrho2 = randomrho2' + randomrho2'
     randomrho2 = convert(MERA.operatortype(meratype),
@@ -160,7 +162,8 @@ For each layer, generate a random operator above and below it (not necessarily H
 and confirm that ascending the lower or descending the upper one both lead to the same
 expectation value (trace of product).
 """
-function test_ascend_and_descend(meratype, spacetype)
+function test_ascend_and_descend(::Type{meratype}, ::Type{spacetype}
+                                ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -186,7 +189,8 @@ end
 Test that the expectation value of the identity is 1.0, regardless of which layer we
 evaluate it at.
 """
-function test_expectation_of_identity(meratype, spacetype)
+function test_expectation_of_identity(::Type{meratype}, ::Type{spacetype}
+                                     ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -202,7 +206,8 @@ end
 Test that the expectation value of a random Hermitian operator does not depend on the layer
 that we evaluate it at.
 """
-function test_expectation_evalscale(meratype, spacetype)
+function test_expectation_evalscale(::Type{meratype}, ::Type{spacetype}
+                                   ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -221,7 +226,8 @@ end
 Test that pseudoserializing and depseudoserializing back does not change the expectation
 value of a random Hermitian operator.
 """
-function test_pseudoserialization(meratype, spacetype)
+function test_pseudoserialization(::Type{meratype}, ::Type{spacetype}
+                                 ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -240,7 +246,8 @@ end
 Confirm that expanding bond dimensions does not change the expectation value of a random
 Hermitian operator.
 """
-function test_expand_bonddim(meratype, spacetype)
+function test_expand_bonddim(::Type{meratype}, ::Type{spacetype}
+                            ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers, 4)
     intspaces = random_internalspaces(spaces, meratype)
@@ -284,7 +291,7 @@ end
 Confirm that releasing a does not change the expectation value of a random Hermitian
 operator.
 """
-function test_release_layer(meratype, spacetype)
+function test_release_layer(::Type{meratype}, ::Type{spacetype}) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -302,7 +309,8 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-function test_remove_symmetry(meratype, spacetype)
+function test_remove_symmetry(::Type{meratype}, ::Type{spacetype}
+                             ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -321,7 +329,7 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-function test_reset_storage(meratype, spacetype)
+function test_reset_storage(::Type{meratype}, ::Type{spacetype}) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -357,7 +365,8 @@ Create a MERA that breaks the isometricity condition, by summing up two random M
 Restore isometricity with projectisometric and projectisometric!, and confirm that the
 expectation value of the identity is indeed 1 after this.
 """
-function test_projectisometric(meratype, spacetype)
+function test_projectisometric(::Type{meratype}, ::Type{spacetype}
+                              ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -382,7 +391,8 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-function test_optimization(meratype, spacetype, method, precondition=false)
+function test_optimization(::Type{meratype}, ::Type{spacetype}, method, precondition=false
+                          ) where {meratype, spacetype}
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
@@ -419,7 +429,8 @@ end
 """
 Test gradients and retraction.
 """
-function test_gradient_and_retraction(meratype, spacetype, alg, metric)
+function test_gradient_and_retraction(::Type{meratype}, ::Type{spacetype}, alg, metric
+                                     ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -466,7 +477,8 @@ end
 """
 Test vector transport.
 """
-function test_transport(meratype, spacetype, alg, metric)
+function test_transport(::Type{meratype}, ::Type{spacetype}, alg, metric
+                       ) where {meratype, spacetype}
     layers = 4
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
