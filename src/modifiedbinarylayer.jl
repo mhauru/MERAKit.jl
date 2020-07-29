@@ -26,10 +26,10 @@
 #  |  u  |
 #  | / \ |
 
-struct ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType} <: SimpleLayer
-    disentangler::DisType
-    isometry_left::IsoLeftType
-    isometry_right::IsoRightType
+struct ModifiedBinaryLayer{DT, ILT, IRT} <: SimpleLayer
+    disentangler::DT
+    isometry_left::ILT
+    isometry_right::IRT
 end
 
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
@@ -164,14 +164,14 @@ function Base.convert(::Type{ModifiedBinaryOp{T}}, op::ModifiedBinaryOp) where {
     return ModifiedBinaryOp{T}(convert(T, op.mid), convert(T, op.gap))
 end
 
-function operatortype(::Type{ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType}}
-                     ) where {DisType <: AbstractTensorMap,
-                              IsoLeftType <: AbstractTensorMap,
-                              IsoRightType <: AbstractTensorMap}
-    V = spacetype(DisType)
-    E = eltype(DisType)
-    @assert E === eltype(IsoLeftType)
-    @assert E === eltype(IsoRightType)
+function operatortype(::Type{ModifiedBinaryLayer{DT, ILT, IRT}}
+                     ) where {DT <: AbstractTensorMap,
+                              ILT <: AbstractTensorMap,
+                              IRT <: AbstractTensorMap}
+    V = spacetype(DT)
+    E = eltype(DT)
+    @assert E === eltype(ILT)
+    @assert E === eltype(IRT)
     return ModifiedBinaryOp{tensortype(V, Val(2), Val(2), E)}
 end
 operatortype(::Type{ModifiedBinaryLayer{T1, T2, T3}}

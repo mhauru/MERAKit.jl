@@ -18,9 +18,9 @@
 #  +-------+
 #  1| 2| 3|
 
-struct TernaryLayer{DisType, IsoType} <: SimpleLayer
-    disentangler::DisType
-    isometry::IsoType
+struct TernaryLayer{DT, IT} <: SimpleLayer
+    disentangler::DT
+    isometry::IT
 end
 
 TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
@@ -30,12 +30,12 @@ TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
-function operatortype(::Type{TernaryLayer{DisType, IsoType}}
+function operatortype(::Type{TernaryLayer{DT, IT}}
                      ) where {S,
-                              DisType <: AbstractTensorMap{S, 2, 2},
-                              IsoType <: AbstractTensorMap{S, 3, 1}}
-    Eltype = eltype(DisType)
-    @assert Eltype === eltype(IsoType)
+                              DT <: AbstractTensorMap{S, 2, 2},
+                              IT <: AbstractTensorMap{S, 3, 1}}
+    Eltype = eltype(DT)
+    @assert Eltype === eltype(IT)
     return tensortype(S, Val(2), Val(2), Eltype)
 end
 operatortype(::Type{TernaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing

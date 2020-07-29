@@ -18,9 +18,9 @@
 #  +------+
 #  1|   2|
 
-struct BinaryLayer{DisType, IsoType} <: SimpleLayer
-    disentangler::DisType
-    isometry::IsoType
+struct BinaryLayer{DT, IT} <: SimpleLayer
+    disentangler::DT
+    isometry::IT
 end
 
 BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
@@ -30,12 +30,12 @@ BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 layertype(::BinaryLayer) = BinaryLayer
 layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
-function operatortype(::Type{BinaryLayer{DisType, IsoType}}
+function operatortype(::Type{BinaryLayer{DT, IT}}
                      ) where {S,
-                              DisType <: AbstractTensorMap{S, 2, 2},
-                              IsoType <: AbstractTensorMap{S, 2, 1}}
-    Eltype = eltype(DisType)
-    @assert Eltype === eltype(IsoType)
+                              DT <: AbstractTensorMap{S, 2, 2},
+                              IT <: AbstractTensorMap{S, 2, 1}}
+    Eltype = eltype(DT)
+    @assert Eltype === eltype(IT)
     return tensortype(S, Val(3), Val(3), Eltype)
 end
 operatortype(::Type{BinaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing

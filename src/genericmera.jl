@@ -10,34 +10,34 @@ collection of tensors, the orders and shapes of which depend on the type.
 """
 abstract type Layer end
 
-mutable struct MERACache{N, LayerType <: Layer, OperatorType}
+mutable struct MERACache{N, LT <: Layer, OT}
     # TODO Should we use NTuple{N}s instead for densitymatrices and environments?
-    densitymatrices::Vector{Union{Nothing, OperatorType}}
-    operators::Dict{Any, Vector{OperatorType}}
-    environments::Dict{Any, Vector{Union{Nothing, LayerType}}}
-    previous_fixedpoint_densitymatrix::Union{Nothing, OperatorType}
-    previous_operatorsum::Union{Nothing, OperatorType}
+    densitymatrices::Vector{Union{Nothing, OT}}
+    operators::Dict{Any, Vector{OT}}
+    environments::Dict{Any, Vector{Union{Nothing, LT}}}
+    previous_fixedpoint_densitymatrix::Union{Nothing, OT}
+    previous_operatorsum::Union{Nothing, OT}
 
-    function MERACache{N, LayerType, OperatorType}() where {N, LayerType, OperatorType}
-        @assert OperatorType === operatortype(LayerType)
-        densitymatrices = Vector{Union{Nothing, OperatorType}}(repeat([nothing], N))
-        operators = Dict{Any, Vector{OperatorType}}()
-        environments = Dict{Any, Vector{Union{LayerType}}}()
+    function MERACache{N, LT, OT}() where {N, LT, OT}
+        @assert OT === operatortype(LT)
+        densitymatrices = Vector{Union{Nothing, OT}}(repeat([nothing], N))
+        operators = Dict{Any, Vector{OT}}()
+        environments = Dict{Any, Vector{Union{LT}}}()
         previous_fixedpoint_densitymatrix = nothing
         previous_operatorsum = nothing
-        new{N, LayerType, OperatorType}(densitymatrices, operators, environments,
-                                        previous_fixedpoint_densitymatrix,
-                                        previous_operatorsum)
+        new{N, LT, OT}(densitymatrices, operators, environments,
+                       previous_fixedpoint_densitymatrix,
+                       previous_operatorsum)
     end
 end
 
-function MERACache{N, LayerType}() where {N, LayerType}
-    OperatorType = operatortype(LayerType)
-    return MERACache{N, LayerType, OperatorType}()
+function MERACache{N, LT}() where {N, LT}
+    OT = operatortype(LT)
+    return MERACache{N, LT, OT}()
 end
 
-operatortype(c::MERACache{N, T, O}) where {N, T, O} = O
-layertype(c::MERACache{N, T, O}) where {N, T, O} = T
+operatortype(c::MERACache{N, LT, OT}) where {N, LT, OT} = OT
+layertype(c::MERACache{N, LT, OT}) where {N, LT, OT} = LT
 causal_cone_width(c::MERACache) = causal_cone_width(layertype(c))
 
 """
@@ -52,57 +52,53 @@ A few notes on conventions and terminology:
 - Each layer is thought of as a linear map from its top, or input space to its bottom, or
 output space.
 """
-struct GenericMERA{N, LayerType <: Layer, OperatorType}
-    layers::NTuple{N, LayerType}
-    cache::MERACache{N, LayerType, OperatorType}
+struct GenericMERA{N, LT <: Layer, OT}
+    layers::NTuple{N, LT}
+    cache::MERACache{N, LT, OT}
 
-    function GenericMERA{N, T, O}(layers::NTuple{N}, cache::MERACache{N}) where {N, T, O}
-        LayerType = eltype(typeof(layers))
-        OperatorType = operatortype(LayerType)
+    function GenericMERA{N, LT, OT}(layers::NTuple{N}, cache::MERACache{N}) where {N, LT, OT}
         # Note that this prevents the creation of types like GenericMERA{3, SimpleLayer}:
         # The second type parameter must be exactly the element type of layers, specified at
         # the lowest, concrete level. This is intentional, to avoid accidentally creating
         # unnecessarily abstract types that would hamper inference.
-        @assert T === LayerType
-        @assert isconcretetype(T)
-        @assert O === OperatorType
-        cache::MERACache{N, T, O}
-        return new{N, T, O}(layers, cache)
+        @assert LT === eltype(typeof(layers))
+        @assert isconcretetype(LT)
+        @assert OT === operatortype(LT)
+        cache::MERACache{N, LT, OT}
+        return new{N, LT, OT}(layers, cache)
     end
 end
 
 function GenericMERA(layers::NTuple{N}, cache::MERACache{N}) where {N}
-    LayerType = eltype(typeof(layers))
-    OperatorType = operatortype(LayerType)
-    cache::MERACache{N, LayerType, OperatorType}
-    return GenericMERA{N, LayerType, OperatorType}(layers, cache)
+    LT = eltype(typeof(layers))
+    OT = operatortype(LT)
+    cache::MERACache{N, LT, OT}
+    return GenericMERA{N, LT, OT}(layers, cache)
 end
 
 function GenericMERA(layers::NTuple{N}) where {N}
-    LayerType = eltype(typeof(layers))
-    OperatorType = operatortype(LayerType)
-    cache = MERACache{N, LayerType, OperatorType}()
+    LT = eltype(typeof(layers))
+    OT = operatortype(LT)
+    cache = MERACache{N, LT, OT}()
     return GenericMERA(layers, cache)
 end
 
 GenericMERA(layers) = GenericMERA(tuple(layers...))
 
-function GenericMERA{N, LayerType, OperatorType}(layers::NTuple{N}) where {N, LayerType, OperatorType}
-    T = eltype(typeof(layers))
-    O = operatortype(T)
-    cache = MERACache{N, T, O}()
-    return GenericMERA{N, LayerType, OperatorType}(layers, cache)
+function GenericMERA{N, LT, OT}(layers::NTuple{N}) where {N, LT, OT}
+    cache = MERACache{N, LT, OT}()
+    return GenericMERA{N, LT, OT}(layers, cache)
 end
 
-function GenericMERA{N, LayerType, OperatorType}(layers) where {N, LayerType, OperatorType}
-    return GenericMERA{N, LayerType, OperatorType}(tuple(layers...))
+function GenericMERA{N, LT, OT}(layers) where {N, LT, OT}
+    return GenericMERA{N, LT, OT}(tuple(layers...))
 end
 
-function (::Type{GenericMERA{M, T, O} where M})(layers::NTuple{N}) where {N, T, O}
+function (::Type{GenericMERA{M, LT, OT} where M})(layers::NTuple{N}) where {N, LT, OT}
     return GenericMERA(layers)
 end
 
-function (::Type{GenericMERA{M, T, O} where M})(layers) where {T, O}
+function (::Type{GenericMERA{M, LT, OT} where M})(layers) where {LT, OT}
     return (GenericMERA where {N})(tuple(layers...))
 end
 
@@ -111,21 +107,21 @@ end
 """
 Return the type of the layers of `m`.
 """
-layertype(m::GenericMERA{N, LayerType, OperatorType}) where {N, LayerType, OperatorType} = LayerType
-layertype(::Type{GenericMERA{N, LayerType, OperatorType} where N}) where {LayerType, OperatorType} = LayerType
-layertype(::Type{GenericMERA{N, LayerType, OperatorType}}) where {N, LayerType, OperatorType} = LayerType
+layertype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = LT
+layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
+layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
 Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
 
-operatortype(m::GenericMERA{N, LayerType, OperatorType}) where {N, LayerType, OperatorType} = OperatorType
-operatortype(::Type{GenericMERA{N, LayerType, OperatorType} where N}) where {LayerType, OperatorType} = OperatorType
-operatortype(::Type{GenericMERA{N, LayerType, OperatorType}}) where {N, LayerType, OperatorType} = OperatorType
+operatortype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = OT
+operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
+operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 
 """
 The ratio by which the number of sites changes when one descends by one layer.
 """
-scalefactor(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = scalefactor(LayerType)
-scalefactor(::Type{GenericMERA{M, LayerType} where M}) where {LayerType} = scalefactor(LayerType)
+scalefactor(::Type{GenericMERA{N, LT}}) where {N, LT} = scalefactor(LT)
+scalefactor(::Type{GenericMERA{M, LT} where M}) where {LT} = scalefactor(LT)
 
 """
 Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.
@@ -139,7 +135,7 @@ end
 Return the number of transition layers, i.e. layers below the scale invariant one, in the
 MERA.
 """
-num_translayers(m::GenericMERA{N, LayerType}) where {N, LayerType} = N-1
+num_translayers(m::GenericMERA{N, LT}) where {N, LT} = N-1
 
 """
 Return the layer at the given depth. 1 is the lowest layer, i.e. the one with physical
@@ -165,7 +161,7 @@ end
 Add one more transition layer at the top of the MERA, by taking the lowest of the scale
 invariant one and releasing it to vary independently.
 """
-function release_transitionlayer(m::GenericMERA{N, LayerType}) where {N, LayerType}
+function release_transitionlayer(m::GenericMERA{N, LT}) where {N, LT}
     new_layers = (m.layers..., m.layers[end])
     new_cache = release_transitionlayer(m.cache)
     new_m = GenericMERA(new_layers, new_cache)
@@ -270,8 +266,8 @@ function replace_layer(c::MERACache{N}, depth) where N
     return c
 end
 
-function release_transitionlayer(c::MERACache{N, LayerType}) where {N, LayerType}
-    new_c = MERACache{N+1, LayerType}()
+function release_transitionlayer(c::MERACache{N, LT}) where {N, LT}
+    new_c = MERACache{N+1, LT}()
     copy!(new_c, c)
     density_matrix = new_c.densitymatrices[end]
     push!(new_c.densitymatrices, density_matrix)
@@ -484,9 +480,9 @@ function expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
     return m
 end
 
-function expand_bonddim!(c::MERACache{N, LayerType}, depth, V) where {N, LayerType}
+function expand_bonddim!(c::MERACache{N, LT}, depth, V) where {N, LT}
     depth < N && return c
-    width = causal_cone_width(LayerType)
+    width = causal_cone_width(LT)
     # Pad the stored scale invariant initial guesses.
     old_rho = m.previous_fixedpoint_densitymatrix[1]
     if old_rho !== nothing
@@ -1075,7 +1071,7 @@ function gradient(h, m::GenericMERA{N}, pars; vary_disentanglers=true) where {N}
                                   isometrymanifold=pars[:isometrymanifold])
               end
               for l in 1:nt+1)
-    g = GenericMERA(layers)
+    g = GenericMERA(layers)::GenericMERA{N}
     return g
 end
 
