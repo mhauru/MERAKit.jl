@@ -60,34 +60,34 @@ function main()
     # Three sets of parameters are used when optimizing the MERA:
     # Used when determining which sector to give bond dimension to.
     scale_invariant_eps = pars[:scale_invariant_eps]
-    pars[:initial_opt_pars] = Dict(:maxiter => 30,
-                                   :isometries_only_iters => 10,
-                                   :method => pars[:method],
-                                   :isometrymanifold => pars[:isometrymanifold],
-                                   :retraction => pars[:retraction],
-                                   :transport => pars[:transport],
-                                   :metric => pars[:metric],
-                                   :precondition => pars[:precondition],
-                                   :lbfgs_m => pars[:lbfgs_m],
-                                   :cg_flavor => pars[:cg_flavor],
-                                   :verbosity => pars[:verbosity],
-                                   :scaleinvariant_krylovoptions => Dict(
-                                                                         :tol => scale_invariant_eps,
-                                                                         :krylovdim => 4,
-                                                                         :verbosity => 0,
-                                                                         :maxiter => 20,
-                                                                        ),
-                                  )
+    pars[:initial_opt_pars] = (
+                               maxiter = 30,
+                               isometries_only_iters = 10,
+                               method = pars[:method],
+                               isometrymanifold = pars[:isometrymanifold],
+                               retraction = pars[:retraction],
+                               transport = pars[:transport],
+                               metric = pars[:metric],
+                               precondition = pars[:precondition],
+                               lbfgs_m = pars[:lbfgs_m],
+                               cg_flavor = pars[:cg_flavor],
+                               verbosity = pars[:verbosity],
+                               scaleinvariant_krylovoptions = (
+                                                               tol = scale_invariant_eps,
+                                                               krylovdim = 4,
+                                                               verbosity = 0,
+                                                               maxiter = 20,
+                                                              ),
+                              )
     # Used when optimizing a MERA that has some layers expanded to desired bond dimension,
     # but not all.
-    pars[:mid_opt_pars] = copy(pars[:initial_opt_pars])
-    pars[:mid_opt_pars][:maxiter] = 100
-    pars[:mid_opt_pars][:isometry_iters] = 0
+    pars[:mid_opt_pars] = merge(pars[:initial_opt_pars],
+                                (maxiter = 100, isometry_iters = 0))
     # Used when optimizing a MERA that has all bond dimensions at the full, desired value.
-    pars[:final_opt_pars] = copy(pars[:initial_opt_pars])
-    pars[:final_opt_pars][:gradient_delta] = 1e-7
-    pars[:final_opt_pars][:maxiter] = 1000
-    pars[:final_opt_pars][:isometry_iters] = 0
+    pars[:final_opt_pars] = merge(pars[:initial_opt_pars],
+                                  (gradient_delta = 1e-7,
+                                   maxiter = 1000,
+                                   isometry_iters = 0))
 
     # Get the Hamiltonian.
     if model == "Ising"

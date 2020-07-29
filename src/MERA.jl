@@ -6,6 +6,7 @@ using TensorOperations  # We need this because TensorKit doesn't reexport @ncon
 using KrylovKit
 using OptimKit
 using TupleTools
+using NamedTupleTools
 using Printf
 using LinearAlgebra
 using Logging

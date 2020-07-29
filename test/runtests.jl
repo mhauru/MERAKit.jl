@@ -143,7 +143,7 @@ function test_type_stability(::Type{meratype}, ::Type{spacetype}
 
     # TODO Finish this part, and add @inferred checks for more functions, optimally all
     # functions that can reasonably be expected to be type stable.
-    #pars = Dict(:metric => :euclidean, :precondition => false)
+    #pars = (metric = :euclidean, precondition = false)
     #pars = merge(MERA.default_pars, pars)
     #mtan1 = gradient(randomop1, m, pars)
     #mtan2 = gradient(randomop2, m, pars)
@@ -400,19 +400,19 @@ function test_optimization(::Type{meratype}, ::Type{spacetype}, method, precondi
     eps = 1e-2
     dlow = 2
     dhigh = 3
-    pars = Dict(:method => method,
-                :gradient_delta => 1e-4,
-                :maxiter => 500,
-                :isometries_only_iters => 30,
-                :precondition => precondition,
-                :verbosity => 0,
-                :scaleinvariant_krylovoptions => Dict(
-                                                      :tol => 1e-8,
-                                                      :krylovdim => 4,
-                                                      :verbosity => 0,
-                                                      :maxiter => 20,
-                                                     ),
-               )
+    pars = (method = method,
+            gradient_delta = 1e-4,
+            maxiter = 500,
+            isometries_only_iters = 30,
+            precondition = precondition,
+            verbosity = 0,
+            scaleinvariant_krylovoptions = (
+                                            tol = 1e-8,
+                                            krylovdim = 4,
+                                            verbosity = 0,
+                                            maxiter = 20,
+                                           ),
+           )
 
     op = particle_number_operator(spacetype)
     width = causal_cone_width(meratype)
@@ -444,7 +444,7 @@ function test_gradient_and_retraction(::Type{meratype}, ::Type{spacetype}, alg, 
     ham = ham + ham'
     eye = id(V)
 
-    pars = Dict(:metric => metric, :precondition => false)
+    pars = (metric = metric, precondition = false)
     pars = merge(MERA.default_pars, pars)
 
     fg(x) = (expect(ham, x), gradient(ham, x, pars))
@@ -492,7 +492,7 @@ function test_transport(::Type{meratype}, ::Type{spacetype}, alg, metric
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
 
-    pars = Dict(:metric => metric, :precondition => false)
+    pars = (metric = metric, precondition = false)
     pars = merge(MERA.default_pars, pars)
 
     g1, g2, g3 = [gradient(ham, m, pars) for ham in hams]

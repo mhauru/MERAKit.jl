@@ -120,8 +120,8 @@ operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 """
 The ratio by which the number of sites changes when one descends by one layer.
 """
-scalefactor(::Type{GenericMERA{N, LT}}) where {N, LT} = scalefactor(LT)
-scalefactor(::Type{GenericMERA{M, LT} where M}) where {LT} = scalefactor(LT)
+scalefactor(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = scalefactor(LT)
+scalefactor(::Type{GenericMERA{M, LT, OT} where M}) where {LT, OT} = scalefactor(LT)
 
 """
 Each MERA has a stable width causal cone, that depends on the type of layers the MERA has.
@@ -668,7 +668,7 @@ end
 """
 Find the fixed point density matrix of the scale invariant part of the MERA.
 """
-function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
+function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
@@ -677,7 +677,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=Dict())
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
     end
-    eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, Dict())
+    eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
     rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
@@ -719,7 +719,7 @@ Return the density matrix right below the layer at `depth`.
 This method stores every density matrix in memory as it computes them, and fetches them from
 there if the same one is requested again.
 """
-function densitymatrix(m::GenericMERA, depth, pars=Dict())
+function densitymatrix(m::GenericMERA, depth, pars=(;))
     if !has_densitymatrix_stored(m.cache, depth)
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
@@ -738,7 +738,7 @@ end
 Return the density matrices starting for the layers from `lowest_depth` upwards up to and
 including the scale invariant one.
 """
-function densitymatrices(m::GenericMERA, pars=Dict())
+function densitymatrices(m::GenericMERA, pars=(;))
     rhos = [densitymatrix(m, depth, pars) for depth in 1:num_translayers(m)+1]
     return rhos
 end
@@ -787,7 +787,7 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     if old_opsum !== nothing && space(x0) == space(old_opsum)
         x0 = old_opsum
     end
-    linsolve_pars = get(pars, :scaleinvariant_krylovoptions, Dict())
+    linsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     one_ = one(eltype(m))
     opsum, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
     # We know the result should always be Hermitian.
@@ -882,7 +882,7 @@ set by `opscale`, which by default is the physical one (`opscale=1`). `evalscale
 used to set whether the operator is ascended through the network or the density matrix is
 descended.
 """
-function expect(op, m::GenericMERA, pars=Dict(); opscale=1, evalscale=1)
+function expect(op, m::GenericMERA, pars=(;); opscale=1, evalscale=1)
     rho = densitymatrix(m, evalscale, pars)
     op = ascended_operator(m, op, evalscale)
     value = dot(rho, op)
@@ -896,27 +896,27 @@ end
 
 # # # Optimization
 
-default_pars = Dict(:method => :lbfgs,
-                    :isometrymanifold => :grassmann,
-                    :retraction => :exp,
-                    :transport => :exp,
-                    :metric => :euclidean,
-                    :precondition => true,
-                    :gradient_delta => 1e-14,
-                    :isometries_only_iters => 0,
-                    :maxiter => 2000,
-                    :ev_layer_iters => 1,
-                    :ls_epsilon => 1e-6,
-                    :lbfgs_m => 8,
-                    :cg_flavor => :HagerZhang,
-                    :verbosity => 2,
-                    :scaleinvariant_krylovoptions => Dict(
-                                                          :tol => 1e-13,
-                                                          :krylovdim => 4,
-                                                          :verbosity => 0,
-                                                          :maxiter => 20,
-                                                         ),
-                   )
+default_pars = (method = :lbfgs,
+                isometrymanifold = :grassmann,
+                retraction = :exp,
+                transport = :exp,
+                metric = :euclidean,
+                precondition = true,
+                gradient_delta = 1e-14,
+                isometries_only_iters = 0,
+                maxiter = 2000,
+                ev_layer_iters = 1,
+                ls_epsilon = 1e-6,
+                lbfgs_m = 8,
+                cg_flavor = :HagerZhang,
+                verbosity = 2,
+                scaleinvariant_krylovoptions = (
+                                                tol = 1e-13,
+                                                krylovdim = 4,
+                                                verbosity = 0,
+                                                maxiter = 20,
+                                               ),
+               )
 
 function minimize_expectation(m, h, pars; finalize! = OptimKit._finalize!,
                               vary_disentanglers=true, kwargs...)
@@ -926,9 +926,9 @@ function minimize_expectation(m, h, pars; finalize! = OptimKit._finalize!,
     # disentanglers, with pars[:isometries_only_iters] as the maximum iteration count,
     # before moving on to the main optimization with all tensors varying.
     if vary_disentanglers && pars[:isometries_only_iters] > 0
-        temp_pars = deepcopy(pars)
-        temp_pars[:maxiter] = pars[:isometries_only_iters]
-        m = minimize_expectation(m, h, temp_pars; finalize! = finalize!, vary_disentanglers=false, kwargs...)
+        temp_pars = merge(pars, (maxiter = pars[:isometries_only_iters],))
+        m = minimize_expectation(m, h, temp_pars; finalize! = finalize!,
+                                 vary_disentanglers=false, kwargs...)
     end
 
     method = pars[:method]
@@ -1136,8 +1136,10 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!,
         precondition = OptimKit._precondition
     end
 
-    algkwargs = Dict(:maxiter => pars[:maxiter], :linesearch => linesearch,
-                     :verbosity => pars[:verbosity], :gradtol => pars[:gradient_delta])
+    algkwargs = (maxiter = pars[:maxiter],
+                 linesearch = linesearch,
+                 verbosity = pars[:verbosity],
+                 gradtol = pars[:gradient_delta])
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang
             flavor = HagerZhang()

@@ -58,23 +58,24 @@ function main()
     block_size = pars[:block_size]
     checkpoint_frequency = pars[:checkpoint_frequency]
     scale_invariant_eps = pars[:scale_invariant_eps]
-    opt_pars = Dict(:maxiter => typemax(Int),
-                    :method => pars[:method],
-                    :isometrymanifold => pars[:isometrymanifold],
-                    :retraction => pars[:retraction],
-                    :transport => pars[:transport],
-                    :metric => pars[:metric],
-                    :precondition => pars[:precondition],
-                    :lbfgs_m => pars[:lbfgs_m],
-                    :cg_flavor => pars[:cg_flavor],
-                    :verbosity => pars[:verbosity],
-                    :scaleinvariant_krylovoptions => Dict(
-                                                          :tol => scale_invariant_eps,
-                                                          :krylovdim => 4,
-                                                          :verbosity => 0,
-                                                          :maxiter => 20,
-                                                         ),
-                   )
+    opt_pars = (
+                maxiter = typemax(Int),
+                method = pars[:method],
+                isometrymanifold = pars[:isometrymanifold],
+                retraction = pars[:retraction],
+                transport = pars[:transport],
+                metric = pars[:metric],
+                precondition = pars[:precondition],
+                lbfgs_m = pars[:lbfgs_m],
+                cg_flavor = pars[:cg_flavor],
+                verbosity = pars[:verbosity],
+                scaleinvariant_krylovoptions = (
+                                                tol = scale_invariant_eps,
+                                                krylovdim = 4,
+                                                verbosity = 0,
+                                                maxiter = 20,
+                                               ),
+               )
 
     logstr = "Running demo_refine.jl with"
     for (k, v) in pars
