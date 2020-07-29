@@ -23,15 +23,26 @@ struct TernaryLayer{DisType, IsoType} <: SimpleLayer
     isometry::IsoType
 end
 
-TernaryMERA{N} = GenericMERA{N, T} where T <: TernaryLayer
+TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 
 # Given an instance of a type like TernaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type TernaryLayer.
 layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
-operatortype(::Type{<:TernaryLayer}) = AbstractTensorMap
-operatortype(::Type{<:TernaryMERA}) = operatortype(TernaryLayer)
+function operatortype(::Type{TernaryLayer{DisType, IsoType}}
+                     ) where {S,
+                              DisType <: AbstractTensorMap{S, 2, 2},
+                              IsoType <: AbstractTensorMap{S, 3, 1}}
+    Eltype = eltype(DisType)
+    @assert Eltype === eltype(IsoType)
+    return tensortype(S, Val(2), Val(2), Eltype)
+end
+operatortype(::Type{TernaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing
+
+function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
+    return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
+end
 
 # Implement the iteration and indexing interfaces.
 Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)

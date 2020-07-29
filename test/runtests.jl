@@ -98,26 +98,27 @@ function test_type_stability(::Type{meratype}, ::Type{spacetype}
     L = layertype(meratype)
     spaces = random_layerspaces(spacetype, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
+    m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
+
     V1, V2 = spaces[1:2]
     Vend = spaces[end]
     randomop1 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop1 = randomop1 + randomop1'
-    randomop1 = convert(MERA.operatortype(meratype),
+    randomop1 = convert(MERA.operatortype(m),
                         MERA.expand_support(randomop1, causal_cone_width(meratype)))
     randomop2 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop2 = randomop2 + randomop2'
-    randomop2 = convert(MERA.operatortype(meratype),
+    randomop2 = convert(MERA.operatortype(m),
                         MERA.expand_support(randomop2, causal_cone_width(meratype)))
     randomrho1 = TensorMap(randn, ComplexF64, Vend ← Vend)
-    randomrho1 = randomrho1' + randomrho1'
-    randomrho1 = convert(MERA.operatortype(meratype),
+    randomrho1 = randomrho1 + randomrho1'
+    randomrho1 = convert(MERA.operatortype(m),
                          MERA.expand_support(randomrho1, causal_cone_width(meratype)))
     randomrho2 = TensorMap(randn, ComplexF64, V2 ← V2)
-    randomrho2 = randomrho2' + randomrho2'
-    randomrho2 = convert(MERA.operatortype(meratype),
+    randomrho2 = randomrho2 + randomrho2'
+    randomrho2 = convert(MERA.operatortype(m),
                          MERA.expand_support(randomrho2, causal_cone_width(meratype)))
 
-    m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     nt = @inferred num_translayers(m)
     l1 = @inferred randomlayer(L, ComplexF64, V2, V1, intspaces[1];
                                random_disentangler=false)

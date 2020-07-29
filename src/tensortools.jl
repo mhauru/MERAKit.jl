@@ -1,17 +1,51 @@
 # Utilities for creating and modifying vector spaces and TensorMaps.
 # To be `included` in MERA.jl.
 
+Tangent = Union{Grassmann.GrassmannTangent, Stiefel.StiefelTangent, Unitary.UnitaryTangent}
+
+# TODO These are not nice, and besides, belong in TensorKit
+Base.convert(::Type{TensorMap}, t::TensorKit.AdjointTensorMap) = t*1
+function Base.convert(::Type{TensorMap{S, N1, N2, G, A, F1, F2}},
+                      t::TensorKit.AdjointTensorMap{S, N1, N2, G, A, F1, F2}
+                     ) where {S, N1, N2, G, A, F1, F2}
+    return t*1
+end
+
+# These, too, belong in TensorKit.
+function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
+                      t::TensorMap{S, N1, N2, G, Matrix{E2}, F1, F2}
+                     ) where {S, N1, N2, G, E1, E2, F1, F2}
+    data = convert(Matrix{E1}, t.data)
+    return TensorMap(data, t.codom, t.dom)
+end
+
+function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
+                      t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
+                     ) where {S, N1, N2, G, E1, E2, F1, F2}
+    data = convert(TensorKit.SectorDict{G, Matrix{E1}}, t.data)
+    return TensorMap(data, t.codom, t.dom)
+end
+
+function Base.convert(::Type{TensorKit.SectorDict{G, Matrix{E1}}},
+                      t::TensorKit.SectorDict{G, Matrix{E2}}
+                     ) where {G, E1, E2}
+    keys = t.keys
+    values = map(x -> convert(Matrix{E1}, x), t.values)
+    return TensorKit.SectorDict{G, Matrix{E1}}(keys, values)
+end
+
+
 """
 Given the `IndexSpace` type, number of codomain and domain indices, and storage type
 (typically `Matrix{M} where M <: Number`), return the corresponding concrete `TensorMap`
 type.
 """
-function tensortype(T::IndexSpace, N1, N2, A)
+function tensortype(::Type{T}, ::Val{N1}, ::Val{N2}, ::Type{E}) where {T, N1, N2, E}
     G = sectortype(T)
-    D = G === Trivial ? A : TensorKit.SectorDict{G, A}
+    A = G === Trivial ? Matrix{E} : TensorKit.SectorDict{G, Matrix{E}}
     F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, TupleTools.StaticLength{N1}())
     F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, TupleTools.StaticLength{N2}())
-    return TensorMap{T, N1, N2, G, D, F1, F2}
+    return TensorMap{T, N1, N2, G, A, F1, F2}
 end
 
 """

@@ -10,23 +10,35 @@ collection of tensors, the orders and shapes of which depend on the type.
 """
 abstract type Layer end
 
-mutable struct MERACache{N, LayerType}
-    densitymatrices::Vector
-    operators::Dict
-    environments::Dict
-    previous_fixedpoint_densitymatrix
-    previous_operatorsum
+mutable struct MERACache{N, LayerType <: Layer, OperatorType}
+    # TODO Should we use NTuple{N}s instead for densitymatrices and environments?
+    densitymatrices::Vector{Union{Nothing, OperatorType}}
+    operators::Dict{Any, Vector{OperatorType}}
+    environments::Dict{Any, Vector{Union{Nothing, LayerType}}}
+    previous_fixedpoint_densitymatrix::Union{Nothing, OperatorType}
+    previous_operatorsum::Union{Nothing, OperatorType}
 
-    function MERACache{N, LayerType}() where {N, LayerType <: Layer}
-        densitymatrices = Vector{Any}(repeat([nothing], N))
-        operators = Dict()
-        environments = Dict()
+    function MERACache{N, LayerType, OperatorType}() where {N, LayerType, OperatorType}
+        @assert OperatorType === operatortype(LayerType)
+        densitymatrices = Vector{Union{Nothing, OperatorType}}(repeat([nothing], N))
+        operators = Dict{Any, Vector{OperatorType}}()
+        environments = Dict{Any, Vector{Union{LayerType}}}()
         previous_fixedpoint_densitymatrix = nothing
         previous_operatorsum = nothing
-        new(densitymatrices, operators, environments,
-            previous_fixedpoint_densitymatrix, previous_operatorsum)
+        new{N, LayerType, OperatorType}(densitymatrices, operators, environments,
+                                        previous_fixedpoint_densitymatrix,
+                                        previous_operatorsum)
     end
 end
+
+function MERACache{N, LayerType}() where {N, LayerType}
+    OperatorType = operatortype(LayerType)
+    return MERACache{N, LayerType, OperatorType}()
+end
+
+operatortype(c::MERACache{N, T, O}) where {N, T, O} = O
+layertype(c::MERACache{N, T, O}) where {N, T, O} = T
+causal_cone_width(c::MERACache) = causal_cone_width(layertype(c))
 
 """
 A GenericMERA is a collection of Layers. The type of these layers then determines whether
@@ -40,51 +52,57 @@ A few notes on conventions and terminology:
 - Each layer is thought of as a linear map from its top, or input space to its bottom, or
 output space.
 """
-struct GenericMERA{N, LayerType <: Layer}
+struct GenericMERA{N, LayerType <: Layer, OperatorType}
     layers::NTuple{N, LayerType}
-    cache::MERACache{N, LayerType}
+    cache::MERACache{N, LayerType, OperatorType}
 
-    function GenericMERA{N, T}(layers::NTuple{N}, cache::MERACache{N}) where {N, T}
+    function GenericMERA{N, T, O}(layers::NTuple{N}, cache::MERACache{N}) where {N, T, O}
         LayerType = eltype(typeof(layers))
+        OperatorType = operatortype(LayerType)
         # Note that this prevents the creation of types like GenericMERA{3, SimpleLayer}:
         # The second type parameter must be exactly the element type of layers, specified at
         # the lowest, concrete level. This is intentional, to avoid accidentally creating
-        # unnecessarily abstract types that would hamper to inference.
-        @assert T == LayerType && isconcretetype(T)
-        cache::MERACache{N, LayerType}
-        return new{N, LayerType}(layers, cache)
+        # unnecessarily abstract types that would hamper inference.
+        @assert T === LayerType
+        @assert isconcretetype(T)
+        @assert O === OperatorType
+        cache::MERACache{N, T, O}
+        return new{N, T, O}(layers, cache)
     end
 end
 
 function GenericMERA(layers::NTuple{N}, cache::MERACache{N}) where {N}
     LayerType = eltype(typeof(layers))
-    cache::MERACache{N, LayerType}
-    return GenericMERA{N, LayerType}(layers, cache)
+    OperatorType = operatortype(LayerType)
+    cache::MERACache{N, LayerType, OperatorType}
+    return GenericMERA{N, LayerType, OperatorType}(layers, cache)
 end
 
 function GenericMERA(layers::NTuple{N}) where {N}
     LayerType = eltype(typeof(layers))
-    cache = MERACache{N, LayerType}()
+    OperatorType = operatortype(LayerType)
+    cache = MERACache{N, LayerType, OperatorType}()
     return GenericMERA(layers, cache)
 end
 
 GenericMERA(layers) = GenericMERA(tuple(layers...))
 
-function GenericMERA{N, LayerType}(layers::NTuple{N}) where {N, LayerType}
+function GenericMERA{N, LayerType, OperatorType}(layers::NTuple{N}) where {N, LayerType, OperatorType}
     T = eltype(typeof(layers))
-    cache = MERACache{N, T}()
-    return GenericMERA{N, LayerType}(layers, cache)
+    O = operatortype(T)
+    cache = MERACache{N, T, O}()
+    return GenericMERA{N, LayerType, OperatorType}(layers, cache)
 end
 
-function GenericMERA{N, LayerType}(layers) where {N, LayerType}
-    return GenericMERA{N, LayerType}(tuple(layers...))
+function GenericMERA{N, LayerType, OperatorType}(layers) where {N, LayerType, OperatorType}
+    return GenericMERA{N, LayerType, OperatorType}(tuple(layers...))
 end
 
-function (::Type{GenericMERA{M, T} where M})(layers::NTuple{N}) where {N, T}
+function (::Type{GenericMERA{M, T, O} where M})(layers::NTuple{N}) where {N, T, O}
     return GenericMERA(layers)
 end
 
-function (::Type{GenericMERA{M, LayerType} where M})(layers) where {LayerType}
+function (::Type{GenericMERA{M, T, O} where M})(layers) where {T, O}
     return (GenericMERA where {N})(tuple(layers...))
 end
 
@@ -93,11 +111,15 @@ end
 """
 Return the type of the layers of `m`.
 """
-layertype(m::GenericMERA{N, LayerType}) where {N, LayerType} = LayerType
-layertype(::Type{GenericMERA{N, LayerType} where N}) where {LayerType} = LayerType
-layertype(::Type{GenericMERA{N, LayerType}}) where {N, LayerType} = LayerType
+layertype(m::GenericMERA{N, LayerType, OperatorType}) where {N, LayerType, OperatorType} = LayerType
+layertype(::Type{GenericMERA{N, LayerType, OperatorType} where N}) where {LayerType, OperatorType} = LayerType
+layertype(::Type{GenericMERA{N, LayerType, OperatorType}}) where {N, LayerType, OperatorType} = LayerType
 
 Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
+
+operatortype(m::GenericMERA{N, LayerType, OperatorType}) where {N, LayerType, OperatorType} = OperatorType
+operatortype(::Type{GenericMERA{N, LayerType, OperatorType} where N}) where {LayerType, OperatorType} = OperatorType
+operatortype(::Type{GenericMERA{N, LayerType, OperatorType}}) where {N, LayerType, OperatorType} = OperatorType
 
 """
 The ratio by which the number of sites changes when one descends by one layer.
@@ -274,11 +296,7 @@ Return the density matrix at given depth, assuming it's in store.
 function get_stored_densitymatrix(c::MERACache{N}, depth) where N
     depth = Int(min(N, depth))
     rho = c.densitymatrices[depth]
-    if rho === nothing
-        msg = "Density matrix at depth $(depth) not in storage."
-        throw(ArgumentError(msg))
-    end
-    return rho
+    return rho::operatortype(c)
 end
 
 """
@@ -294,7 +312,9 @@ Return the stored ascended versions of `op`. Initialize storage for `op` if nece
 """
 function operator_storage!(c::MERACache, op)
     if !(op in keys(c.operators))
-        c.operators[op] = Vector{Any}([op])
+        OT = operatortype(c)
+        op_conv = convert(OT, expand_support(op, causal_cone_width(c)))
+        c.operators[op] = Vector{OT}([op_conv])
     end
     return c.operators[op]
 end
@@ -356,7 +376,7 @@ Return the environments related to `op`. Initialize storage for `op` if necessar
 """
 function environment_storage!(c::MERACache{N}, op) where N
     if !(op in keys(c.environments))
-        c.environments[op] = repeat(Any[nothing], N)
+        c.environments[op] = repeat(Union{Nothing, operatortype(c)}[nothing], N)
     end
     return c.environments[op]
 end
@@ -370,12 +390,12 @@ function has_environment_stored(c::MERACache, op, depth)
 end
 
 """
-Return the environment related to `op` at `depth`. Return `nothing` is this environment is
-not in store.
+Return the environment related to `op` at `depth`. A type assertion error is raised if the
+requested environment is not in storage.
 """
 function get_stored_environment(c::MERACache, op, depth)
     storage = environment_storage!(c, op)
-    return storage[depth]
+    return storage[depth]::layertype(c)
 end
 
 """
@@ -869,8 +889,6 @@ descended.
 function expect(op, m::GenericMERA, pars=Dict(); opscale=1, evalscale=1)
     rho = densitymatrix(m, evalscale, pars)
     op = ascended_operator(m, op, evalscale)
-    # If the operator is defined on a smaller support (number of sites) than rho, expand it.
-    op = expand_support(op, support(rho))
     value = dot(rho, op)
     if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")
@@ -1048,7 +1066,7 @@ function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericME
     return res
 end
 
-function gradient(h, m::GenericMERA, pars; vary_disentanglers=true)
+function gradient(h, m::GenericMERA{N}, pars; vary_disentanglers=true) where {N}
     nt = num_translayers(m)
     layers = (begin
                   layer = get_layer(m, l)

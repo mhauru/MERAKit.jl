@@ -23,15 +23,26 @@ struct BinaryLayer{DisType, IsoType} <: SimpleLayer
     isometry::IsoType
 end
 
-BinaryMERA{N} = GenericMERA{N, T} where T <: BinaryLayer
+BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 
 # Given an instance of a type like BinaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type BinaryLayer.
 layertype(::BinaryLayer) = BinaryLayer
 layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
-operatortype(::Type{<:BinaryLayer}) = AbstractTensorMap
-operatortype(::Type{<:BinaryMERA}) = operatortype(BinaryLayer)
+function operatortype(::Type{BinaryLayer{DisType, IsoType}}
+                     ) where {S,
+                              DisType <: AbstractTensorMap{S, 2, 2},
+                              IsoType <: AbstractTensorMap{S, 2, 1}}
+    Eltype = eltype(DisType)
+    @assert Eltype === eltype(IsoType)
+    return tensortype(S, Val(3), Val(3), Eltype)
+end
+operatortype(::Type{BinaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing
+
+function Base.convert(::Type{BinaryLayer{T1, T2}}, l::BinaryLayer) where {T1, T2}
+    return BinaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
+end
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)

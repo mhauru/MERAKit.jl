@@ -32,12 +32,19 @@ struct ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType} <: SimpleLayer
     isometry_right::IsoRightType
 end
 
-ModifiedBinaryMERA{N} = GenericMERA{N, T} where T <: ModifiedBinaryLayer
+ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 
 # Given an instance of a type like ModifiedBinaryLayer{TensorMap, TensorMap, TensorMap},
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
+
+function Base.convert(::Type{ModifiedBinaryLayer{T1, T2, T3}}, l::ModifiedBinaryLayer
+                     ) where {T1, T2, T3}
+    return ModifiedBinaryLayer(convert(T1, l.disentangler),
+                               convert(T2, l.isometry_left),
+                               convert(T3, l.isometry_right))
+end
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
@@ -141,7 +148,7 @@ end
 # defined by two tensors, one for each possible position. We create a `struct` for
 # encapsulating this, so that all the necessary operations like trace and matrix product can
 # be defined for such operators. We call the two positions `mid` and `gap`, where `mid`
-# refers to the a position that has disentangler directly below it, and `gap` to the
+# refers to the position that has a disentangler directly below it, and `gap` to the
 # position where the disentangler below is missing.
 
 struct ModifiedBinaryOp{T}
@@ -151,22 +158,29 @@ end
 
 ModifiedBinaryOp(op::T) where T = ModifiedBinaryOp{T}(op, op)
 ModifiedBinaryOp(op::ModifiedBinaryOp) = op  # makes some method signatures simpler to write
-Base.convert(::Type{ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
+Base.convert(::Type{<: ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
 
-operatortype(::Type{<:ModifiedBinaryLayer}) = ModifiedBinaryOp
-operatortype(::Type{<:ModifiedBinaryMERA}) = operatortype(ModifiedBinaryLayer)
-
-Base.iterate(op::ModifiedBinaryOp) = (op.mid, 1)
-Base.iterate(op::ModifiedBinaryOp, state) = state == 1 ? (op.gap, 2) : nothing
-Base.length(op::ModifiedBinaryOp) = 2
-Base.firstindex(op::ModifiedBinaryOp) = 1
-Base.lastindex(op::ModifiedBinaryOp) = 2
-
-function Base.getindex(op::ModifiedBinaryOp, i)
-    i == 1 && return op.mid
-    i == 2 && return op.gap
-    throw(BoundsError(op, i))
+function Base.convert(::Type{ModifiedBinaryOp{T}}, op::ModifiedBinaryOp) where {T}
+    return ModifiedBinaryOp{T}(convert(T, op.mid), convert(T, op.gap))
 end
+
+function operatortype(::Type{ModifiedBinaryLayer{DisType, IsoLeftType, IsoRightType}}
+                     ) where {DisType <: AbstractTensorMap,
+                              IsoLeftType <: AbstractTensorMap,
+                              IsoRightType <: AbstractTensorMap}
+    V = spacetype(DisType)
+    E = eltype(DisType)
+    @assert E === eltype(IsoLeftType)
+    @assert E === eltype(IsoRightType)
+    return ModifiedBinaryOp{tensortype(V, Val(2), Val(2), E)}
+end
+operatortype(::Type{ModifiedBinaryLayer{T1, T2, T3}}
+            ) where {T1 <: Tangent, T2 <: Tangent, T3 <: Tangent} = Nothing
+
+Base.iterate(op::ModifiedBinaryOp) = (op.mid, Val(1))
+Base.iterate(op::ModifiedBinaryOp, state::Val{1}) = (op.gap, Val(2))
+Base.iterate(op::ModifiedBinaryOp, state::Val{2}) = nothing
+Base.length(op::ModifiedBinaryOp) = 2
 
 Base.eltype(op::ModifiedBinaryOp) = reduce(promote_type, map(eltype, op))
 Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(deepcopy, op)...)
@@ -191,9 +205,9 @@ function expand_support(op::ModifiedBinaryOp, n::Integer)
     return ModifiedBinaryOp(mid, gap)
 end
 
-function Base.similar(op::ModifiedBinaryOp, element_type=eltype(op))
-    mid = similar(op.mid, element_type)
-    gap = similar(op.gap, element_type)
+function Base.similar(op::ModifiedBinaryOp, ::Type{elementT}=eltype(op)) where {elementT}
+    mid = similar(op.mid, elementT)
+    gap = similar(op.gap, elementT)
     return ModifiedBinaryOp(mid, gap)
 end
 
