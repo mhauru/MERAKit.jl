@@ -681,26 +681,29 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
     f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
-    x0 = thermal_densitymatrix(m, Inf)
+    x0::operatortype(m) = thermal_densitymatrix(m, Inf)
     old_rho = m.cache.previous_fixedpoint_densitymatrix
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
     end
     eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
-    rho = vecs[1]
+    rho_cmplx = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
-    rho = (rho + rho') / 2.0
-    rho /= tr(rho)
+    rho_cmplx = (rho_cmplx + rho_cmplx') / 2.0
+    rho_cmplx /= tr(rho_cmplx)
+    local rho::operatortype(m)
     if eltype(m) <: Real
         # rho isn't generally real for generic matrices, but we know that it should be for
         # the descending superoperator.
-        imag_norm = norm(imag(rho))
+        imag_norm = norm(imag(rho_cmplx))
         if imag_norm > 1e-12
             msg = "The fixed point density matrix has a significant imaginary part, that we discard: $(imag_norm)"
             @warn(msg)
         end
-        rho = real(rho)
+        rho = real(rho_cmplx)
+    else
+        rho = rho_cmplx
     end
     m.cache.previous_fixedpoint_densitymatrix = rho
     if :verbosity in keys(pars) && pars[:verbosity] > 3
@@ -798,7 +801,7 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     end
     linsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     one_ = one(eltype(m))
-    opsum, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
+    opsum::operatortype(m), info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
     # We know the result should always be Hermitian.
     opsum = (opsum + opsum') / 2.0
     m.cache.previous_operatorsum = opsum
