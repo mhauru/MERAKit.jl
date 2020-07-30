@@ -334,15 +334,6 @@ end
 
 LinearAlgebra.tr(op::ModifiedBinaryOp) = (tr(op.mid) + tr(op.gap)) / 2.0
 
-# The initial guesses for finding the scale invariant density matrix and scaling operators
-# need to be wrapped in ModifiedBinaryOp.
-function thermal_densitymatrix(m::ModifiedBinaryMERA, args...)
-    # Call the method of the supertype GenericMERA.
-    argtypes = (typeof(x) for x in args)
-    rho = invoke(thermal_densitymatrix, Tuple{GenericMERA, argtypes...}, m, args...)
-    return ModifiedBinaryOp(rho)
-end
-
 function scalingoperator_initialguess(m::ModifiedBinaryMERA, args...)
     # Call the method of the supertype GenericMERA.
     argtypes = (typeof(x) for x in args)

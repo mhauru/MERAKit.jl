@@ -130,28 +130,25 @@ function test_type_stability(::Type{meratype}, ::Type{spacetype}
     @inferred inputspace(m, Inf)
     @inferred MERA.environment(l1, randomop1, randomrho2)
 
-    @inferred ascend(randomop1, m)
-    # TODO This probably doesn't work because the cache isn't type specific.
-    #@inferred ascended_operator(m, randomop1, 1)
-    @inferred descend(randomrho1, m)
-    # TODO The problem here is that the width of the causal cone is only seen at
-    # runtime and thus thermal_densitymatrix isn't type stable and hence none of its
-    # descendants are.
-    #@inferred MERA.thermal_densitymatrix(m, Inf)
-    #@inferred MERA.fixedpoint_densitymatrix(m)
-    #@inferred densitymatrix(m, 1)
+    @inferred MERA.ascend(randomop1, m)
+    @inferred ascended_operator(m, randomop1, 1)
+    @inferred MERA.descend(randomrho1, m)
+    @inferred MERA.thermal_densitymatrix(m, Inf)
+    @inferred MERA.fixedpoint_densitymatrix(m)
+    @inferred MERA.scale_invariant_operator_sum(m, randomop1, (;))
+    @inferred densitymatrix(m, 1)
 
     # TODO Finish this part, and add @inferred checks for more functions, optimally all
     # functions that can reasonably be expected to be type stable.
-    #pars = (metric = :euclidean, precondition = false)
-    #pars = merge(MERA.default_pars, pars)
-    #mtan1 = gradient(randomop1, m, pars)
-    #mtan2 = gradient(randomop2, m, pars)
-    #ltan1 = get_layer(mtan1, 1)
-    #ltan2 = get_layer(mtan2, 1)
-    #@inferred (x -> tuple(ltan1...))(:a)
-    #@inferred MERA.tensorwise_scale(ltan1, 0.1)
-    #@inferred MERA.tensorwise_sum(ltan1, ltan2)
+    pars = (metric = :euclidean, precondition = false)
+    pars = merge(MERA.default_pars, pars)
+    mtan1 = gradient(randomop1, m, pars)
+    mtan2 = gradient(randomop2, m, pars)
+    ltan1 = get_layer(mtan1, 1)
+    ltan2 = get_layer(mtan2, 1)
+    @inferred (x -> tuple(ltan1...))(:a)
+    @inferred MERA.tensorwise_scale(ltan1, 0.1)
+    @inferred MERA.tensorwise_sum(ltan1, ltan2)
     #@inferred inner(l1, ltan1, ltan2)
     #@inferred MERA.tensorwise_scale(mtan1, 0.1)
     #@inferred MERA.tensorwise_sum(mtan1, mtan2)

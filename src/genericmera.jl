@@ -721,7 +721,8 @@ function thermal_densitymatrix(m::GenericMERA, depth)
     width = causal_cone_width(typeof(m))
     V = inputspace(m, depth)^width
     rho_tensor = id(Matrix{eltype(m)}, V)
-    rho_op = convert(operatortype(typeof(m)), rho_tensor)
+    OT = operatortype(typeof(m))
+    rho_op::OT = convert(OT, rho_tensor)
     return rho_op
 end
 
