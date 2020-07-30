@@ -783,26 +783,26 @@ non-dominant eigenvalues of the ascending superoperator are smaller than 1.
 To approximate the converging series, we use an iterative Krylov solver. The options for the
 solver should be in a dictionary pars[:scaleinvariant_krylovoptions].
 """
-function scale_invariant_operator_sum(m::GenericMERA, op, pars)
+function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars) where {N, LT, OT}
     nt = num_translayers(m)
     # fp is the dominant eigenvector of the ascending superoperator. We are not interested
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
-    function f(x)
-        xasc = ascend(x, m; startscale=nt+1, endscale=nt+2)
-        xnorm = xasc - fp * dot(fp, xasc)
+    function f(x::OT)
+        xasc::OT = ascend(x, m; startscale=nt+1, endscale=nt+2)
+        xnorm::OT = xasc - fp * dot(fp, xasc)
         return xnorm
     end
     op_top = ascended_operator(m, op, nt+1)
-    x0::operatortype(m) = op_top
+    x0::OT = op_top
     old_opsum = m.cache.previous_operatorsum
     if old_opsum !== nothing && space(x0) == space(old_opsum)
         x0 = old_opsum
     end
     linsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     one_ = one(eltype(m))
-    opsum::operatortype(m), info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
+    opsum::OT, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
     # We know the result should always be Hermitian.
     opsum = (opsum + opsum') / 2.0
     m.cache.previous_operatorsum = opsum
@@ -819,8 +819,10 @@ end
 Return the environment related to `op` at `depth`. This function uses the cache to store the
 environment and retrieve it from storage if it is already there.
 """
-function environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
+function environment(m::GenericMERA{N, LT, OT}, op, depth, pars; vary_disentanglers=true
+                    ) where {N, LT, OT}
     if !has_environment_stored(m.cache, op, depth)
+        local op_below::OT
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
         else
