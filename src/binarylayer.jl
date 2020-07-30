@@ -45,8 +45,9 @@ function Base.convert(::Type{BinaryLayer{T1, T2}}, l::BinaryLayer) where {T1, T2
 end
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
-Base.iterate(layer::BinaryLayer) = (layer.disentangler, 1)
-Base.iterate(layer::BinaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
+Base.iterate(layer::BinaryLayer) = (layer.disentangler, Val(1))
+Base.iterate(layer::BinaryLayer, ::Val{1}) = (layer.isometry, Val(2))
+Base.iterate(layer::BinaryLayer, ::Val{2}) = nothing
 Base.length(layer::BinaryLayer) = 2
 
 """
@@ -128,7 +129,7 @@ layer, normalised to have norm 1.
 function ascending_fixedpoint(layer::BinaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
-    Vtotal = reduce(⊗, repeat([V], width))
+    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
     eye = id(Vtotal) / sqrt(dim(Vtotal))
     return eye
 end

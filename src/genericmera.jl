@@ -111,7 +111,14 @@ layertype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
-Base.eltype(m::GenericMERA) = reduce(promote_type, map(eltype, m.layers))
+# TODO Since we don't allow mixed types between layers, should the constructor enforce this?
+function Base.eltype(m::GenericMERA)
+    E = eltype(first(m.layers))
+    for l in m.layers
+        @assert eltype(l) === E
+    end
+    return E
+end
 
 operatortype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
@@ -172,11 +179,11 @@ end
 Project all the tensors of the MERA to respect the isometricity condition.
 """
 function TensorKitManifolds.projectisometric(m::T) where T <: GenericMERA
-    return T(map(projectisometric, m.layers))
+    return T((projectisometric(x) for x in m.layers))
 end
 
 function TensorKitManifolds.projectisometric!(m::T) where T <: GenericMERA
-    return T(map(projectisometric!, m.layers))
+    return T((projectisometric!(x) for x in m.layers))
 end
 
 """
@@ -205,7 +212,7 @@ function densitymatrix_entropy(rho)
     return S
 end
 
-densitymatrix_entropies(m::GenericMERA) = map(densitymatrix_entropy, densitymatrices(m))
+densitymatrix_entropies(m::GenericMERA) = (densitymatrix_entropy(x) for x in densitymatrices(m))
 
 # # # Storage of density matrices, ascended operators, and environments
 
@@ -542,7 +549,7 @@ function expand_outputspace end
 Given a MERA which may possibly be built of symmetry preserving TensorMaps, return another
 MERA that has the symmetry structure stripped from it, and all tensors are dense.
 """
-remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
+remove_symmetry(m::GenericMERA) = GenericMERA((remove_symmetry(x) for x in m.layers))
 
 # # # Pseudo(de)serialization
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
@@ -556,7 +563,9 @@ remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
 Return a tuple of objects that can be used to reconstruct a given MERA, and that are all of
 Julia base types.
 """
-pseudoserialize(m::T) where T <: GenericMERA = (repr(T), map(pseudoserialize, m.layers))
+function pseudoserialize(m::T) where T <: GenericMERA
+    return (repr(T), tuple((pseudoserialize(x) for x in m.layers)...))
+end
 
 """
 Reconstruct a MERA given the output of `pseudoserialize`.
@@ -777,12 +786,12 @@ function scale_invariant_operator_sum(m::GenericMERA, op, pars)
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
     function f(x)
-        x = ascend(x, m; startscale=nt+1, endscale=nt+2)
-        x = x - fp * dot(fp, x)
-        return x
+        xasc = ascend(x, m; startscale=nt+1, endscale=nt+2)
+        xnorm = xasc - fp * dot(fp, xasc)
+        return xnorm
     end
     op_top = ascended_operator(m, op, nt+1)
-    x0 = op_top
+    x0::operatortype(m) = op_top
     old_opsum = m.cache.previous_operatorsum
     if old_opsum !== nothing && space(x0) == space(old_opsum)
         x0 = old_opsum
@@ -843,7 +852,7 @@ function scalingdimensions(m::GenericMERA; howmany=20)
     nm = num_translayers(m)
     f(x) = ascend(x, m; endscale=nm+2, startscale=nm+1)
     # Find out which symmetry sectors we should do the diagonalization in.
-    interlayer_space = reduce(⊗, repeat([V], width))
+    interlayer_space = ⊗(Iterators.repeated(V, width)...)
     sects = sectors(fuse(interlayer_space))
     scaldim_dict = Dict()
     for irrep in sects

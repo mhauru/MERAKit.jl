@@ -19,6 +19,10 @@ function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
     return TensorMap(data, t.codom, t.dom)
 end
 
+# TODO These next two, or at least one of them, seem to be invoked when doing
+# julia> V2 = ℤ₂Space(0=>1, 1=>1)
+# julia> TensorMap(randn, Float64, V2 ⊗ V2, V2)
+# Investigate why, and what the effects are.
 function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
                       t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
                      ) where {S, N1, N2, G, E1, E2, F1, F2}
@@ -30,7 +34,7 @@ function Base.convert(::Type{TensorKit.SectorDict{G, Matrix{E1}}},
                       t::TensorKit.SectorDict{G, Matrix{E2}}
                      ) where {G, E1, E2}
     keys = t.keys
-    values = map(x -> convert(Matrix{E1}, x), t.values)
+    values = [convert(Matrix{E1}, x) for x in t.values]
     return TensorKit.SectorDict{G, Matrix{E1}}(keys, values)
 end
 
@@ -134,8 +138,8 @@ remove_symmetry(V::ElementarySpace{ℂ}) = ComplexSpace(dim(V), isdual(V))
 
 """ Strip a TensorMap of its internal symmetries."""
 function remove_symmetry(t::TensorMap)
-    domain_nosym = reduce(⊗, map(remove_symmetry, domain(t)))
-    codomain_nosym = reduce(⊗, map(remove_symmetry, codomain(t)))
+    domain_nosym = ⊗((remove_symmetry(x) for x in domain(t))...)
+    codomain_nosym = ⊗((remove_symmetry(x) for x in codomain(t))...)
     t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
     t_nosym.data[:] = convert(Array, t)
     return t_nosym

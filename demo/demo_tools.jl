@@ -265,7 +265,7 @@ function expand_best_sector(m, i, chi, h, opt_pars)
     expanded_meras_array = collect(expanded_meras)
     # Of the MERAs that got different symmetry sectors expanded, pick the one that has
     # the smallest energy.
-    minindex = argmin(map(pair -> expect(h, pair[2]), expanded_meras_array))
+    minindex = argmin((pair -> expect(h, pair[2]) for pair in expanded_meras_array))
     s, m = expanded_meras_array[minindex]
     msg = "Expanding sector $s yielded the lowest energy, keeping that.\nOutput spaces now:"
     for i in 1:num_translayers(m)+1

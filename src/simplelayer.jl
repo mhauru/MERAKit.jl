@@ -10,28 +10,36 @@ order in which the constructor takes them in.
 abstract type SimpleLayer <: Layer end
 
 Base.convert(::Type{T}, tuple::Tuple) where T <: SimpleLayer= T(tuple...)
-Base.eltype(layer::SimpleLayer) = reduce(promote_type, map(eltype, layer))
-Base.copy(layer::T) where T <: SimpleLayer = T(map(deepcopy, layer)...)
+Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
+
+# TODO Since we don't allow mixed types between layers, should the constructor enforce this?
+function Base.eltype(l::SimpleLayer)
+    E = eltype(first(l))
+    for x in l
+        @assert eltype(x) === E
+    end
+    return E
+end
 
 """Strip a layer of its internal symmetries."""
 function remove_symmetry(layer::SimpleLayer)
-    return layertype(layer)(map(remove_symmetry, layer)...)
+    return layertype(layer)((remove_symmetry(x) for x in layer)...)
 end
 
 function TensorKitManifolds.projectisometric(layer::T) where T <: SimpleLayer
-    return T(map(projectisometric, layer)...)
+    return T((projectisometric(x) for x in layer)...)
 end
 
 function TensorKitManifolds.projectisometric!(layer::T) where T <: SimpleLayer
-    return T(map(projectisometric!, layer)...)
+    return T((projectisometric!(x) for x in layer)...)
 end
 
 function pseudoserialize(layer::T) where T <: SimpleLayer
-    return repr(T), map(pseudoserialize, layer)
+    return repr(T), tuple((pseudoserialize(x) for x in layer)...)
 end
 
 function depseudoserialize(::Type{T}, data) where T <: SimpleLayer
-    return T([depseudoserialize(d...) for d in data]...)
+    return T((depseudoserialize(d...) for d in data)...)
 end
 
 # TODO Definitions like the following are a little dangerous, since they allow for instance

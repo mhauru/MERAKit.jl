@@ -45,8 +45,9 @@ function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, 
 end
 
 # Implement the iteration and indexing interfaces.
-Base.iterate(layer::TernaryLayer) = (layer.disentangler, 1)
-Base.iterate(layer::TernaryLayer, state) = state == 1 ? (layer.isometry, 2) : nothing
+Base.iterate(layer::TernaryLayer) = (layer.disentangler, Val(1))
+Base.iterate(layer::TernaryLayer, ::Val{1}) = (layer.isometry, Val(2))
+Base.iterate(layer::TernaryLayer, ::Val{2}) = nothing
 Base.length(layer::TernaryLayer) = 2
 
 """
@@ -129,7 +130,7 @@ layer, normalised to have norm 1.
 function ascending_fixedpoint(layer::TernaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
-    Vtotal = reduce(⊗, repeat([V], width))
+    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
     eye = id(Vtotal) / sqrt(dim(Vtotal))
     return eye
 end

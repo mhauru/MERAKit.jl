@@ -54,7 +54,7 @@ Base.iterate(layer::ModifiedBinaryLayer, ::Val{3}) = nothing
 Base.length(layer::ModifiedBinaryLayer) = 3
 
 """
-The ratio by which the number of sites changes when go down through this layer.
+The ratio by which the number of sites changes when we go down through this layer.
 """
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
 scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
@@ -182,14 +182,14 @@ Base.iterate(op::ModifiedBinaryOp, state::Val{1}) = (op.gap, Val(2))
 Base.iterate(op::ModifiedBinaryOp, state::Val{2}) = nothing
 Base.length(op::ModifiedBinaryOp) = 2
 
-Base.eltype(op::ModifiedBinaryOp) = reduce(promote_type, map(eltype, op))
-Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(deepcopy, op)...)
-Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(adjoint, op)...)
-Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(imag, op)...)
-Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp(map(real, op)...)
+Base.eltype(op::ModifiedBinaryOp) = promote_type((eltype(x) for x in op)...)
+Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp((deepcopy(x) for x in op)...)
+Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp((x' for x in op)...)
+Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp((imag(x) for x in op)...)
+Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp((real(x) for x in op)...)
 
 function pad_with_zeros_to(op::ModifiedBinaryOp, args...)
-    return ModifiedBinaryOp(map(x -> pad_with_zeros_to(x, args...), op)...)
+    return ModifiedBinaryOp((pad_with_zeros_to(x, args...) for x in op)...)
 end
 
 function gershgorin_bounds(op::ModifiedBinaryOp)
@@ -338,14 +338,14 @@ LinearAlgebra.tr(op::ModifiedBinaryOp) = (tr(op.mid) + tr(op.gap)) / 2.0
 # need to be wrapped in ModifiedBinaryOp.
 function thermal_densitymatrix(m::ModifiedBinaryMERA, args...)
     # Call the method of the supertype GenericMERA.
-    argtypes = map(typeof, args)
+    argtypes = (typeof(x) for x in args)
     rho = invoke(thermal_densitymatrix, Tuple{GenericMERA, argtypes...}, m, args...)
     return ModifiedBinaryOp(rho)
 end
 
 function scalingoperator_initialguess(m::ModifiedBinaryMERA, args...)
     # Call the method of the supertype GenericMERA.
-    argtypes = map(typeof, args)
+    argtypes = (typeof(x) for x in args)
     rho = invoke(scalingoperator_initialguess, Tuple{GenericMERA, argtypes...}, m, args...)
     return ModifiedBinaryOp(rho)
 end
@@ -365,7 +365,7 @@ layer, normalised to have norm 1.
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
-    Vtotal = reduce(⊗, repeat([V], width))
+    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
     eye = id(Vtotal) / sqrt(dim(Vtotal))
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
