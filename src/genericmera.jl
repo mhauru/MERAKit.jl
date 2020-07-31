@@ -212,7 +212,7 @@ function densitymatrix_entropy(rho)
     return S
 end
 
-densitymatrix_entropies(m::GenericMERA) = (densitymatrix_entropy(x) for x in densitymatrices(m))
+densitymatrix_entropies(m::GenericMERA) = [densitymatrix_entropy(x) for x in densitymatrices(m)]
 
 # # # Storage of density matrices, ascended operators, and environments
 
@@ -856,7 +856,8 @@ function scalingdimensions(m::GenericMERA; howmany=20)
     # Define a function that takes an operator and ascends it once through the scale
     # invariant layer.
     nm = num_translayers(m)
-    f(x) = ascend(x, m; endscale=nm+2, startscale=nm+1)
+    toplayer = get_layer(m, Inf)
+    f(x) = ascend(x, toplayer)
     # Find out which symmetry sectors we should do the diagonalization in.
     interlayer_space = ⊗(Iterators.repeated(V, width)...)
     sects = sectors(fuse(interlayer_space))
