@@ -52,6 +52,43 @@ function tensortype(::Type{T}, ::Val{N1}, ::Val{N2}, ::Type{E}) where {T, N1, N2
     return TensorMap{T, N1, N2, G, A, F1, F2}
 end
 
+function disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
+    TensorType = tensortype(ST, Val(2), Val(2), ET)
+    if Tan
+        TA = tensortype(ST, Val(2), Val(2), ET)
+        DisType = Stiefel.StiefelTangent{TensorType, TA}
+    else
+        DisType = TensorType
+    end
+    return DisType
+end
+
+function ternaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
+    TensorType = tensortype(ST, Val(3), Val(1), ET)
+    if Tan
+        TU = tensortype(ST, Val(3), Val(1), ET)
+        TS = tensortype(ST, Val(1), Val(1), real(ET))
+        TV = tensortype(ST, Val(1), Val(1), ET)
+        IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
+    else
+        IsoType = TensorType
+    end
+    return IsoType
+end
+
+function binaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
+    TensorType = tensortype(ST, Val(2), Val(1), ET)
+    if Tan
+        TU = tensortype(ST, Val(2), Val(1), ET)
+        TS = tensortype(ST, Val(1), Val(1), real(ET))
+        TV = tensortype(ST, Val(1), Val(1), ET)
+        IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
+    else
+        IsoType = TensorType
+    end
+    return IsoType
+end
+
 """
 A TensorMap from N indices to N indices.
 """

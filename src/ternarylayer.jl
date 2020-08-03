@@ -18,9 +18,49 @@
 #  +-------+
 #  1| 2| 3|
 
-struct TernaryLayer{DT, IT} <: SimpleLayer
-    disentangler::DT
-    isometry::IT
+struct TernaryLayer{ST, ET, Tan} <: SimpleLayer
+    disentangler::Any
+    isometry::Any
+
+    function TernaryLayer{ST, ET, Tan}(disentangler, isometry) where {ST, ET, Tan}
+        DisType = disentangler_type(ST, ET, Tan)
+        IsoType = ternaryisometry_type(ST, ET, Tan)
+        disconv = convert(DisType, disentangler)::DisType
+        isoconv = convert(IsoType, isometry)::IsoType
+        return new{ST, ET, Tan}(disconv, isoconv)
+    end
+end
+
+function TernaryLayer(disentangler::DisType, isometry::IsoType
+                     ) where {ST,
+                              DisType <: AbstractTensorMap{ST, 2, 2},
+                              IsoType <: AbstractTensorMap{ST, 3, 1}}
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return TernaryLayer{ST, ET, false}(disentangler, isometry)
+end
+
+function TernaryLayer(disentangler::DisTanType, isometry::IsoTanType
+                     ) where {ST,
+                              DisType <: AbstractTensorMap{ST, 2, 2},
+                              IsoType <: AbstractTensorMap{ST, 3, 1},
+                              DisTanType <: Stiefel.StiefelTangent{DisType},
+                              IsoTanType <: Grassmann.GrassmannTangent{IsoType},
+                             }
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return TernaryLayer{ST, ET, true}(disentangler, isometry)
+end
+
+function Base.getproperty(l::TernaryLayer{ST, ET, Tan}, sym::Symbol) where {ST, ET, Tan}
+    if sym === :disentangler
+        T = disentangler_type(ST, ET, Tan)
+    elseif sym === :isometry
+        T = ternaryisometry_type(ST, ET, Tan)
+    else
+        T = Any
+    end
+    return getfield(l, sym)::T
 end
 
 TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
@@ -30,15 +70,10 @@ TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
-function operatortype(::Type{TernaryLayer{DT, IT}}
-                     ) where {S,
-                              DT <: AbstractTensorMap{S, 2, 2},
-                              IT <: AbstractTensorMap{S, 3, 1}}
-    Eltype = eltype(DT)
-    @assert Eltype === eltype(IT)
-    return tensortype(S, Val(2), Val(2), Eltype)
+function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
+    return tensortype(ST, Val(2), Val(2), ET)
 end
-operatortype(::Type{TernaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing
+operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
     return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))

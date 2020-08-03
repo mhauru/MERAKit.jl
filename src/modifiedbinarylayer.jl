@@ -26,10 +26,54 @@
 #  |  u  |
 #  | / \ |
 
-struct ModifiedBinaryLayer{DT, ILT, IRT} <: SimpleLayer
-    disentangler::DT
-    isometry_left::ILT
-    isometry_right::IRT
+struct ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer
+    disentangler::Any
+    isometry_left::Any
+    isometry_right::Any
+
+    function ModifiedBinaryLayer{ST, ET, Tan}(disentangler, isometry_left, isometry_right
+                                             ) where {ST, ET, Tan}
+        DisType = disentangler_type(ST, ET, Tan)
+        IsoType = binaryisometry_type(ST, ET, Tan)
+        disconv = convert(DisType, disentangler)::DisType
+        isoleftconv = convert(IsoType, isometry_left)::IsoType
+        isorightconv = convert(IsoType, isometry_right)::IsoType
+        return new{ST, ET, Tan}(disconv, isoleftconv, isorightconv)
+    end
+end
+
+function ModifiedBinaryLayer(disentangler::DisType, isometry_left::IsoType,
+                             isometry_right::IsoType
+                            ) where {ST,
+                                     DisType <: AbstractTensorMap{ST, 2, 2},
+                                     IsoType <: AbstractTensorMap{ST, 2, 1}}
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return ModifiedBinaryLayer{ST, ET, false}(disentangler, isometry_left, isometry_right)
+end
+
+function ModifiedBinaryLayer(disentangler::DisTanType, isometry_left::IsoTanType,
+                             isometry_right::IsoTanType
+                            ) where {ST,
+                                     DisType <: AbstractTensorMap{ST, 2, 2},
+                                     IsoType <: AbstractTensorMap{ST, 2, 1},
+                                     DisTanType <: Stiefel.StiefelTangent{DisType},
+                                     IsoTanType <: Grassmann.GrassmannTangent{IsoType}}
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return ModifiedBinaryLayer{ST, ET, true}(disentangler, isometry_left, isometry_right)
+end
+
+function Base.getproperty(l::ModifiedBinaryLayer{ST, ET, Tan}, sym::Symbol
+                         ) where {ST, ET, Tan}
+    if sym === :disentangler
+        T = disentangler_type(ST, ET, Tan)
+    elseif sym === :isometry_left || sym === :isometry_right
+        T = binaryisometry_type(ST, ET, Tan)
+    else
+        T = Any
+    end
+    return getfield(l, sym)::T
 end
 
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
@@ -38,13 +82,6 @@ ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
-
-function Base.convert(::Type{ModifiedBinaryLayer{T1, T2, T3}}, l::ModifiedBinaryLayer
-                     ) where {T1, T2, T3}
-    return ModifiedBinaryLayer(convert(T1, l.disentangler),
-                               convert(T2, l.isometry_left),
-                               convert(T3, l.isometry_right))
-end
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
@@ -164,18 +201,11 @@ function Base.convert(::Type{ModifiedBinaryOp{T}}, op::ModifiedBinaryOp) where {
     return ModifiedBinaryOp{T}(convert(T, op.mid), convert(T, op.gap))
 end
 
-function operatortype(::Type{ModifiedBinaryLayer{DT, ILT, IRT}}
-                     ) where {DT <: AbstractTensorMap,
-                              ILT <: AbstractTensorMap,
-                              IRT <: AbstractTensorMap}
-    V = spacetype(DT)
-    E = eltype(DT)
-    @assert E === eltype(ILT)
-    @assert E === eltype(IRT)
-    return ModifiedBinaryOp{tensortype(V, Val(2), Val(2), E)}
+function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
+                     ) where {ST, ET}
+    return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
 end
-operatortype(::Type{ModifiedBinaryLayer{T1, T2, T3}}
-            ) where {T1 <: Tangent, T2 <: Tangent, T3 <: Tangent} = Nothing
+operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 Base.iterate(op::ModifiedBinaryOp) = (op.mid, Val(1))
 Base.iterate(op::ModifiedBinaryOp, state::Val{1}) = (op.gap, Val(2))

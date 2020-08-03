@@ -18,9 +18,49 @@
 #  +------+
 #  1|   2|
 
-struct BinaryLayer{DT, IT} <: SimpleLayer
-    disentangler::DT
-    isometry::IT
+struct BinaryLayer{ST, ET, Tan} <: SimpleLayer
+    disentangler::Any
+    isometry::Any
+
+    function BinaryLayer{ST, ET, Tan}(disentangler, isometry) where {ST, ET, Tan}
+        DisType = disentangler_type(ST, ET, Tan)
+        IsoType = binaryisometry_type(ST, ET, Tan)
+        disconv = convert(DisType, disentangler)::DisType
+        isoconv = convert(IsoType, isometry)::IsoType
+        return new{ST, ET, Tan}(disconv, isoconv)
+    end
+end
+
+function BinaryLayer(disentangler::DisType, isometry::IsoType
+                     ) where {ST,
+                              DisType <: AbstractTensorMap{ST, 2, 2},
+                              IsoType <: AbstractTensorMap{ST, 2, 1}}
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return BinaryLayer{ST, ET, false}(disentangler, isometry)
+end
+
+function BinaryLayer(disentangler::DisTanType, isometry::IsoTanType
+                     ) where {ST,
+                              DisType <: AbstractTensorMap{ST, 2, 2},
+                              IsoType <: AbstractTensorMap{ST, 2, 1},
+                              DisTanType <: Stiefel.StiefelTangent{DisType},
+                              IsoTanType <: Grassmann.GrassmannTangent{IsoType},
+                             }
+    ET = eltype(DisType)
+    @assert eltype(IsoType) === ET
+    return BinaryLayer{ST, ET, true}(disentangler, isometry)
+end
+
+function Base.getproperty(l::BinaryLayer{ST, ET, Tan}, sym::Symbol) where {ST, ET, Tan}
+    if sym === :disentangler
+        T = disentangler_type(ST, ET, Tan)
+    elseif sym === :isometry
+        T = binaryisometry_type(ST, ET, Tan)
+    else
+        T = Any
+    end
+    return getfield(l, sym)::T
 end
 
 BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
@@ -30,15 +70,10 @@ BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 layertype(::BinaryLayer) = BinaryLayer
 layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
-function operatortype(::Type{BinaryLayer{DT, IT}}
-                     ) where {S,
-                              DT <: AbstractTensorMap{S, 2, 2},
-                              IT <: AbstractTensorMap{S, 2, 1}}
-    Eltype = eltype(DT)
-    @assert Eltype === eltype(IT)
-    return tensortype(S, Val(3), Val(3), Eltype)
+function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
+    return tensortype(ST, Val(3), Val(3), ET)
 end
-operatortype(::Type{BinaryLayer{T1, T2}}) where {T1 <: Tangent, T2 <: Tangent} = Nothing
+operatortype(::Type{BinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 function Base.convert(::Type{BinaryLayer{T1, T2}}, l::BinaryLayer) where {T1, T2}
     return BinaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))

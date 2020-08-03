@@ -175,8 +175,8 @@ function test_ascend_and_descend(::Type{meratype}, ::Type{spacetype}
         lower_space = reduce(⊗, repeat([Vout], width))
         randomop1 = TensorMap(randn, ComplexF64, upper_space ← upper_space)
         randomop2 = TensorMap(randn, ComplexF64, lower_space ← lower_space)
-        down1 = descend(randomop1, m, startscale=i+1, endscale=i)
-        up2 = ascend(randomop2, m, startscale=i, endscale=i+1)
+        down1 = MERA.descend(randomop1, m, startscale=i+1, endscale=i)
+        up2 = MERA.ascend(randomop2, m, startscale=i, endscale=i+1)
         e1 = dot(down1, randomop2)
         e2 = dot(randomop1, up2)
         @test e1 ≈ e2
