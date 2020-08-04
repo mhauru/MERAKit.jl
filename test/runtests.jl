@@ -149,7 +149,7 @@ function test_type_stability(::Type{meratype}, ::Type{spacetype}
     @inferred (x -> tuple(ltan1...))(:a)
     @inferred MERA.tensorwise_scale(ltan1, 0.1)
     @inferred MERA.tensorwise_sum(ltan1, ltan2)
-    @inferred inner(l1, ltan1, ltan2)
+    #@inferred inner(l1, ltan1, ltan2)
     #@inferred MERA.tensorwise_scale(mtan1, 0.1)
     #@inferred MERA.tensorwise_sum(mtan1, mtan2)
     #@inferred inner(m, mtan1, mtan2)
