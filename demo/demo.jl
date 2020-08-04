@@ -22,7 +22,6 @@ function parse_pars()
                     , "--J_xy", arg_type=Float64, default=-1.0  # XX + YY coupling for XXZ
                     , "--datafolder", arg_type=String, default="JLMdata"
                     , "--method", arg_type=Symbol, default=:lbfgs
-                    , "--isometrymanifold", arg_type=Symbol, default=:grassmann
                     , "--retraction", arg_type=Symbol, default=:exp
                     , "--transport", arg_type=Symbol, default=:exp
                     , "--metric", arg_type=Symbol, default=:euclidean
@@ -64,7 +63,6 @@ function main()
                                maxiter = 30,
                                isometries_only_iters = 10,
                                method = pars[:method],
-                               isometrymanifold = pars[:isometrymanifold],
                                retraction = pars[:retraction],
                                transport = pars[:transport],
                                metric = pars[:metric],

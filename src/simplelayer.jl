@@ -9,17 +9,8 @@ order in which the constructor takes them in.
 """
 abstract type SimpleLayer <: Layer end
 
-Base.convert(::Type{T}, tuple::Tuple) where T <: SimpleLayer= T(tuple...)
+Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
 Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
-
-# TODO Since we don't allow mixed types between layers, should the constructor enforce this?
-function Base.eltype(l::SimpleLayer)
-    E = eltype(first(l))
-    for x in l
-        @assert eltype(x) === E
-    end
-    return E
-end
 
 """Strip a layer of its internal symmetries."""
 function remove_symmetry(layer::SimpleLayer)
@@ -65,7 +56,7 @@ end
 
 function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;
                                     alg=:exp)
-    ts_and_ttans = [retract(t..., alpha; alg=alg) for t in zip(l, ltan)]
+    ts_and_ttans = (retract(t..., alpha; alg=alg) for t in zip(l, ltan))
     ts, ttans = zip(ts_and_ttans...)
     # TODO The following two lines just work around a compiler bug in Julia < 1.6.
     ts = tuple(ts...)
@@ -79,8 +70,7 @@ function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::
                          for t in zip(lvec, l, ltan, lend))...)
 end
 
-function gradient_normsq(layer::SimpleLayer, env::SimpleLayer; isometrymanifold=:grassmann,
-                         metric=:euclidean)
-    grad = gradient(layer, env; isometrymanifold=isometrymanifold, metric=metric)
+function gradient_normsq(layer::SimpleLayer, env::SimpleLayer; metric=:euclidean)
+    grad = gradient(layer, env; metric=metric)
     return sum(inner(x, z, z; metric=metric) for (x, z) in zip(layer, grad))
 end

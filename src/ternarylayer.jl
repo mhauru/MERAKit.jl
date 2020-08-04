@@ -75,6 +75,9 @@ function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
 end
 operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
+Base.eltype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
+Base.eltype(l::TernaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
+
 function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
     return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
 end
@@ -170,8 +173,7 @@ function ascending_fixedpoint(layer::TernaryLayer)
     return eye
 end
 
-function gradient(layer::TernaryLayer, env::TernaryLayer; isometrymanifold=:grassmann,
-                  metric=:euclidean)
+function gradient(layer::TernaryLayer, env::TernaryLayer; metric=:euclidean)
     u, w = layer
     uenv, wenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
@@ -179,14 +181,7 @@ function gradient(layer::TernaryLayer, env::TernaryLayer; isometrymanifold=:gras
     # The factor of two is from the partial_x + i partial_y derivative of the cost function,
     # and how it depends on both v and v^dagger.
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
-    if isometrymanifold === :stiefel
-        wgrad = Stiefel.project!(2*wenv, w; metric=metric)
-    elseif isometrymanifold === :grassmann
-        wgrad = Grassmann.project!(2*wenv, w)
-    else
-        msg = "Unknown isometrymanifold $(isometrymanifold)"
-        throw(ArgumentError(msg))
-    end
+    wgrad = Grassmann.project!(2*wenv, w)
     return TernaryLayer(ugrad, wgrad)
 end
 
@@ -213,8 +208,8 @@ Return true/false.
 """
 function space_invar_intralayer(layer::TernaryLayer)
     u, w = layer
-    matching_bonds = [(space(u, 3)', space(w, 3)),
-                      (space(u, 4)', space(w, 1))]
+    matching_bonds = ((space(u, 3)', space(w, 3)),
+                      (space(u, 4)', space(w, 1)))
     allmatch = all([==(pair...) for pair in matching_bonds])
     # Check that the dimensions are such that isometricity can hold.
     for v in layer
@@ -231,9 +226,9 @@ disentanglers of the layer above it. Return true/false.
 function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
-    matching_bonds = [(space(w, 4)', space(unext, 1)),
+    matching_bonds = ((space(w, 4)', space(unext, 1)),
                       (space(w, 4)', space(unext, 2)),
-                      (space(w, 4)', space(wnext, 2))]
+                      (space(w, 4)', space(wnext, 2)))
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end

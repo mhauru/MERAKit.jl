@@ -5,12 +5,12 @@
 # To be included in MERA.jl.
 
 """
-Layer is an abstract supertype of concrete types such as BinaryLayer. A typical Layer is a
-collection of tensors, the orders and shapes of which depend on the type.
+Layer is an abstract supertype of concrete types such as `BinaryLayer`.
 """
 abstract type Layer end
 
 mutable struct MERACache{N, LT <: Layer, OT}
+    # LT stands for Layer Type, OT for Operator Type.
     # TODO Should we use NTuple{N}s instead for densitymatrices and environments?
     densitymatrices::Vector{Union{Nothing, OT}}
     operators::Dict{Any, Vector{OT}}
@@ -45,18 +45,20 @@ A GenericMERA is a collection of Layers. The type of these layers then determine
 the MERA is binary, ternary, etc.
 
 A few notes on conventions and terminology:
-- The physical indices of the MERA are at the "bottom", the scale invariant part at the
+* The physical indices of the MERA are at the "bottom", the scale invariant part at the
 "top".
-- The counting of layers starts from the bottom, so the layer with physical indices is layer
+* The counting of layers starts from the bottom, so the layer with physical indices is layer
 #1. The last layer is the scale invariant one, that then repeats upwards to infinity.
-- Each layer is thought of as a linear map from its top, or input space to its bottom, or
+* Each layer is thought of as a linear map from its top, or input space to its bottom, or
 output space.
 """
 struct GenericMERA{N, LT <: Layer, OT}
+    # LT stands for Layer Type, OT for Operator Type.
     layers::NTuple{N, LT}
     cache::MERACache{N, LT, OT}
 
-    function GenericMERA{N, LT, OT}(layers::NTuple{N}, cache::MERACache{N}) where {N, LT, OT}
+    function GenericMERA{N, LT, OT}(layers::NTuple{N}, cache::MERACache{N, LT, OT}
+                                   ) where {N, LT, OT}
         # Note that this prevents the creation of types like GenericMERA{3, SimpleLayer}:
         # The second type parameter must be exactly the element type of layers, specified at
         # the lowest, concrete level. This is intentional, to avoid accidentally creating
@@ -64,7 +66,6 @@ struct GenericMERA{N, LT <: Layer, OT}
         @assert LT === eltype(typeof(layers))
         @assert isconcretetype(LT)
         @assert OT === operatortype(LT)
-        cache::MERACache{N, LT, OT}
         return new{N, LT, OT}(layers, cache)
     end
 end
@@ -111,14 +112,7 @@ layertype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
-# TODO Since we don't allow mixed types between layers, should the constructor enforce this?
-function Base.eltype(m::GenericMERA)
-    E = eltype(first(m.layers))
-    for l in m.layers
-        @assert eltype(l) === E
-    end
-    return E
-end
+Base.eltype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = eltype(LT)
 
 operatortype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
@@ -155,7 +149,8 @@ get_layer(m::GenericMERA, depth) = (depth > num_translayers(m) ?
 Replace one of the layers of a MERA with a new one. If check_invar=true, check that the
 indices match afterwards.
 """
-function replace_layer(m::GenericMERA, layer, depth; check_invar=true)
+function replace_layer(m::GenericMERA{N, LT}, layer::LT, depth; check_invar=true
+                      ) where {N, LT}
     index = min(num_translayers(m)+1, depth)
     new_layers = Base.setindex(m.layers, layer, index)
     new_cache = replace_layer(m.cache, depth)
@@ -168,7 +163,7 @@ end
 Add one more transition layer at the top of the MERA, by taking the lowest of the scale
 invariant one and releasing it to vary independently.
 """
-function release_transitionlayer(m::GenericMERA{N, LT}) where {N, LT}
+function release_transitionlayer(m::GenericMERA)
     new_layers = (m.layers..., m.layers[end])
     new_cache = release_transitionlayer(m.cache)
     new_m = GenericMERA(new_layers, new_cache)
@@ -212,7 +207,9 @@ function densitymatrix_entropy(rho)
     return S
 end
 
-densitymatrix_entropies(m::GenericMERA) = [densitymatrix_entropy(x) for x in densitymatrices(m)]
+function densitymatrix_entropies(m::GenericMERA)
+    return [densitymatrix_entropy(x) for x in densitymatrices(m)]
+end
 
 # # # Storage of density matrices, ascended operators, and environments
 
@@ -236,7 +233,7 @@ densitymatrix_entropies(m::GenericMERA) = [densitymatrix_entropy(x) for x in den
 Reset cached operators, so that they will be recomputed when
 they are needed.
 """
-reset_storage(m::GenericMERA) = GenericMERA(m.layers, typeof(m.cache)())
+reset_storage(m::T) where {T <: GenericMERA} = T(m.layers, typeof(m.cache)())
 
 function Base.copy!(dst::MERACache, src::MERACache)
     dst.densitymatrices = copy(src.densitymatrices)
@@ -313,9 +310,8 @@ end
 """
 Return the stored ascended versions of `op`. Initialize storage for `op` if necessary.
 """
-function operator_storage!(c::MERACache, op)
+function operator_storage!(c::MERACache{N, LT, OT}, op) where {N, LT, OT}
     if !(op in keys(c.operators))
-        OT = operatortype(c)
         op_conv = convert(OT, expand_support(op, causal_cone_width(c)))
         c.operators[op] = Vector{OT}([op_conv])
     end
@@ -432,10 +428,10 @@ parameters passed to the constructor for each layer, e.g. additional intralayer 
 dimension. Also passed to the constructor for individual layers will be any additional
 keyword arguments, but these will all be the same for each layer.
 """
-function random_MERA(::Type{T}, Tel, Vouts, Vints=Vouts; kwargs...) where T <: GenericMERA
+function random_MERA(::Type{T}, ET, Vouts, Vints=Vouts; kwargs...) where T <: GenericMERA
     L = layertype(T)
     Vins = tuple(Vouts[2:end]..., Vouts[end])
-    layers = tuple((randomlayer(L, Tel, Vin, Vout, Vint; kwargs...)
+    layers = tuple((randomlayer(L, ET, Vin, Vout, Vint; kwargs...)
                     for (Vin, Vout, Vint) in zip(Vins, Vouts, Vints))...)
     m = GenericMERA(layers)
     return m
@@ -598,7 +594,7 @@ function space_invar(m::GenericMERA)
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_intralayer has no method for type $(layertype(m)). We recommend writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_intralayer has no method for type $(layertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
 
@@ -608,7 +604,7 @@ function space_invar(m::GenericMERA)
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_interlayer has no method for type $(layertype(m)). We recommend writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_interlayer has no method for type $(layertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
         layer = next_layer
@@ -641,15 +637,17 @@ layer `endscale`. Living "on" a layer means living on the indices right below it
 `endscale=num_translayers(m)+1` (the default) to the indices just below the first scale
 invariant layer.
 """
-function ascend(op, m::GenericMERA; endscale=num_translayers(m)+1, startscale=1)
+function ascend(op, m::GenericMERA{N, LT, OT}, endscale=num_translayers(m)+1, startscale=1
+               ) where {N, LT, OT}
+    local op_pre::OT, op_asc::OT
     if endscale < startscale
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
-        op_pre = ascend(op, m; endscale=endscale-1, startscale=startscale)
+        op_pre = ascend(op, m, endscale-1, startscale)
         layer = get_layer(m, endscale-1)
         op_asc = ascend(op_pre, layer)
     else
-        op_asc = convert(operatortype(typeof(m)), op)
+        op_asc = convert(OT, op)
     end
     return op_asc
 end
@@ -661,15 +659,17 @@ layer `endscale`. Living "on" a layer means living on the indices right below it
 `startscale=num_translayers(m)+1` (the default) to the indices just below the first scale
 invariant layer.
 """
-function descend(op, m::GenericMERA; endscale=1, startscale=num_translayers(m)+1)
+function descend(op, m::GenericMERA{N, LT, OT}, endscale=1, startscale=num_translayers(m)+1
+                ) where {N, LT, OT}
+    local op_pre::OT, op_asc::OT
     if endscale > startscale
         throw(ArgumentError("endscale > startscale"))
     elseif endscale < startscale
-        op_pre = descend(op, m; endscale=endscale+1, startscale=startscale)
+        op_pre = descend(op, m, endscale+1, startscale)
         layer = get_layer(m, endscale)
         op_desc = descend(op_pre, layer)
     else
-        op_desc = convert(operatortype(typeof(m)), op)
+        op_desc = convert(OT, op)
     end
     return op_desc
 end
@@ -677,11 +677,11 @@ end
 """
 Find the fixed point density matrix of the scale invariant part of the MERA.
 """
-function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
-    f(x) = descend(x, m; endscale=num_translayers(m)+1, startscale=num_translayers(m)+2)
+function fixedpoint_densitymatrix(m::GenericMERA{N, LT, OT}, pars=(;)) where {N, LT, OT}
+    f(x) = descend(x, m, num_translayers(m)+1, num_translayers(m)+2)
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
-    x0::operatortype(m) = thermal_densitymatrix(m, Inf)
+    x0::OT = thermal_densitymatrix(m, Inf)
     old_rho = m.cache.previous_fixedpoint_densitymatrix
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
@@ -692,7 +692,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
     # We know the result should always be Hermitian, and scaled to have trace 1.
     rho_cmplx = (rho_cmplx + rho_cmplx') / 2.0
     rho_cmplx /= tr(rho_cmplx)
-    local rho::operatortype(m)
+    local rho::OT
     if eltype(m) <: Real
         # rho isn't generally real for generic matrices, but we know that it should be for
         # the descending superoperator.
@@ -717,11 +717,10 @@ end
 Return the thermal density matrix for the indices right below the layer at `depth`. Used as
 an initial guess for the fixed-point density matrix.
 """
-function thermal_densitymatrix(m::GenericMERA, depth)
+function thermal_densitymatrix(m::GenericMERA{N, LT, OT}, depth) where {N, LT, OT}
     width = causal_cone_width(typeof(m))
     V = inputspace(m, depth)^width
     rho_tensor = id(Matrix{eltype(m)}, V)
-    OT = operatortype(typeof(m))
     rho_op::OT = convert(OT, rho_tensor)
     return rho_op
 end
@@ -732,14 +731,15 @@ Return the density matrix right below the layer at `depth`.
 This method stores every density matrix in memory as it computes them, and fetches them from
 there if the same one is requested again.
 """
-function densitymatrix(m::GenericMERA, depth, pars=(;))
+function densitymatrix(m::GenericMERA{N, LT, OT}, depth, pars=(;)) where {N, LT, OT}
     if !has_densitymatrix_stored(m.cache, depth)
+        local rho_above::OT, rho::OT
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
             rho = fixedpoint_densitymatrix(m, pars)
         else
             rho_above = densitymatrix(m, depth+1, pars)
-            rho = descend(rho_above, m; endscale=depth, startscale=depth+1)
+            rho = descend(rho_above, m, depth, depth+1)
         end
         # Store this density matrix for future use.
         set_stored_densitymatrix!(m.cache, rho, depth)
@@ -761,12 +761,12 @@ Return the operator `op` ascended from the physical level to `depth`. The benefi
 this over `ascend(m, op; startscale=1, endscale=depth)` is that this one stores the result
 in memory and fetches it from there if them same operator is requested again.
 """
-function ascended_operator(m::GenericMERA, op, depth)
+function ascended_operator(m::GenericMERA{N, LT, OT}, op, depth) where {N, LT, OT}
     # Note that if depth=1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
     if !has_operator_stored(m.cache, op, depth)
-        op_below = ascended_operator(m, op, depth-1)
-        opasc = ascend(op_below, m; endscale=depth, startscale=depth-1)
+        op_below::OT = ascended_operator(m, op, depth-1)
+        opasc::OT = ascend(op_below, m, depth, depth-1)
         # Store this density matrix for future use.
         set_stored_operator!(m.cache, opasc, op, depth)
     end
@@ -790,7 +790,7 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars) where
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
     function f(x::OT)
-        xasc::OT = ascend(x, m; startscale=nt+1, endscale=nt+2)
+        xasc::OT = ascend(x, m, nt+2, nt+1)
         xnorm::OT = xasc - fp * dot(fp, xasc)
         return xnorm
     end
@@ -878,7 +878,8 @@ end
 Return an initial guess to be used in the iterative eigensolver that solves for scaling
 operators.
 """
-function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
+function scalingoperator_initialguess(m::GenericMERA{N, LT, OT}, interlayer_space, irrep
+                                     ) where {N, LT, OT}
     typ = eltype(m)
     inspace = interlayer_space
     outspace = interlayer_space
@@ -886,7 +887,7 @@ function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
     irrep !== Trivial() && (inspace = inspace ⊗ spacetype(inspace)(irrep => 1))
     # The initial guess for the eigenvalue search. Also defines the type for
     # eigenvectors.
-    x0 = TensorMap(randn, typ, outspace ← inspace)
+    x0::OT = convert(OT, TensorMap(randn, typ, outspace ← inspace))
     return x0
 end
 
@@ -913,7 +914,6 @@ end
 # # # Optimization
 
 default_pars = (method = :lbfgs,
-                isometrymanifold = :grassmann,
                 retraction = :exp,
                 transport = :exp,
                 metric = :euclidean,
@@ -934,7 +934,7 @@ default_pars = (method = :lbfgs,
                                                ),
                )
 
-function minimize_expectation(m, h, pars; finalize! = OptimKit._finalize!,
+function minimize_expectation(m::GenericMERA, h, pars; finalize! = OptimKit._finalize!,
                               vary_disentanglers=true, kwargs...)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
@@ -986,7 +986,7 @@ have no default values. The different parameters are:
     the different Layer types. Typical parameters are for instance how many times to iterate
     optimizing individual tensors.
 """
-function minimize_expectation_ev(m, h, pars; finalize! = OptimKit._finalize!,
+function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._finalize!,
                                  lowest_depth=1, vary_disentanglers=true)
     nt = num_translayers(m)
     rhos = densitymatrices(m, pars)
@@ -1004,7 +1004,7 @@ function minimize_expectation_ev(m, h, pars; finalize! = OptimKit._finalize!,
         gradnorm_sq = 0.0
 
         for l in lowest_depth:nt+1
-            env, layer = nothing, nothing
+            local env, layer
             for i in 1:pars[:ev_layer_iters]
                 env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
                 layer = get_layer(m, l)
@@ -1016,17 +1016,14 @@ function minimize_expectation_ev(m, h, pars; finalize! = OptimKit._finalize!,
             # gradient. This isn't quite the gradient at the end point, which is what we
             # would want, but close enough.
             gradnorm_sq += gradient_normsq(layer, env;
-                                           isometrymanifold=pars[:isometrymanifold],
                                            metric=pars[:metric])
         end
 
         gradnorm = sqrt(gradnorm_sq)
         rhos = densitymatrices(m, pars)
         expectation = expect(h, m, pars)
-        if old_rhos !== nothing
-            rho_diffs = [norm(r - or) for (r, or) in zip(rhos, old_rhos)]
-            rhos_maxchange = maximum(rho_diffs)
-        end
+        rho_diffs = [norm(r - or) for (r, or) in zip(rhos, old_rhos)]
+        rhos_maxchange = maximum(rho_diffs)
         # The nothing is for the gradient, which we don't use, but OptimKit's format of
         # finalize! expects.
         m = finalize!(m, expectation, nothing, counter)[1]
@@ -1059,8 +1056,8 @@ end
 
 # # # Gradient optimization
 
-function tensorwise_scale(m::T, alpha) where T <: GenericMERA
-    t = tuple((tensorwise_scale(l, alpha) for l in m.layers)...)
+function tensorwise_scale(m::GenericMERA, alpha)
+    t = (tensorwise_scale(l, alpha) for l in m.layers)
     return GenericMERA(t)
 end
 
@@ -1083,33 +1080,30 @@ function gradient(h, m::GenericMERA{N}, pars; vary_disentanglers=true) where {N}
     layers = (begin
                   layer = get_layer(m, l)
                   env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
-                  grad = gradient(layer, env; metric=pars[:metric],
-                                  isometrymanifold=pars[:isometrymanifold])
+                  gradient(layer, env; metric=pars[:metric])
               end
               for l in 1:nt+1)
-    g = GenericMERA(layers)::GenericMERA{N}
+    g = GenericMERA(layers)
     return g
 end
 
-function precondition_tangent(m::T1, tan::T2, pars) where {T1 <: GenericMERA,
-                                                           T2 <: GenericMERA}
+function precondition_tangent(m::GenericMERA, tan::GenericMERA, pars)
     nt = num_translayers(m)
-    tanlayers_prec = []
-    for l in 1:nt+1
-        layer = get_layer(m, l)
-        tanlayer = get_layer(tan, l)
-        rho = densitymatrix(m, l+1, pars)
-        tanlayer_prec = precondition_tangent(layer, tanlayer, rho)
-        push!(tanlayers_prec, tanlayer_prec)
-    end
-    tan_prec = T2(tanlayers_prec)
+    tanlayers_prec = (begin
+                          layer = get_layer(m, l)
+                          tanlayer = get_layer(tan, l)
+                          rho = densitymatrix(m, l+1, pars)
+                          precondition_tangent(layer, tanlayer, rho)
+                      end
+                      for l in 1:nt+1)
+    tan_prec = typeof(tan)(tanlayers_prec)
     return tan_prec
 end
 
 function TensorKitManifolds.retract(m::T1, mtan::T2, alpha::Real; kwargs...
                                    ) where {T1 <: GenericMERA, T2 <: GenericMERA}
-    layers, layers_tan = zip([retract(l, ltan, alpha; kwargs...)
-                              for (l, ltan) in zip(m.layers, mtan.layers)]...)
+    layers, layers_tan = zip((retract(l, ltan, alpha; kwargs...)
+                              for (l, ltan) in zip(m.layers, mtan.layers))...)
     # TODO The following two lines just work around a compiler bug in Julia < 1.6.
     layers = tuple(layers...)
     layers_tan = tuple(layers_tan...)
@@ -1119,9 +1113,9 @@ end
 function TensorKitManifolds.transport!(mvec::T2, m::T1, mtan::T2, alpha::Real, mend::T1;
                                        kwargs...) where {T1 <: GenericMERA, T2 <:
                                                          GenericMERA}
-    layers = [transport!(lvec, l, ltan, alpha, lend; kwargs...)
+    layers = (transport!(lvec, l, ltan, alpha, lend; kwargs...)
               for (lvec, l, ltan, lend)
-              in zip(mvec.layers, m.layers, mtan.layers, mend.layers)]
+              in zip(mvec.layers, m.layers, mtan.layers, mend.layers))
     return T2(layers)
 end
 
@@ -1139,9 +1133,9 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!,
         return f, g
     end
 
-    rtrct(args...; kwargs...) = retract(args...; alg=pars[:retraction], kwargs...)
-    trnsprt!(args...; kwargs...) = transport!(args...; alg=pars[:transport], kwargs...)
-    innr(args...; kwargs...) = inner(args...; metric=pars[:metric], kwargs...)
+    rtrct(args...) = retract(args...; alg=pars[:retraction])
+    trnsprt!(args...) = transport!(args...; alg=pars[:transport])
+    innr(args...) = inner(args...; metric=pars[:metric])
     scale(vec, beta) = tensorwise_scale(vec, beta)
     add(vec1, vec2, beta) = tensorwise_sum(vec1, scale(vec2, beta))
     linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])
@@ -1156,6 +1150,7 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!,
                  linesearch = linesearch,
                  verbosity = pars[:verbosity],
                  gradtol = pars[:gradient_delta])
+    local alg
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang
             flavor = HagerZhang()

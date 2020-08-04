@@ -83,6 +83,9 @@ ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
 
+Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
+Base.eltype(l::ModifiedBinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
+
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
 Base.iterate(layer::ModifiedBinaryLayer, ::Val{1}) = (layer.isometry_left, Val(2))
@@ -392,7 +395,7 @@ function ascending_fixedpoint(layer::ModifiedBinaryLayer)
 end
 
 function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
-                  isometrymanifold=:grassmann, metric=:euclidean)
+                  metric=:euclidean)
     u, wl, wr = layer
     uenv, wlenv, wrenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
@@ -400,16 +403,8 @@ function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
     # The factor of two is from the partial_x + i partial_y derivative of the cost function,
     # and how it depends on both v and v^dagger.
     ugrad = Stiefel.project!(2*uenv, u; metric=metric)
-    if isometrymanifold === :stiefel
-        wlgrad = Stiefel.project!(2*wlenv, wl; metric=metric)
-        wrgrad = Stiefel.project!(2*wrenv, wr; metric=metric)
-    elseif isometrymanifold === :grassmann
-        wlgrad = Grassmann.project!(2*wlenv, wl)
-        wrgrad = Grassmann.project!(2*wrenv, wr)
-    else
-        msg = "Unknown isometrymanifold $(isometrymanifold)"
-        throw(ArgumentError(msg))
-    end
+    wlgrad = Grassmann.project!(2*wlenv, wl)
+    wrgrad = Grassmann.project!(2*wrenv, wr)
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
 end
 
@@ -440,8 +435,8 @@ Return true/false.
 """
 function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
-    matching_bonds = [(space(u, 3)', space(wl, 2)),
-                      (space(u, 4)', space(wr, 1))]
+    matching_bonds = ((space(u, 3)', space(wl, 2)),
+                      (space(u, 4)', space(wr, 1)))
     allmatch = all([==(pair...) for pair in matching_bonds])
     # Check that the dimensions are such that isometricity can hold.
     for v in layer
@@ -458,10 +453,10 @@ disentanglers of the layer above it. Return true/false.
 function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     unext, wlnext, wrnext = next_layer
-    matching_bonds = [(space(wl, 3)', space(unext, 1)),
+    matching_bonds = ((space(wl, 3)', space(unext, 1)),
                       (space(wl, 3)', space(unext, 2)),
                       (space(wr, 3)', space(unext, 1)),
-                      (space(wr, 3)', space(unext, 2))]
+                      (space(wr, 3)', space(unext, 2)))
     allmatch = all([==(pair...) for pair in matching_bonds])
     return allmatch
 end
