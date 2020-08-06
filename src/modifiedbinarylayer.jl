@@ -367,13 +367,6 @@ end
 
 LinearAlgebra.tr(op::ModifiedBinaryOp) = (tr(op.mid) + tr(op.gap)) / 2.0
 
-function scalingoperator_initialguess(m::ModifiedBinaryMERA, args...)
-    # Call the method of the supertype GenericMERA.
-    argtypes = (typeof(x) for x in args)
-    rho = invoke(scalingoperator_initialguess, Tuple{GenericMERA, argtypes...}, m, args...)
-    return ModifiedBinaryOp(rho)
-end
-
 # The entropy of the density matrix is the average over the two different density matrices.
 function densitymatrix_entropy(rho::ModifiedBinaryOp)
     rho_mid, rho_gap = rho

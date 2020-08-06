@@ -196,7 +196,7 @@ function test_expectation_of_identity(::Type{meratype}, ::Type{spacetype}
     V = outputspace(m, 1)
     eye = id(V)
     for i in 1:(layers+1)
-        @test expect(eye, m; evalscale=i) ≈ 1.0
+        @test expect(eye, m, (;), 1, i) ≈ 1.0
     end
 end
 
@@ -215,7 +215,7 @@ function test_expectation_evalscale(::Type{meratype}, ::Type{spacetype}
     randomop = (randomop + randomop')/2
     expectation = expect(randomop, m)
     for i in 1:(layers+1)
-        expectation_i = expect(randomop, m; evalscale=i)
+        expectation_i = expect(randomop, m, (;), 1, i)
         @test expectation_i ≈ expectation
     end
 end
@@ -345,14 +345,6 @@ function test_reset_storage(::Type{meratype}, ::Type{spacetype}) where {meratype
     expectation_reset = expect(randomop, m)
     @test expectation_orig ≈ expectation_reset
 
-    reset_operator_storage!(m, randomop)
-    expectation_reset = expect(randomop, m)
-    @test expectation_orig ≈ expectation_reset
-
-    reset_operator_storage!(m)
-    expectation_reset = expect(randomop, m)
-    @test expectation_orig ≈ expectation_reset
-
     # TODO Consider writing tests that check that a) storage is correctly reset after
     # assigning new tensors, b) storage isn't needlessly reset when assigning tensors, i.e.
     # no unnecessary recomputation is done.
@@ -374,15 +366,15 @@ function test_projectisometric(::Type{meratype}, ::Type{spacetype}
     V = outputspace(m, 1)
     eye = id(V)
     # Test that we've broken isometricity
-    @test !(expect(eye, m; evalscale=1) ≈ 1.0)
+    @test !(expect(eye, m) ≈ 1.0)
     # Test that the new MERA is isometric, but that the old one hasn't changed.
     m_new = projectisometric(m)
-    @test expect(eye, m_new; evalscale=1) ≈ 1.0
-    @test !(expect(eye, m; evalscale=1) ≈ 1.0)
+    @test expect(eye, m_new) ≈ 1.0
+    @test !(expect(eye, m) ≈ 1.0)
     # Test that projectisometric! works too. Note that there's no guarantee that it modifies
     # the old m to be isometric. The ! simply gives it permission to mess with old objects.
     m = projectisometric!(m)
-    @test expect(eye, m; evalscale=1) ≈ 1.0
+    @test expect(eye, m) ≈ 1.0
 end
 
 """

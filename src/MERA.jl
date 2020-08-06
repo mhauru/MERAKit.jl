@@ -11,28 +11,59 @@ using Printf
 using LinearAlgebra
 using Logging
 
-export GenericMERA, TernaryMERA, BinaryMERA, ModifiedBinaryMERA
-export TernaryLayer, BinaryLayer, ModifiedBinaryLayer
+export GenericMERA
+export TernaryMERA
+export BinaryMERA
+export ModifiedBinaryMERA
+export TernaryLayer
+export BinaryLayer
+export ModifiedBinaryLayer
 export SquareTensorMap
-export ascend, ascended_operator, descend
+export ascend
+export ascended_operator
+export scale_invariant_operator_sum
+export descend
+export fixedpoint_densitymatrix
+export environment
 export remove_symmetry
 export layertype
-export get_layer, get_disentangler, get_isometry, num_translayers
-export outputspace, inputspace, internalspace
-export causal_cone_width, scalefactor
-export densitymatrix, densitymatrices, densitymatrix_entropies
-export random_MERA, randomlayer
+export get_layer
+export get_disentangler
+export get_isometry
+export num_translayers
+export outputspace
+export inputspace
+export internalspace
+export causal_cone_width
+export scalefactor
+export densitymatrix
+export densitymatrices
+export densitymatrix_entropies
+export random_MERA
+export randomlayer
 export scalingdimensions
-export replace_layer, release_transitionlayer, expand_bonddim, expand_internal_bonddim
+export replace_layer
+export release_transitionlayer
+export expand_bonddim
+export expand_internal_bonddim
 export expect
 export minimize_expectation
-export pseudoserialize, depseudoserialize
-export projectisometric, projectisometric!
-export reset_storage, reset_operator_storage!
-export tensorwise_sum, tensorwise_scale
-export gradient, retract, transport!, inner
+export pseudoserialize
+export depseudoserialize
+export projectisometric
+export projectisometric!
+export reset_storage
+export reset_operator_storage!
+export tensorwise_sum
+export tensorwise_scale
+export gradient
+export retract
+export transport!
+export inner
 
 include("tensortools.jl")
+include("layer.jl")
+include("meracache.jl")
 include("genericmera.jl")
 include("simplelayer.jl")
 include("ternarylayer.jl")

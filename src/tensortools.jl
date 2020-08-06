@@ -379,6 +379,22 @@ function gershgorin_discs(a::Array{S, 2}) where {S}
 end
 
 """
+    densitymatrix_entropy(rho)
+
+Compute the von Neumann entropy of a density matrix `rho`.
+"""
+function densitymatrix_entropy(rho)
+    eigs = eigh(rho)[1]
+    eigs = real.(diag(convert(Array, eigs)))
+    if sum(abs.(eigs[eigs .<= 0.])) > 1e-13
+        @warn("Significant negative eigenvalues for a density matrix: $eigs")
+    end
+    eigs = eigs[eigs .> 0.]
+    S = -dot(eigs, log.(eigs))
+    return S
+end
+
+"""
     precondition_tangent(X::Tangent, rho::AbstractTensorMap, delta=precondition_regconst(X))
 
 Precondition the tangent vector `X` with the metrix g(X, Y) =  Tr[X' Y rho], where `rho`
