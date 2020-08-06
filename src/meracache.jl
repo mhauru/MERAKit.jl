@@ -1,3 +1,4 @@
+# A cache type for GenericMERA.
 # To be included in MERA.jl.
 
 # The storage formats for density matrices, operators, and environments are a little

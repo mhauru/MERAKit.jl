@@ -1,10 +1,13 @@
 # The SimpleLayer abstract type and methods for it.
 # To be `included` in MERA.jl.
 
-"""A SimpleLayer is a MERA layer that consists of a set of isometries and/or unitaries, and
+"""
+    SimpleLayer <: Layer
+
+A `SimpleLayer` is a MERA layer that consists of a set of isometries and/or unitaries, and
 nothing else. This allows writing convenient generic versions of many methods, reducing code
-duplication for the concrete Layer types. Every subtype of SimpleLayer should implement the
-iteration and indexing interfaces to return the various tensors of the layer in the same
+duplication for the concrete `Layer` types. Every subtype of `SimpleLayer` should implement
+the iteration and indexing interfaces to return the various tensors of the layer in the same
 order in which the constructor takes them in.
 """
 abstract type SimpleLayer <: Layer end
@@ -12,7 +15,6 @@ abstract type SimpleLayer <: Layer end
 Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
 Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
 
-"""Strip a layer of its internal symmetries."""
 function remove_symmetry(layer::SimpleLayer)
     return layertype(layer)((remove_symmetry(x) for x in layer)...)
 end
@@ -70,6 +72,14 @@ function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::
                          for t in zip(lvec, l, ltan, lend))...)
 end
 
+"""
+    gradient_normsq(layer::Layer, env::Layer; metric=:euclidean)
+
+Compute the norm of the gradient, given the enviroment layer `env` and the base point
+`layer`.
+
+See also: [`gradient`](@ref)
+"""
 function gradient_normsq(layer::SimpleLayer, env::SimpleLayer; metric=:euclidean)
     grad = gradient(layer, env; metric=metric)
     return sum(inner(x, z, z; metric=metric) for (x, z) in zip(layer, grad))

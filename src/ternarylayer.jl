@@ -1,24 +1,43 @@
 # TernaryLayer and TernaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
-# # # The core stuff
+"""
+    TernaryLayer{ST, ET, Tan} <: SimpleLayer
 
-# Index numbering convention is as follows, where the physical indices are at the bottom:
-# Disentangler:
-#  3|   4|
-#  +------+
-#  |  u   |
-#  +------+
-#  1|   2|
-#
-# Isometry:
-#     4|
-#  +-------+
-#  |   w   |
-#  +-------+
-#  1| 2| 3|
+The type for layers of a ternary MERA.
 
+Each layer consists of two tensors, a 2-to-2 disentangler, often called `u`, and a 3-to-1
+isometry, often called `w`.
+
+The type parameters are `ST` for space type, e.g. `ComplexSpace` or `SU2Space`; `ET` for
+element type, e.g. `Complex{Float64}`; and `Tan` for whether this layer is a tangent layer
+or not.  If `Tan = false`, the layer is question is an actual MERA layer. If `Tan = true` it
+consists, instead of the actual tensors, of Stiefel/Grassmann tangent vectors of these
+tensors.
+
+Index numbering convention is as follows, where the physical indices are at the bottom:
+Disentangler:
+```
+ 3|   4|
+ +------+
+ |  u   |
+ +------+
+ 1|   2|
+```
+
+Isometry:
+```
+    4|
+ +-------+
+ |   w   |
+ +-------+
+ 1| 2| 3|
+```
+"""
 struct TernaryLayer{ST, ET, Tan} <: SimpleLayer
+    # Even though the types are here marked as any, they are restricted to be specific,
+    # concrete types dependent on ST, ET and Tan, both in the constructor and in
+    # getproperty.
     disentangler::Any
     isometry::Any
 
@@ -63,9 +82,14 @@ function Base.getproperty(l::TernaryLayer{ST, ET, Tan}, sym::Symbol) where {ST, 
     return getfield(l, sym)::T
 end
 
+"""
+    TernaryMERA{N}
+
+A ternary MERA is a MERA consisting of `TernaryLayer`s.
+"""
 TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 
-# Given an instance of a type like TernaryLayer{TensorMap, TensorMap, TensorMap},
+# Given an instance of a type like TernaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type TernaryLayer.
 layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
@@ -88,9 +112,6 @@ Base.iterate(layer::TernaryLayer, ::Val{1}) = (layer.isometry, Val(2))
 Base.iterate(layer::TernaryLayer, ::Val{2}) = nothing
 Base.length(layer::TernaryLayer) = 2
 
-"""
-The ratio by which the number of sites changes when go down through this layer.
-"""
 scalefactor(::Type{<:TernaryLayer}) = 3
 scalefactor(::Type{TernaryMERA}) = scalefactor(TernaryLayer)
 
@@ -114,20 +135,12 @@ inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
 internalspace(layer::TernaryLayer) = space(layer.isometry, 1)
 internalspace(m::TernaryMERA, depth) = internalspace(get_layer(m, depth))
 
-"""
-Return a new layer where the isometries have been padded with zeros to change the top vector
-space to be V_new.
-"""
 function expand_inputspace(layer::TernaryLayer, V_new)
     u, w = layer
     w = pad_with_zeros_to(w, 4 => V_new')
     return TernaryLayer(u, w)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the bottom vector space to be V_new.
-"""
 function expand_outputspace(layer::TernaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
@@ -135,10 +148,6 @@ function expand_outputspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the internal vector space to be V_new.
-"""
 function expand_internalspace(layer::TernaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
@@ -146,14 +155,6 @@ function expand_internalspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-"""
-Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-The optionalargument `Vint` is the output bond dimension of the disentangler. If
-`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
-it is the identity or the product of two single-site isometries, depending on if `u` is
-supposed to be unitary or isometric. `T` is the data type for the tensors, by default
-`ComplexF64`.
-"""
 function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint=Vout;
                      random_disentangler=false)
     w = randomisometry(T, Vint ⊗ Vout ⊗ Vint, Vin)
@@ -161,10 +162,6 @@ function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint=Vout;
     return TernaryLayer(u, w)
 end
 
-"""
-Return the operator that is the fixed point of the average ascending superoperator of this
-layer, normalised to have norm 1.
-"""
 function ascending_fixedpoint(layer::TernaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
@@ -202,10 +199,6 @@ end
 
 # # # Invariants
 
-"""
-Check the compatibility of the legs connecting the disentanglers and the isometries.
-Return true/false.
-"""
 function space_invar_intralayer(layer::TernaryLayer)
     u, w = layer
     matching_bonds = ((space(u, 3)', space(w, 3)),
@@ -219,10 +212,6 @@ function space_invar_intralayer(layer::TernaryLayer)
     return allmatch
 end
 
-"""
-Check the compatibility of the legs connecting the isometries of the first layer to the
-disentanglers of the layer above it. Return true/false.
-"""
 function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
@@ -290,9 +279,6 @@ function ascend_mid(op::SquareTensorMap{2}, layer::TernaryLayer)
     return scaled_op
 end
 
-"""
-Ascend a twosite `op` from the bottom of the given layer to the top.
-"""
 function ascend(op::SquareTensorMap{2}, layer::TernaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
@@ -347,9 +333,6 @@ function ascend_mid(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S
     return scaled_op
 end
 
-"""
-Ascend a twosite `op` with an extra free leg from the bottom of the given layer to the top.
-"""
 function ascend(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
     u, w = layer
     l = ascend_left(op, layer)
@@ -406,9 +389,6 @@ function descend_mid(rho::SquareTensorMap{2}, layer::TernaryLayer)
     return scaled_rho
 end
 
-"""
-Decend a twosite `rho` from the top of the given layer to the bottom.
-"""
 function descend(rho::SquareTensorMap{2}, layer::TernaryLayer)
     u, w = layer
     l = descend_left(rho, layer)
@@ -420,9 +400,6 @@ end
 
 # # # Optimization
 
-"""
-Compute the environments of all the tensors in the layer, and return them as a Layer.
-"""
 function environment(layer::TernaryLayer, op, rho; vary_disentanglers=true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
@@ -434,11 +411,7 @@ function environment(layer::TernaryLayer, op, rho; vary_disentanglers=true)
     return TernaryLayer(env_u, env_w)
 end
 
-"""
-Return a new layer that minimizes the expectation value with respect to the environment
-`env`.
-"""
-function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer, pars;
+function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer;
                                  vary_disentanglers=true)
     u = (vary_disentanglers ? projectisometric(env.disentangler; alg=Polar())
          : layer.disentangler)
@@ -446,9 +419,6 @@ function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer, pars;
     return TernaryLayer(u, w)
 end
 
-"""
-Return the environment for a disentangler.
-"""
 function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -487,9 +457,6 @@ function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
     return env
 end
 
-"""
-Return the environment for an isometry.
-"""
 function environment_isometry(h::SquareTensorMap{2}, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6

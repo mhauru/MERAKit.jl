@@ -1,24 +1,43 @@
 # BinaryLayer and BinaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
-# # # The core stuff
+"""
+    BinaryLayer{ST, ET, Tan} <: SimpleLayer
 
-# Index numbering convention is as follows, where the physical indices are at the bottom:
-# Disentangler:
-#  3|   4|
-#  +------+
-#  |  u   |
-#  +------+
-#  1|   2|
-#
-# Isometry:
-#    3|
-#  +------+
-#  |  w   |
-#  +------+
-#  1|   2|
+The type for layers of a binary MERA.
 
+Each layer consists of two tensors, a 2-to-2 disentangler, often called `u`, and a 2-to-1
+isometry, often called `w`.
+
+The type parameters are `ST` for space type, e.g. `ComplexSpace` or `SU2Space`; `ET` for
+element type, e.g. `Complex{Float64}`; and `Tan` for whether this layer is a tangent layer
+or not.  If `Tan = false`, the layer is question is an actual MERA layer. If `Tan = true` it
+consists, instead of the actual tensors, of Stiefel/Grassmann tangent vectors of these
+tensors.
+
+Index numbering convention is as follows, where the physical indices are at the bottom:
+Disentangler:
+```
+ 3|   4|
+ +------+
+ |  u   |
+ +------+
+ 1|   2|
+```
+
+Isometry:
+```
+   3|
+ +------+
+ |  w   |
+ +------+
+ 1|   2|
+```
+"""
 struct BinaryLayer{ST, ET, Tan} <: SimpleLayer
+    # Even though the types are here marked as any, they are restricted to be specific,
+    # concrete types dependent on ST, ET and Tan, both in the constructor and in
+    # getproperty.
     disentangler::Any
     isometry::Any
 
@@ -63,9 +82,14 @@ function Base.getproperty(l::BinaryLayer{ST, ET, Tan}, sym::Symbol) where {ST, E
     return getfield(l, sym)::T
 end
 
+"""
+    BinaryMERA{N}
+
+A binary MERA is a MERA consisting of `BinaryLayer`s.
+"""
 BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 
-# Given an instance of a type like BinaryLayer{TensorMap, TensorMap, TensorMap},
+# Given an instance of a type like BinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type BinaryLayer.
 layertype(::BinaryLayer) = BinaryLayer
 layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
@@ -84,9 +108,6 @@ Base.iterate(layer::BinaryLayer, ::Val{1}) = (layer.isometry, Val(2))
 Base.iterate(layer::BinaryLayer, ::Val{2}) = nothing
 Base.length(layer::BinaryLayer) = 2
 
-"""
-The ratio by which the number of sites changes when you go down through this layer.
-"""
 scalefactor(::Type{<:BinaryLayer}) = 2
 scalefactor(::Type{BinaryMERA}) = scalefactor(BinaryLayer)
 
@@ -110,30 +131,18 @@ inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
 internalspace(layer::BinaryLayer) = space(layer.isometry, 1)
 internalspace(m::BinaryMERA, depth) = internalspace(get_layer(m, depth))
 
-"""
-Return a new layer where the isometries have been padded with zeros to change the input
-(top) vector space to be V_new.
-"""
 function expand_inputspace(layer::BinaryLayer, V_new)
     u, w = layer
     w = pad_with_zeros_to(w, 3 => V_new')
     return BinaryLayer(u, w)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the output (bottom) vector space to be V_new.
-"""
 function expand_outputspace(layer::BinaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
     return BinaryLayer(u, w)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the internal vector space to be V_new.
-"""
 function expand_internalspace(layer::BinaryLayer, V_new)
     u, w = layer
     u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
@@ -141,14 +150,6 @@ function expand_internalspace(layer::BinaryLayer, V_new)
     return BinaryLayer(u, w)
 end
 
-"""
-Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-The optionalargument `Vint` is the output bond dimension of the disentangler. If
-`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
-it is the identity or the product of two single-site isometries, depending on if `u` is
-supposed to be unitary or isometric. `T` is the data type for the tensors, by default
-`ComplexF64`.
-"""
 function randomlayer(::Type{BinaryLayer}, T, Vin, Vout, Vint=Vout;
                      random_disentangler=false)
     w = randomisometry(T, Vint ⊗ Vint, Vin)
@@ -156,10 +157,6 @@ function randomlayer(::Type{BinaryLayer}, T, Vin, Vout, Vint=Vout;
     return BinaryLayer(u, w)
 end
 
-"""
-Return the operator that is the fixed point of the average ascending superoperator of this
-layer, normalised to have norm 1.
-"""
 function ascending_fixedpoint(layer::BinaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
@@ -201,10 +198,6 @@ end
 
 # # # Invariants
 
-"""
-Check the compatibility of the legs connecting the disentanglers and the isometries.
-Return true/false.
-"""
 function space_invar_intralayer(layer::BinaryLayer)
     u, w = layer
     matching_bonds = ((space(u, 3)', space(w, 2)),
@@ -218,10 +211,6 @@ function space_invar_intralayer(layer::BinaryLayer)
     return allmatch
 end
 
-"""
-Check the compatibility of the legs connecting the isometries of the first layer to the
-disentanglers of the layer above it. Return true/false.
-"""
 function space_invar_interlayer(layer::BinaryLayer, next_layer::BinaryLayer)
     u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
@@ -259,9 +248,6 @@ function ascend_right(op::SquareTensorMap{3}, layer::BinaryLayer)
     return scaled_op
 end
 
-"""
-Ascend a threesite `op` from the bottom of the given layer to the top.
-"""
 function ascend(op::SquareTensorMap{3}, layer::BinaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
@@ -300,10 +286,6 @@ function ascend_right(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {
     return scaled_op
 end
 
-"""
-Ascend a threesite `op` with an extra free leg from the bottom of the given layer to the
-top.
-"""
 function ascend(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {S1}
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
@@ -347,9 +329,6 @@ function descend_right(rho::SquareTensorMap{3}, layer::BinaryLayer)
     return scaled_rho
 end
 
-"""
-Decend a threesite `rho` from the top of the given layer to the bottom.
-"""
 function descend(rho::SquareTensorMap{3}, layer::BinaryLayer)
     l = descend_left(rho, layer)
     r = descend_right(rho, layer)
@@ -359,9 +338,6 @@ end
 
 # # # Optimization
 
-"""
-Compute the environments of all the tensors in the layer, and return them as a Layer.
-"""
 function environment(layer::BinaryLayer, op, rho; vary_disentanglers=true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
@@ -373,11 +349,7 @@ function environment(layer::BinaryLayer, op, rho; vary_disentanglers=true)
     return BinaryLayer(env_u, env_w)
 end
 
-"""
-Return a new layer that minimizes the expectation value with respect to the environment
-`env`.
-"""
-function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer, pars;
+function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer;
                                  vary_disentanglers=true)
     u = (vary_disentanglers ? projectisometric(env.disentangler; alg=Polar())
          : layer.disentangler)
@@ -385,9 +357,6 @@ function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer, pars;
     return BinaryLayer(u, w)
 end
 
-"""
-Return the environment for a disentangler.
-"""
 function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
     u, w = layer
     @tensor(
@@ -446,9 +415,6 @@ function environment_disentangler(h::SquareTensorMap{1}, layer::BinaryLayer, rho
     return environment_disentangler(h, layer, rho)
 end
 
-"""
-Return the environment for the isometry.
-"""
 function environment_isometry(h::SquareTensorMap{3}, layer, rho)
     u, w = layer
     @tensor(

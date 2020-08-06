@@ -1,32 +1,50 @@
 # ModifiedBinaryLayer and ModifiedBinaryMERA types, and methods thereof.
 # To be `included` in MERA.jl.
 
-# # # The core stuff
+"""
+    ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer
 
-# Index numbering convention is as follows, where the physical indices are at the bottom:
-# Disentangler:
-#  3|   4|
-#  +------+
-#  |  u   |
-#  +------+
-#  1|   2|
-#
-# Isometries:
-#    3|
-#  +------+
-#  |  w   |
-#  +------+
-#  1|   2|
-#
-#  The isometries are called left and right, or wl and wr, and their location is with
-#  respect to the disentangler below them:
-#  |     |
-#  wl   wr
-#  | \ / |
-#  |  u  |
-#  | / \ |
+The type for layers of a modified binary MERA.
 
+Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, and two 2-to-1
+isometries, often called `wl` and `wr`, for left and right. Their relative locations are
+```
+|     |
+wl   wr
+| \\ / |
+|  u  |
+| / \\ |
+```
+
+The type parameters are `ST` for space type, e.g. `ComplexSpace` or `SU2Space`; `ET` for
+element type, e.g. `Complex{Float64}`; and `Tan` for whether this layer is a tangent layer
+or not.  If `Tan = false`, the layer is question is an actual MERA layer. If `Tan = true` it
+consists, instead of the actual tensors, of Stiefel/Grassmann tangent vectors of these
+tensors.
+
+Index numbering convention is as follows, where the physical indices are at the bottom:
+Disentangler:
+```
+ 3|   4|
+ +------+
+ |  u   |
+ +------+
+ 1|   2|
+```
+
+Isometries:
+```
+   3|
+ +------+
+ |  w   |
+ +------+
+ 1|   2|
+```
+"""
 struct ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer
+    # Even though the types are here marked as any, they are restricted to be specific,
+    # concrete types dependent on ST, ET and Tan, both in the constructor and in
+    # getproperty.
     disentangler::Any
     isometry_left::Any
     isometry_right::Any
@@ -76,9 +94,14 @@ function Base.getproperty(l::ModifiedBinaryLayer{ST, ET, Tan}, sym::Symbol
     return getfield(l, sym)::T
 end
 
+"""
+    ModifiedBinaryMERA{N}
+
+A modified binary MERA is a MERA consisting of `ModifiedBinaryLayer`s.
+"""
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 
-# Given an instance of a type like ModifiedBinaryLayer{TensorMap, TensorMap, TensorMap},
+# Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
@@ -93,9 +116,6 @@ Base.iterate(layer::ModifiedBinaryLayer, ::Val{2}) = (layer.isometry_right, Val(
 Base.iterate(layer::ModifiedBinaryLayer, ::Val{3}) = nothing
 Base.length(layer::ModifiedBinaryLayer) = 3
 
-"""
-The ratio by which the number of sites changes when we go down through this layer.
-"""
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
 scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
 
@@ -128,10 +148,6 @@ inputspace(layer::ModifiedBinaryLayer) = space(layer.isometry_left, 3)'
 internalspace(layer::ModifiedBinaryLayer) = space(layer.isometry_right, 1)
 internalspace(m::ModifiedBinaryMERA, depth) = internalspace(get_layer(m, depth))
 
-"""
-Return a new layer where the isometries have been padded with zeros to change the input
-(top) vector space to be V_new.
-"""
 function expand_inputspace(layer::ModifiedBinaryLayer, V_new)
     u, wl, wr = layer
     wl = pad_with_zeros_to(wl, 3 => V_new')
@@ -139,10 +155,6 @@ function expand_inputspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the output (bottom) vector space to be V_new.
-"""
 function expand_outputspace(layer::ModifiedBinaryLayer, V_new)
     u, wl, wr = layer
     u = pad_with_zeros_to(u, 1 => V_new, 2 => V_new)
@@ -151,10 +163,6 @@ function expand_outputspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-"""
-Return a new layer where the disentanglers and isometries have been padded with zeros to
-change the internal vector space to be V_new.
-"""
 function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
     u, wl, wr = layer
     u = pad_with_zeros_to(u, 3 => V_new', 4 => V_new')
@@ -163,14 +171,6 @@ function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-"""
-Return a layer with random tensors, with `Vin` and `Vout` as the input and output spaces.
-The optionalargument `Vint` is the output bond dimension of the disentangler. If
-`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
-it is the identity or the product of two single-site isometries, depending on if `u` is
-supposed to be unitary or isometric. `T` is the data type for the tensors, by default
-`ComplexF64`.
-"""
 function randomlayer(::Type{ModifiedBinaryLayer}, T, Vin, Vout, Vint=Vout;
                      random_disentangler=false)
     wl = randomisometry(T, Vout ⊗ Vint, Vin)
@@ -182,203 +182,12 @@ function randomlayer(::Type{ModifiedBinaryLayer}, T, Vin, Vout, Vint=Vout;
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-# # # ModifiedBinaryOp
-# Due to the structure of the ModifiedBinaryMERA, there's an alternating pattern of two-site
-# translation invariance at each layer. Because of this, every operator at a layer is
-# defined by two tensors, one for each possible position. We create a `struct` for
-# encapsulating this, so that all the necessary operations like trace and matrix product can
-# be defined for such operators. We call the two positions `mid` and `gap`, where `mid`
-# refers to the position that has a disentangler directly below it, and `gap` to the
-# position where the disentangler below is missing.
-
-struct ModifiedBinaryOp{T}
-    mid::T
-    gap::T
-end
-
-ModifiedBinaryOp(op::T) where T = ModifiedBinaryOp{T}(op, op)
-ModifiedBinaryOp(op::ModifiedBinaryOp) = op  # makes some method signatures simpler to write
-Base.convert(::Type{<: ModifiedBinaryOp}, op::AbstractTensorMap) = ModifiedBinaryOp(op)
-
-function Base.convert(::Type{ModifiedBinaryOp{T}}, op::ModifiedBinaryOp) where {T}
-    return ModifiedBinaryOp{T}(convert(T, op.mid), convert(T, op.gap))
-end
-
 function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
                      ) where {ST, ET}
     return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
 end
 operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
-Base.iterate(op::ModifiedBinaryOp) = (op.mid, Val(1))
-Base.iterate(op::ModifiedBinaryOp, state::Val{1}) = (op.gap, Val(2))
-Base.iterate(op::ModifiedBinaryOp, state::Val{2}) = nothing
-Base.length(op::ModifiedBinaryOp) = 2
-
-Base.eltype(op::ModifiedBinaryOp) = promote_type((eltype(x) for x in op)...)
-Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp((deepcopy(x) for x in op)...)
-Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp((x' for x in op)...)
-Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp((imag(x) for x in op)...)
-Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp((real(x) for x in op)...)
-
-function pad_with_zeros_to(op::ModifiedBinaryOp, args...)
-    return ModifiedBinaryOp((pad_with_zeros_to(x, args...) for x in op)...)
-end
-
-function gershgorin_bounds(op::ModifiedBinaryOp)
-    lb_mid, ub_mid = gershgorin_bounds(op.mid)
-    lb_gap, ub_gap = gershgorin_bounds(op.gap)
-    return min(lb_mid, lb_gap), max(ub_mid, ub_gap)
-end
-
-support(op::ModifiedBinaryOp) = support(op.mid)  # Could equally well be op.gap.
-function expand_support(op::ModifiedBinaryOp, n::Integer)
-    mid = expand_support(op.mid, n)
-    gap = expand_support(op.gap, n)
-    return ModifiedBinaryOp(mid, gap)
-end
-
-function Base.similar(op::ModifiedBinaryOp, ::Type{elementT}=eltype(op)) where {elementT}
-    mid = similar(op.mid, elementT)
-    gap = similar(op.gap, elementT)
-    return ModifiedBinaryOp(mid, gap)
-end
-
-TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
-TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
-TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
-
-# TODO This whole thing is very messy and ad hoc, with the interplay of TensorMaps and
-# ModifiedBinaryOps.
-
-# Pass element-wise arithmetic down onto the AbstractTensorMaps. Promote AbstractTensorMaps
-# to ModifiedBinaryOps if necessary.
-for op in (:+, :-, :/, :*)
-    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::ModifiedBinaryOp)
-           = ModifiedBinaryOp(($(op)(xi, yi) for (xi, yi) in zip(x, y))...)))
-    eval(:(Base.$(op)(x::AbstractTensorMap, y::ModifiedBinaryOp) = $(op)(ModifiedBinaryOp(x), y)))
-    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::AbstractTensorMap) = $(op)(x, ModifiedBinaryOp(y))))
-end
-
-Base.:*(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid * a, op.gap * a)
-Base.:*(a::Number, op::ModifiedBinaryOp) = op*a
-Base.:/(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid / a, op.gap / a)
-
-function Base.copyto!(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
-    copyto!(op1.mid, op2.mid)
-    copyto!(op1.gap, op2.gap)
-    return op1
-end
-
-function Base.fill!(op::ModifiedBinaryOp, a::Number)
-    fill!(op.mid, a)
-    fill!(op.gap, a)
-    return op
-end
-
-function LinearAlgebra.dot(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
-    dotmid = dot(op1.mid, op2.mid)
-    dotgap = dot(op1.gap, op2.gap)
-    return (dotmid + dotgap) / 2.0
-end
-
-function LinearAlgebra.dot(op1::ModifiedBinaryOp, t2::AbstractTensorMap)
-    return dot(op1, ModifiedBinaryOp(t2))
-end
-
-function LinearAlgebra.dot(t1::AbstractTensorMap, op2::ModifiedBinaryOp)
-    return dot(ModifiedBinaryOp(t1), op2)
-end
-
-function LinearAlgebra.rmul!(op::ModifiedBinaryOp, a::Number)
-    rmul!(op.mid, a)
-    rmul!(op.gap, a)
-    return op
-end
-
-function LinearAlgebra.lmul!(a::Number, op::ModifiedBinaryOp)
-    lmul!(a, op.mid)
-    lmul!(a, op.gap)
-    return op
-end
-
-function BLAS.axpby!(a::Number, X::ModifiedBinaryOp, b::Number, Y::ModifiedBinaryOp)
-    axpby!(a, X.mid, b, Y.mid)
-    axpby!(a, X.gap, b, Y.gap)
-    return Y
-end
-
-function BLAS.axpby!(a::Number, X::AbstractTensorMap, b::Number, Y::ModifiedBinaryOp)
-    return axpby!(a, ModifiedBinaryOp(X), b, Y)
-end
-
-function BLAS.axpby!(a::Number, X::ModifiedBinaryOp, b::Number, Y::AbstractTensorMap)
-    return axpby!(a, X, b, ModifiedBinaryOp(Y))
-end
-
-function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::ModifiedBinaryOp)
-    axpy!(a, X.mid, Y.mid)
-    axpy!(a, X.gap, Y.gap)
-    return Y
-end
-
-function BLAS.axpy!(a::Number, X::AbstractTensorMap, Y::ModifiedBinaryOp)
-    return axpy!(a, ModifiedBinaryOp(X), Y)
-end
-
-function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::AbstractTensorMap)
-    return axpy!(a, X, ModifiedBinaryOp(Y))
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::ModifiedBinaryOp, B::ModifiedBinaryOp,
-                            α, β)
-    mul!(C.mid, A.mid, B.mid, α, β)
-    mul!(C.gap, A.gap, B.gap, α, β)
-    return C
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::ModifiedBinaryOp, B::Number)
-    mul!(C.mid, A.mid, B)
-    mul!(C.gap, A.gap, B)
-    return C
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::Number, B::ModifiedBinaryOp)
-    mul!(C.mid, A, B.mid)
-    mul!(C.gap, A, B.gap)
-    return C
-end
-
-function LinearAlgebra.mul!(C::AbstractTensorMap, A::ModifiedBinaryOp, B::Number)
-    return mul!(ModifiedBinaryOp(C), A, B)
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::AbstractTensorMap, B::Number)
-    return mul!(C, ModifiedBinaryOp(A), B)
-end
-
-function LinearAlgebra.mul!(C::AbstractTensorMap, A::Number, B::ModifiedBinaryOp)
-    return mul!(ModifiedBinaryOp(C), A, B)
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::Number, B::AbstractTensorMap)
-    return mul!(C, A, ModifiedBinaryOp(B))
-end
-
-LinearAlgebra.tr(op::ModifiedBinaryOp) = (tr(op.mid) + tr(op.gap)) / 2.0
-
-# The entropy of the density matrix is the average over the two different density matrices.
-function densitymatrix_entropy(rho::ModifiedBinaryOp)
-    rho_mid, rho_gap = rho
-    S_mid, S_gap = densitymatrix_entropy(rho_mid), densitymatrix_entropy(rho_gap)
-    S = (S_mid + S_gap) / 2.0
-    return S
-end
-
-"""
-Return the operator that is the fixed point of the average ascending superoperator of this
-layer, normalised to have norm 1.
-"""
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     V = inputspace(layer)
     width = causal_cone_width(typeof(layer))
@@ -422,10 +231,6 @@ end
 
 # # # Invariants
 
-"""
-Check the compatibility of the legs connecting the disentanglers and the isometries.
-Return true/false.
-"""
 function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     matching_bonds = ((space(u, 3)', space(wl, 2)),
@@ -439,10 +244,6 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     return allmatch
 end
 
-"""
-Check the compatibility of the legs connecting the isometries of the first layer to the
-disentanglers of the layer above it. Return true/false.
-"""
 function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     unext, wlnext, wrnext = next_layer
@@ -595,9 +396,6 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     return scaled_op
 end
 
-"""
-Ascend a two-site `op` from the bottom of the given layer to the top.
-"""
 function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
                ) where {S1, T <: AbstractTensorMap{S1,2,3}}
     u, wl, wr = layer
@@ -684,9 +482,6 @@ function descend_between(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     return scaled_rho
 end
 
-"""
-Decend a two-site `rho` from the top of the given layer to the bottom.
-"""
 function descend(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     rho_mid, rho_gap = rho
@@ -706,9 +501,6 @@ end
 
 # # # Optimization
 
-"""
-Compute the environments of all the tensors in the layer, and return them as a Layer.
-"""
 function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers=true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
@@ -721,11 +513,7 @@ function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers=tru
     return ModifiedBinaryLayer(env_u, env_wl, env_wr)
 end
 
-"""
-Return a new layer that minimizes the expectation value with respect to the environment
-`env`.
-"""
-function minimize_expectation_ev(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer, pars;
+function minimize_expectation_ev(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
                                  vary_disentanglers=true)
     u = (vary_disentanglers ?  projectisometric(env.disentangler; alg=Polar())
          : layer.disentangler)
@@ -734,9 +522,6 @@ function minimize_expectation_ev(layer::ModifiedBinaryLayer, env::ModifiedBinary
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-"""
-Return the environment for a disentangler.
-"""
 function environment_disentangler(h::ModifiedBinaryOp, layer::ModifiedBinaryLayer,
                                   rho::ModifiedBinaryOp)
     u, wl, wr = layer
@@ -788,9 +573,6 @@ function environment_disentangler(h::SquareTensorMap{1}, layer::ModifiedBinaryLa
     return environment_disentangler(h, layer, rho)
 end
 
-"""
-Return the environment for the left isometry.
-"""
 function environment_isometry_left(h::ModifiedBinaryOp, layer, rho::ModifiedBinaryOp)
     u, wl, wr = layer
     h_mid, h_gap = h
@@ -855,9 +637,6 @@ function environment_isometry_left(h::SquareTensorMap{1}, layer::ModifiedBinaryL
     return environment_isometry_left(h, layer, rho)
 end
 
-"""
-Return the environment for the right isometry.
-"""
 function environment_isometry_right(h::ModifiedBinaryOp, layer, rho::ModifiedBinaryOp)
     u, wl, wr = layer
     h_mid, h_gap = h

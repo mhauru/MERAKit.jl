@@ -1,4 +1,4 @@
-# The most important types of the package, GenericMERA and Layer, on which all specific MERA
+# The most important type of the package, GenericMERA, on which all specific MERA
 # implementations (binary, ternary, ...) are built. Methods and functions that can be
 # implemented on this level of abstraction, without having to know the details of the
 # specific MERA type.
@@ -12,11 +12,11 @@ whether the MERA is binary, ternary, etc.
 
 On conventions and terminology:
 * The physical indices of the MERA are at the "bottom", the scale invariant part at the
-"top".
-* The counting of layers starts from the bottom, so the layer with physical indices is layer
-1. The last layer is the scale invariant one, that then repeats upwards to infinity.
+  "top".
+* The counting of layers starts from the bottom, so the layer with physical indices is
+  layer 1. The last layer is the scale invariant one, that then repeats upwards to infinity.
 * Each layer is thought of as a linear map from its top, or input space to its bottom, or
-output space.
+  output space.
 
 The type parameters are
 `N`:  The number of distinct layers (N-1 transition layers and one scale invariant one).
@@ -254,18 +254,6 @@ function random_MERA(::Type{T}, ET, Vouts, Vints=Vouts; kwargs...) where T <: Ge
     return m
 end
 
-"""
-    randomlayer(::Type{T <: Layer}, T, Vin, Vout, Vint=Vout; kwargs...)
-
-Return a MERA layer with random tensors.
-
-`T` is the `Layer` type, and `Vin` and `Vout` are the input and output spaces. `Vint` is a
-possible internal vector space for the layer, and `kwargs...` may contain any extra data
-needed, that depends on which layer type this is for. Each subtype of `Layer` should have
-its own method for this function.
-"""
-function randomlayer end
-
 # TODO Should the numbering be changed, so that the bond at `depth` would be the
 # output bond of layer `depth`, instead of input? Would maybe be more consistent.
 # TODO Replace the newdims Dict thing with just a vector space. Or allow for both?
@@ -336,26 +324,6 @@ function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar=tru
     m = replace_layer(m, layer, depth; check_invar=check_invar)
     return m
 end
-
-"""
-    expand_inputspace(layer::Layer, V_new)
-
-Return a new layer where the tensors have been padded with zeros as necessary to change the
-input space to be `V_new`.
-
-Each subtype of `Layer` should have its own method for this function.
-"""
-function expand_inputspace end
-
-"""
-    expand_outputspace(layer::Layer, V_new)
-
-Return a new layer where the tensors have been padded with zeros as necessary to change the
-output space to be `V_new`.
-
-Each subtype of `Layer` should have its own method for this function.
-"""
-function expand_outputspace end
 
 """
     remove_symmetry(m::GenericMERA)
@@ -443,21 +411,6 @@ function space_invar(m::GenericMERA)
     end
     return true
 end
-
-"""
-    space_invar_intralayer(layer::Layer)
-
-Return `true` if the indices within `layer` are compatible with each other, false otherwise.
-"""
-function space_invar_intralayer end
-
-"""
-    space_invar_interlayer(layer::T, next_layer::T) where {T <: Layer}
-
-Return true if the indices between the two layers are compatible with each other,
-false otherwise. `layer` is below `next_layer`.
-"""
-function space_invar_interlayer end
 
 # # # Scaling superoperators
 
@@ -928,7 +881,7 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
             for i in 1:pars[:ev_layer_iters]
                 env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
                 layer = get_layer(m, l)
-                new_layer = minimize_expectation_ev(layer, env, pars;
+                new_layer = minimize_expectation_ev(layer, env;
                                                     vary_disentanglers=vary_disentanglers)
                 m = replace_layer(m, new_layer, l)
             end

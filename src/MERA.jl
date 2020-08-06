@@ -12,6 +12,8 @@ using LinearAlgebra
 using Logging
 
 export GenericMERA
+export Layer
+export SimpleLayer
 export TernaryMERA
 export BinaryMERA
 export ModifiedBinaryMERA
@@ -27,6 +29,7 @@ export fixedpoint_densitymatrix
 export environment
 export remove_symmetry
 export layertype
+export operatortype
 export get_layer
 export get_disentangler
 export get_isometry
@@ -68,6 +71,7 @@ include("genericmera.jl")
 include("simplelayer.jl")
 include("ternarylayer.jl")
 include("binarylayer.jl")
+include("modifiedbinaryop.jl")
 include("modifiedbinarylayer.jl")
 
 end  # module
