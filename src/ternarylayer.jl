@@ -117,19 +117,6 @@ Base.length(layer::TernaryLayer) = 2
 scalefactor(::Type{<:TernaryLayer}) = 3
 scalefactor(::Type{TernaryMERA}) = scalefactor(TernaryLayer)
 
-get_disentangler(m::TernaryMERA, depth) = get_layer(m, depth).disentangler
-get_isometry(m::TernaryMERA, depth) = get_layer(m, depth).isometry
-
-function set_disentangler!(m::TernaryMERA, u, depth; kwargs...)
-    w = get_isometry(m, depth)
-    return set_layer!(m, (u, w), depth; kwargs...)
-end
-
-function set_isometry!(m::TernaryMERA, w, depth; kwargs...)
-    u = get_disentangler(m, depth)
-    return set_layer!(m, (u, w), depth; kwargs...)
-end
-
 causal_cone_width(::Type{<:TernaryLayer}) = 2
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)

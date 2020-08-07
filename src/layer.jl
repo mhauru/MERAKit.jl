@@ -22,6 +22,35 @@ Each subtype of `Layer` should have its own method for this function.
 function randomlayer end
 
 """
+    outputspace(layer::Layer)
+
+Return the vector space of the downwards-pointing (towards the physical level) indices of
+`layer.
+
+See also: [`inputspace`](@ref), [`internalspace`](@ref)
+"""
+function outputspace end
+
+"""
+    inputspace(layer::Layer)
+
+Return the vector space of the upwards-pointing (towards the scale invariance) indices of
+`layer.
+
+See also: [`outputspace`](@ref), [`internalspace`](@ref)
+"""
+function inputspace end
+
+"""
+    internalspace(layer::Layer)
+
+Return the internal vector space of `layer.
+
+See also: [`outputspace`](@ref),  [`inputspace`](@ref)
+"""
+function internalspace end
+
+"""
     expand_inputspace(layer::Layer, V_new)
 
 Return a new layer where the tensors have been padded with zeros as necessary to change the

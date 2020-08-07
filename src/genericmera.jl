@@ -956,6 +956,14 @@ function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     return GenericMERA(layers)
 end
 
+"""
+    inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA; metric=:euclidean)
+
+Given two tangent MERAs `m1` and `m2`, both at base point `m`, compute their inner product.
+This means the sum of the inner products of the individual tensors.
+
+See `TensorKitManifolds.inner` for more details.
+"""
 function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
                                   metric=:euclidean)
     n = max(num_translayers(m1), num_translayers(m2)) + 1
@@ -1015,6 +1023,20 @@ function precondition_tangent(m::GenericMERA, tan::GenericMERA, pars::NamedTuple
     return tan_prec
 end
 
+"""
+    retract(m::GenericMERA, mtan::GenericMERA, alpha::Real; kwargs...)
+
+Given a "tangent MERA" `mtan`, at base point `m`, retract in the direction of `mtan` by
+distance `alpha`. This is done tensor-by-tensor, i.e. each tensor is retracted along its
+respective Stiefel/Grassmann tangent.
+
+The additional keyword argument are passed on to the respective `TensorKitManifolds`
+function.
+
+See `TensorKitManifolds.retract` for more details.
+
+See also: [`transport!`](@ref)
+"""
 function TensorKitManifolds.retract(m::T1, mtan::T2, alpha::Real; kwargs...
                                    ) where {T1 <: GenericMERA, T2 <: GenericMERA}
     layers, layers_tan = zip((retract(l, ltan, alpha; kwargs...)
@@ -1025,9 +1047,25 @@ function TensorKitManifolds.retract(m::T1, mtan::T2, alpha::Real; kwargs...
     return T1(layers), T2(layers_tan)
 end
 
+"""
+    transport!(mvec::GenericMERA, m::GenericMERA, mtan::GenericMERA, alpha::Real,
+               mend::GenericMERA; kwargs...)
+
+Given a "tangent MERAs" `mtan` and `mvec`, at base point `m`, transport `mvec` in the
+direction of `mtan` by distance `alpha`. This is done tensor-by-tensor, i.e. each tensor is
+transported along its respective Stiefel/Grassmann tangent.
+
+`mend` is the endpoint on the manifold, i.e. the result of retracting by `alpha` in the
+direction of `mtan`. The additional keyword argument are passed on to the respective
+`TensorKitManifolds` function.
+
+See `TensorKitManifolds.transport!` for more details.
+
+See also: [`retract`](@ref)
+"""
 function TensorKitManifolds.transport!(mvec::T2, m::T1, mtan::T2, alpha::Real, mend::T1;
-                                       kwargs...) where {T1 <: GenericMERA, T2 <:
-                                                         GenericMERA}
+                                       kwargs...) where {T1 <: GenericMERA,
+                                                         T2 <: GenericMERA}
     layers = (transport!(lvec, l, ltan, alpha, lend; kwargs...)
               for (lvec, l, ltan, lend)
               in zip(mvec.layers, m.layers, mtan.layers, mend.layers))

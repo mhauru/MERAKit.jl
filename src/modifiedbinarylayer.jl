@@ -129,28 +129,6 @@ Base.length(layer::ModifiedBinaryLayer) = 3
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
 scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
 
-get_disentangler(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).disentangler
-get_isometry_left(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).isometry_left
-get_isometry_right(m::ModifiedBinaryMERA, depth) = get_layer(m, depth).isometry_right
-
-function set_disentangler!(m::ModifiedBinaryMERA, u, depth; kwargs...)
-    wl = get_isometry_left(m, depth)
-    wr = get_isometry_right(m, depth)
-    return set_layer!(m, (u, wl, wr), depth; kwargs...)
-end
-
-function set_isometry_left!(m::ModifiedBinaryMERA, wl, depth; kwargs...)
-    u = get_disentangler(m, depth)
-    wr = get_isometry_right(m, depth)
-    return set_layer!(m, (u, wl, wr), depth; kwargs...)
-end
-
-function set_isometry_right!(m::ModifiedBinaryMERA, wr, depth; kwargs...)
-    u = get_disentangler(m, depth)
-    wl = get_isometry_left(m, depth)
-    return set_layer!(m, (u, wl, wr), depth; kwargs...)
-end
-
 causal_cone_width(::Type{<:ModifiedBinaryLayer}) = 2
 
 outputspace(layer::ModifiedBinaryLayer) = space(layer.disentangler, 1)
