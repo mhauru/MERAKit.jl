@@ -56,7 +56,6 @@ export depseudoserialize
 export projectisometric
 export projectisometric!
 export reset_storage
-export reset_operator_storage!
 export tensorwise_sum
 export tensorwise_scale
 export gradient
