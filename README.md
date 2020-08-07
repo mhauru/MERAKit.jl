@@ -1,9 +1,9 @@
 # MERA.jl
 [![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
 
-MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. It only implements infinite, translation invariant MERAs. At the moment it has implementations of ternary, binary, and modified binary MERAs, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions. An implementation is provided of the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal, or EV, algorithm. Work is also ongoing on gradient based optimization methods. MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
+MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. At the moment it only implements infinite, translation invariant MERAs. It has implementations of ternary, binary, and modified binary MERAs, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions. Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient based optimization methods](https://arxiv.org/abs/2007.03638). MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
 
-MERA.jl remains in active development as of April 2020.
+MERA.jl remains in active development as of August 2020.
 
 ## Usage
 
