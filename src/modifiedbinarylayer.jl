@@ -100,11 +100,21 @@ end
 A modified binary MERA is a MERA consisting of `ModifiedBinaryLayer`s.
 """
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
+Base.show(io::IO, ::Type{ModifiedBinaryMERA}) = print(io, "ModifiedBinaryMERA")
+function Base.show(io::IO, ::Type{ModifiedBinaryMERA{N}}) where {N}
+    return print(io, "ModifiedBinaryMERA{($N)}")
+end
 
 # Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
+
+function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
+                     ) where {ST, ET}
+    return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
+end
+operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 Base.eltype(l::ModifiedBinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
@@ -181,12 +191,6 @@ function randomlayer(::Type{ModifiedBinaryLayer}, T, Vin, Vout, Vint=Vout;
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
 end
-
-function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
-                     ) where {ST, ET}
-    return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
-end
-operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     V = inputspace(layer)

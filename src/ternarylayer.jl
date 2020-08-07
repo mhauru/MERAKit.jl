@@ -88,6 +88,8 @@ end
 A ternary MERA is a MERA consisting of `TernaryLayer`s.
 """
 TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
+Base.show(io::IO, ::Type{TernaryMERA}) = print(io, "TernaryMERA")
+Base.show(io::IO, ::Type{TernaryMERA{N}}) where {N} = print(io, "TernaryMERA{($N)}")
 
 # Given an instance of a type like TernaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type TernaryLayer.

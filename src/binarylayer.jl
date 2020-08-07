@@ -88,6 +88,8 @@ end
 A binary MERA is a MERA consisting of `BinaryLayer`s.
 """
 BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
+Base.show(io::IO, ::Type{BinaryMERA}) = print(io, "BinaryMERA")
+Base.show(io::IO, ::Type{BinaryMERA{N}}) where {N} = print(io, "BinaryMERA{($N)}")
 
 # Given an instance of a type like BinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type BinaryLayer.
