@@ -171,18 +171,41 @@ e.g. I ⊗ op and op ⊗ I, are averaged over.
 
 See also: [`support`](@ref)
 """
-function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
-    V = space(op, 1)
-    eye = id(V)
-    op_support = N
-    while op_support < n
-        opeye = op ⊗ eye
-        eyeop = eye ⊗ op
-        op = (opeye + eyeop)/2
-        op_support += 1
+# function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
+#     V = space(op, 1)
+#     eye = id(V)
+#     op_support = N
+#     while op_support < n
+#         opeye = op ⊗ eye
+#         eyeop = eye ⊗ op
+#         op = (opeye + eyeop)/2
+#         op_support += 1
+#     end
+#     return op
+# end
+@inline expand_support(op::SquareTensorMap, n::Int) = _expand_support(op, Val(n))
+@noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N,n}
+    if n <= N
+        return op
+    else
+        dom = ProductSpace(ntuple(i->space(op, 1), n)...)
+        op2 = fill!(similar(op, dom, dom), 0)
+        V = space(op, 1)
+        eye = id(V)
+        for k = 0:n-N
+            eyes1 = Base.fill_to_length((), eye, Val(k))
+            eyes2 = Base.fill_to_length((), eye, Val(n-N-k))
+            coeff = factorial(n-N)/(factorial(k)*factorial(n-N-k)) / 2^(n-N)
+            axpy!(coeff, ⊗(eyes1..., op, eyes2...), op2)
+            # axpy!(1/(n-N+1), ⊗(eyes1..., op, eyes2...), op2) # this would generate the uniform sum
+        end
+        return op2
     end
-    return op
 end
+# TODO: The above generates, for e.g. op acting on 1 site, and n = 4
+# (1 ⊗ 1 ⊗ 1 ⊗ op + 3 * (1 ⊗ 1 ⊗ op ⊗ 1) + 3 * (1 ⊗ op ⊗ 1 ⊗ 1) + op ⊗ 1 ⊗ 1 ⊗ 1) / 8
+# Was this intended or was
+# (1 ⊗ 1 ⊗ 1 ⊗ op + 1 ⊗ 1 ⊗ op ⊗ 1 + 1 ⊗ op ⊗ 1 ⊗ 1 + op ⊗ 1 ⊗ 1 ⊗ 1) / 4 intended
 
 """
     remove_symmetry(V)
