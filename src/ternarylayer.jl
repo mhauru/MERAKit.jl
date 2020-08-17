@@ -97,7 +97,7 @@ layertype(::TernaryLayer) = TernaryLayer
 layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
 function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
-    return tensortype(ST, Val(2), Val(2), ET)
+    return tensormaptype(ST, 2, 2, ET)
 end
 operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 

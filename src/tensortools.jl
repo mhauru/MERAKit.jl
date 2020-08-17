@@ -32,21 +32,21 @@ Tangent = Union{Grassmann.GrassmannTangent, Stiefel.StiefelTangent, Unitary.Unit
 #     return copyto!(similar(t, E1), t)
 # end
 
-"""
-    tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET})
-
-Given the `IndexSpace` type `ST`, number of codomain (`N1`) and domain (`N2`) indices, and
-storage type `ET` (typically `Matrix{M}` for some M <: Number`), return the corresponding
-concrete `TensorMap` type.
-"""
-function tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET}) where {ST, N1, N2, ET}
-    G = sectortype(ST)
-    A = G === Trivial ? Matrix{ET} : TensorKit.SectorDict{G, Matrix{ET}}
-    staticN1, staticN2 = TupleTools.StaticLength{N1}(), TupleTools.StaticLength{N2}()
-    F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN1)
-    F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN2)
-    return TensorMap{ST, N1, N2, G, A, F1, F2}
-end
+# """
+#     tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET})
+#
+# Given the `IndexSpace` type `ST`, number of codomain (`N1`) and domain (`N2`) indices, and
+# storage type `ET` (typically `Matrix{M}` for some M <: Number`), return the corresponding
+# concrete `TensorMap` type.
+# """
+# function tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET}) where {ST, N1, N2, ET}
+#     G = sectortype(ST)
+#     A = G === Trivial ? Matrix{ET} : TensorKit.SectorDict{G, Matrix{ET}}
+#     staticN1, staticN2 = TupleTools.StaticLength{N1}(), TupleTools.StaticLength{N2}()
+#     F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN1)
+#     F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN2)
+#     return TensorMap{ST, N1, N2, G, A, F1, F2}
+# end
 
 """
     disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool)
@@ -58,9 +58,9 @@ false`) or the corresponding tangent type, i.e. a `StiefelTangent`.
 See also: [`ternaryisometry_type`](@ref), [`binaryisometry_type`](@ref)
 """
 function disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(2), Val(2), ET)
+    TensorType = tensormaptype(ST, 2, 2, ET)
     if Tan
-        TA = tensortype(ST, Val(2), Val(2), ET)
+        TA = tensormaptype(ST, 2, 2, ET)
         DisType = Stiefel.StiefelTangent{TensorType, TA}
     else
         DisType = TensorType
@@ -78,11 +78,11 @@ false`) or the corresponding tangent type, i.e. a `GrassmannTangent`.
 See also: [`disentangler_type`](@ref), [`binaryisometry_type`](@ref)
 """
 function ternaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(3), Val(1), ET)
+    TensorType = tensormaptype(ST, 3, 1, ET)
     if Tan
-        TU = tensortype(ST, Val(3), Val(1), ET)
-        TS = tensortype(ST, Val(1), Val(1), real(ET))
-        TV = tensortype(ST, Val(1), Val(1), ET)
+        TU = tensormaptype(ST, 3, 1, ET)
+        TS = tensormaptype(ST, 1, 1, real(ET))
+        TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
         IsoType = TensorType
@@ -100,11 +100,11 @@ false`) or the corresponding tangent type, i.e. a `GrassmannTangent`.
 See also: [`disentangler_type`](@ref), [`ternaryinaryisometry_type`](@ref)
 """
 function binaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(2), Val(1), ET)
+    TensorType = tensormaptype(ST, 2, 1, ET)
     if Tan
-        TU = tensortype(ST, Val(2), Val(1), ET)
-        TS = tensortype(ST, Val(1), Val(1), real(ET))
-        TV = tensortype(ST, Val(1), Val(1), ET)
+        TU = tensormaptype(ST, 2, 1, ET)
+        TS = tensormaptype(ST, 1, 1, real(ET))
+        TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
         IsoType = TensorType

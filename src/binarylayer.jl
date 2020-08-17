@@ -97,7 +97,7 @@ layertype(::BinaryLayer) = BinaryLayer
 layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
 function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
-    return tensortype(ST, Val(3), Val(3), ET)
+    return tensormaptype(ST, 3, 3, ET)
 end
 operatortype(::Type{BinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
@@ -357,7 +357,7 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
             u'[7 12; 3 4] * u'[11 19; 13 -2] *
             w'[17; 5 7] * w'[18; 12 11] * w'[10; 19 8]
            )
-                
+
     @tensor(
             env2[-1 -2; -3 -4] :=
             rho[3 10 5; 4 15 6] *
@@ -367,7 +367,7 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
             u'[13 14; 12 18] * u'[16 17; 7 8] *
             w'[4; 1 13] * w'[15; 14 16] * w'[6; 17 2]
            )
-                
+
     @tensor(
             env3[-1 -2; -3 -4] :=
             rho[5 10 3; 6 15 4] *
@@ -415,7 +415,7 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
             u'[7 14; 4 3] * u'[13 20; 12 11] *
             w'[16; 5 7] * w'[15; 14 13] * w'[19; 20 -2]
            )
-                
+
     @tensor(
             env2[-1 -2; -3] :=
             rho[16 15 -3; 18 17 19] *
@@ -481,4 +481,3 @@ function environment_isometry(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_isometry(h, layer, rho)
 end
-

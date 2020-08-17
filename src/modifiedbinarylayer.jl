@@ -112,7 +112,7 @@ layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
 
 function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
                      ) where {ST, ET}
-    return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
+    return ModifiedBinaryOp{tensormaptype(ST, 2, 2, ET)}
 end
 operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
@@ -682,4 +682,3 @@ function environment_isometry_right(h::SquareTensorMap{1}, layer::ModifiedBinary
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_right(h, layer, rho)
 end
-
