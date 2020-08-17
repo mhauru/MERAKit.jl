@@ -12,25 +12,25 @@ A `Union` type of the different `TensorKitManifolds` tangent types: `GrassmannTa
 """
 Tangent = Union{Grassmann.GrassmannTangent, Stiefel.StiefelTangent, Unitary.UnitaryTangent}
 
-# TODO These belong in TensorKit
-Base.convert(::Type{TensorMap}, t::TensorKit.AdjointTensorMap) = copy(t)
-function Base.convert(::Type{TensorMap{S, N1, N2, G, A, F1, F2}},
-                      t::TensorKit.AdjointTensorMap{S, N1, N2, G, A, F1, F2}
-                     ) where {S, N1, N2, G, A, F1, F2}
-    return convert(TensorMap, t)
-end
-
-function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
-                      t::TensorMap{S, N1, N2, G, Matrix{E2}, F1, F2}
-                     ) where {S, N1, N2, G, E1, E2, F1, F2}
-    return copyto!(similar(t, E1), t)
-end
-
-function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
-                      t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
-                     ) where {S, N1, N2, G, E1, E2, F1, F2}
-    return copyto!(similar(t, E1), t)
-end
+# TODO These belong in TensorKit => should be done now
+# Base.convert(::Type{TensorMap}, t::TensorKit.AdjointTensorMap) = copy(t)
+# function Base.convert(::Type{TensorMap{S, N1, N2, G, A, F1, F2}},
+#                       t::TensorKit.AdjointTensorMap{S, N1, N2, G, A, F1, F2}
+#                      ) where {S, N1, N2, G, A, F1, F2}
+#     return convert(TensorMap, t)
+# end
+#
+# function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
+#                       t::TensorMap{S, N1, N2, G, Matrix{E2}, F1, F2}
+#                      ) where {S, N1, N2, G, E1, E2, F1, F2}
+#     return copyto!(similar(t, E1), t)
+# end
+#
+# function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
+#                       t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
+#                      ) where {S, N1, N2, G, E1, E2, F1, F2}
+#     return copyto!(similar(t, E1), t)
+# end
 
 """
     tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET})
