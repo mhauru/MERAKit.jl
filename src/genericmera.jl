@@ -251,8 +251,9 @@ See also: [`randomlayer`](@ref)
 function random_MERA(::Type{T}, ET, Vouts, Vints=Vouts; kwargs...) where T <: GenericMERA
     L = layertype(T)
     Vins = tuple(Vouts[2:end]..., Vouts[end])
-    layers = tuple((randomlayer(L, ET, Vin, Vout, Vint; kwargs...)
-                    for (Vin, Vout, Vint) in zip(Vins, Vouts, Vints))...)
+    layers = ntuple(length(Vouts)) do i
+        randomlayer(L, ET, Vins[i], Vouts[i], Vints[i]; kwargs...)
+    end
     m = GenericMERA(layers)
     return m
 end
