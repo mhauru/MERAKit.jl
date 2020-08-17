@@ -223,10 +223,9 @@ Strip an `AbstractTensorMap` of its internal symmetries, and return the correspo
 `TensorMap` that operators on `ComplexSpace` or `CartesianSpace`.
 """
 function remove_symmetry(t::TensorMap)
-    domain_nosym = ⊗((remove_symmetry(x) for x in domain(t))...)
-    codomain_nosym = ⊗((remove_symmetry(x) for x in codomain(t))...)
-    t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
-    t_nosym.data[:] = convert(Array, t)
+    domain_nosym = map(remove_symmetry, domain(t))
+    codomain_nosym = map(remove_symmetry, codomain(t))
+    t_nosym = TensorMap(convert(Array, t), codomain_nosym ← domain_nosym)
     return t_nosym
 end
 
