@@ -89,7 +89,8 @@ end
 
 Return the type of the layers of the MERA.
 """
-layertype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = LT
+layertype(m::GenericMERA) = layertype(typeof(m))
+# typical Julia paradigm, not sure if this is better or equal for inference
 layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
@@ -103,7 +104,7 @@ Return the type of operator associate with this MERA or MERA type. That means th
 operator that fits in the causal cone, and is naturally emerges as one ascends local
 operators.
 """
-operatortype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = OT
+operatortype(m::GenericMERA) = operatortype(typeof(m))
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 
@@ -113,6 +114,7 @@ operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 The ratio by which the number of sites changes when one descends by one layer, e.g. 2 for
 binary MERA, 3 for ternary.
 """
+scalefactor(m::GenericMERA) = scalefactor(typeof(m))
 scalefactor(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = scalefactor(LT)
 scalefactor(::Type{GenericMERA{M, LT, OT} where M}) where {LT, OT} = scalefactor(LT)
 
@@ -131,7 +133,8 @@ end
 Return the number of transition layers, i.e. layers below the scale invariant one, in the
 MERA.
 """
-num_translayers(m::GenericMERA{N, LT}) where {N, LT} = N-1
+num_translayers(m::GenericMERA) = num_translayers(typeof(m))
+num_translayers(::Type{<:GenericMERA{N}}) where {N} = N-1
 
 """
     get_layer(m::GenericMERA, depth)
@@ -177,8 +180,8 @@ end
 
 Project all the tensors of the MERA to respect the isometricity condition.
 """
-function TensorKitManifolds.projectisometric(m::T) where T <: GenericMERA
-    return T((projectisometric(x) for x in m.layers))
+function TensorKitManifolds.projectisometric(m::GenericMERA)
+    return typeof(m)(map(projectisometric, m.layers))
 end
 
 """
@@ -186,8 +189,8 @@ end
 
 Project all the tensors of the MERA to respect the isometricity condition, in place.
 """
-function TensorKitManifolds.projectisometric!(m::T) where T <: GenericMERA
-    return T((projectisometric!(x) for x in m.layers))
+function TensorKitManifolds.projectisometric!(m::GenericMERA)
+    return typeof(m)(map(projectisometric!, m.layers))
 end
 
 """
@@ -225,7 +228,7 @@ end
 
 Reset cached operators, so that they will be recomputed when they are needed.
 """
-reset_storage(m::T) where {T <: GenericMERA} = T(m.layers, typeof(m.cache)())
+reset_storage(m::GenericMERA) = typeof(m)(m.layers, typeof(m.cache)())
 
 # # # Generating random MERAs
 
