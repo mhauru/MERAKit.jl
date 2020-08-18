@@ -38,16 +38,17 @@ mutable struct MERACache{N, LT <: Layer, OT}
     # LT stands for Layer Type, OT for Operator Type.
     # TODO Should we use NTuple{N}s instead for densitymatrices and environments?
     densitymatrices::Vector{Union{Nothing, OT}}
-    operators::Dict{Any, Vector{OT}}
-    environments::Dict{Any, Vector{Union{Nothing, LT}}}
+    # probably a better choice to use IdDicts here
+    operators::IdDict{Any, Vector{OT}}
+    environments::IdDict{Any, Vector{Union{Nothing, LT}}}
     previous_fixedpoint_densitymatrix::Union{Nothing, OT}
     previous_operatorsum::Union{Nothing, OT}
 
     function MERACache{N, LT, OT}() where {N, LT, OT}
         @assert OT === operatortype(LT)
-        densitymatrices = Vector{Union{Nothing, OT}}(repeat([nothing], N))
-        operators = Dict{Any, Vector{OT}}()
-        environments = Dict{Any, Vector{Union{LT}}}()
+        densitymatrices = Vector{Union{Nothing, OT}}(fill(nothing, N))
+        operators = IdDict{Any, Vector{OT}}()
+        environments = IdDict{Any, Vector{Union{LT}}}()
         previous_fixedpoint_densitymatrix = nothing
         previous_operatorsum = nothing
         new{N, LT, OT}(densitymatrices, operators, environments,
@@ -61,9 +62,13 @@ function MERACache{N, LT}() where {N, LT}
     return MERACache{N, LT, OT}()
 end
 
-operatortype(c::MERACache{N, LT, OT}) where {N, LT, OT} = OT
-layertype(c::MERACache{N, LT, OT}) where {N, LT, OT} = LT
-causal_cone_width(c::MERACache) = causal_cone_width(layertype(c))
+operatortype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = OT
+layertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = LT
+causal_cone_width(C::Type{<:MERACache}) = causal_cone_width(layertype(C))
+
+operatortype(c::MERACache) = operatortype(typeof(c))
+layertype(c::MERACache) = layertype(typeof(c))
+causal_cone_width(c::MERACache) = causal_cone_width(typeof(c))
 
 function Base.copy!(dst::MERACache, src::MERACache)
     dst.densitymatrices = copy(src.densitymatrices)
@@ -88,13 +93,15 @@ Base.copy(c::MERACache) = copy!(typeof(c)(), c)
 Create a new `MERACache` that has all the stored pieces removed that are invalidated by
 changing the layer at `depth`.
 """
-function replace_layer(c::MERACache{N}, depth) where N
+replace_layer(c::MERACache, depth) = replace_layer!(copy(c), depth)
+
+function replace_layer!(c::MERACache{N}, depth) where N
     c = copy(c)
     depth = Int(min(N, depth))
     c.densitymatrices[1:depth] .= nothing
-    for (k, v) in c.operators
+    for v in values(c.operators)
         last_index = min(depth, length(v))
-        c.operators[k] = v[1:last_index]
+        delete!(v, last_index+1:length(v))
     end
     # Changing anything always invalidates all environments, since they depend on things
     # both above and below.
@@ -136,7 +143,8 @@ See also: [`set_stored_densitymatrix!`](@ref), [`has_densitymatrix_stored`](@ref
 function get_stored_densitymatrix(c::MERACache{N}, depth) where N
     depth = Int(min(N, depth))
     rho = c.densitymatrices[depth]
-    return rho::operatortype(c)
+    @assert rho !== nothing
+    return rho#::operatortype(c)
 end
 
 """
@@ -157,9 +165,9 @@ end
 Return the cached ascended versions of `op`. Initialize the cache for `op` if necessary.
 """
 function operator_storage!(c::MERACache{N, LT, OT}, op) where {N, LT, OT}
-    if !(op in keys(c.operators))
+    if !haskey(c.operators, op)
         op_conv = convert(OT, expand_support(op, causal_cone_width(c)))
-        c.operators[op] = Vector{OT}([op_conv])
+        c.operators[op] = [op_conv]
     end
     return c.operators[op]
 end
@@ -224,10 +232,7 @@ end
 Reset storage for all operators.
 """
 function reset_operator_storage!(c::MERACache)
-    ops = keys(c.operators)
-    for op in ops
-        reset_operator_storage!(c, op)
-    end
+    empty!(c.operators)
     return c
 end
 
@@ -237,7 +242,7 @@ end
 Return the environments related to `op`. Initialize the storage `Vector` if necessary.
 """
 function environment_storage!(c::MERACache{N}, op) where N
-    if !(op in keys(c.environments))
+    if !haskey(c.environments, op)
         c.environments[op] = repeat(Union{Nothing, operatortype(c)}[nothing], N)
     end
     return c.environments[op]
@@ -265,7 +270,9 @@ See also: [`set_stored_environment!`](@ref), [`has_environment_stored`](@ref)
 """
 function get_stored_environment(c::MERACache, op, depth)
     storage = environment_storage!(c, op)
-    return storage[depth]::layertype(c)
+    env = storage[depth]
+    @assert env !== nothing
+    return env
 end
 
 """
@@ -287,10 +294,7 @@ end
 Reset storage for environments.
 """
 function reset_environment_storage!(c::MERACache)
-    ops = keys(c.environments)
-    for op in ops
-        delete!(c.environments, op)
-    end
+    empty!(c.environments)
     return c
 end
 
