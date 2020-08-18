@@ -88,15 +88,12 @@ end
 A binary MERA is a MERA consisting of `BinaryLayer`s.
 """
 BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
+layertype(::Type{BinaryMERA}) = BinaryLayer
 #Base.show(io::IO, ::Type{BinaryMERA}) = print(io, "BinaryMERA")
 #Base.show(io::IO, ::Type{BinaryMERA{N}}) where {N} = print(io, "BinaryMERA{($N)}")
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
 _tuple(layer::BinaryLayer) = (layer.disentangler, layer.isometry)
-
-# Given an instance of a type like BinaryLayer{ComplexSpace, Float64, true},
-# return the unparametrised type BinaryLayer.
-layertype(::BinaryLayer) = BinaryLayer
 
 function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
     return tensormaptype(ST, 3, 3, ET)

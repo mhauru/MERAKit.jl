@@ -100,6 +100,7 @@ end
 A modified binary MERA is a MERA consisting of `ModifiedBinaryLayer`s.
 """
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
+layertype(::Type{ModifiedBinaryMERA}) = ModifiedBinaryLayer
 #Base.show(io::IO, ::Type{ModifiedBinaryMERA}) = print(io, "ModifiedBinaryMERA")
 #function Base.show(io::IO, ::Type{ModifiedBinaryMERA{N}}) where {N}
 #    return print(io, "ModifiedBinaryMERA{($N)}")
@@ -108,10 +109,6 @@ ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 _tuple(layer::ModifiedBinaryLayer) =
     (layer.disentangler, layer.isometry_left, layer.isometry_right)
-
-# Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
-# return the unparametrised type ModifiedBinaryLayer.
-layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
 
 function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
                      ) where {ST, ET}

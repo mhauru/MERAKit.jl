@@ -88,16 +88,13 @@ end
 A ternary MERA is a MERA consisting of `TernaryLayer`s.
 """
 TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
+layertype(::Type{TernaryMERA}) = TernaryLayer
 #Base.show(io::IO, ::Type{TernaryMERA}) = print(io, "TernaryMERA")
 #Base.show(io::IO, ::Type{TernaryMERA{N}}) where {N} = print(io, "TernaryMERA{($N)}")
 
 # Implement the iteration and indexing interfaces.
 _tuple(layer::TernaryLayer) =
     (layer.disentangler, layer.isometry)
-
-# Given an instance of a type like TernaryLayer{ComplexSpace, Float64, true},
-# return the unparametrised type TernaryLayer.
-layertype(::TernaryLayer) = TernaryLayer
 
 function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
     return tensormaptype(ST, 2, 2, ET)
