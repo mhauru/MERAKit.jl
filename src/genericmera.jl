@@ -336,7 +336,7 @@ Given a MERA which may possibly be built of symmetry preserving `TensorMap`s, re
 another, equivalent MERA that has the symmetry structure stripped from it, and all tensors
 are dense.
 """
-remove_symmetry(m::GenericMERA) = GenericMERA((remove_symmetry(x) for x in m.layers))
+remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
 
 # # # Pseudo(de)serialization
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
@@ -359,7 +359,7 @@ written and read from e.g. disk, without having to worry about quirks of the typ
 See also: [`depseudoserialize`](@ref)
 """
 function pseudoserialize(m::T) where T <: GenericMERA
-    return (repr(T), tuple((pseudoserialize(x) for x in m.layers)...))
+    return (repr(T), map(pseudoserialize, m.layers))
 end
 
 """
