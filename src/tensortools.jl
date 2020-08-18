@@ -123,12 +123,7 @@ The implementation uses a QR decomposition of a Gaussian random matrix.
 function randomisometry(::Type{T}, Vout, Vin) where {T}
     temp = TensorMap(randn, T, Vout ← Vin)
     q, r = leftorth(temp)
-<<<<<<< HEAD
-    iso = isomorphism(domain(q), Vin)
-    u = q * iso
-=======
     u = q * isomorphism(storagetype(q), domain(q), Vin)
->>>>>>> stabilize randonisometry and initialize_disentangler
     return u
 end
 
