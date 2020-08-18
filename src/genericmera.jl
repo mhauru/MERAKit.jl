@@ -102,6 +102,9 @@ operators.
 """
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
+# we could also just do:
+# operatortype(M::Type{<:GenericMERA}) = operatortype(layertype(M))
+
 
 """
     scalefactor(::Type{<: GenericMERA})
