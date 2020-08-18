@@ -429,9 +429,7 @@ layer `endscale`. Living "on" a layer means living on the indices right below it
 `startscale=1` refers to the physical indices, and `endscale=num_translayers(m)+1` to the
 indices just below the first scale invariant layer.
 """
-function ascend(op, m::GenericMERA{N, LT, OT}, endscale=num_translayers(m)+1, startscale=1
-               ) where {N, LT, OT}
-    # local op_pre::OT, op_asc::OT # not necessary, probably larger compilation time
+function ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
     if endscale < startscale
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
@@ -439,7 +437,7 @@ function ascend(op, m::GenericMERA{N, LT, OT}, endscale=num_translayers(m)+1, st
         layer = get_layer(m, endscale-1)
         op_asc = ascend(op_pre, layer)
     else
-        op_asc = convert(OT, op)
+        op_asc = convert(operatortype(m), op)
     end
     return op_asc
 end
@@ -452,9 +450,7 @@ layer `endscale`. Living "on" a layer means living on the indices right below it
 `endscale=1` refers to the physical indices, and `startscale=num_translayers(m)+1` to the
 indices just below the first scale invariant layer.
 """
-function descend(op, m::GenericMERA{N, LT, OT}, endscale=1, startscale=num_translayers(m)+1
-                ) where {N, LT, OT}
-    local op_pre::OT, op_asc::OT
+function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1)
     if endscale > startscale
         throw(ArgumentError("endscale > startscale"))
     elseif endscale < startscale
@@ -462,7 +458,7 @@ function descend(op, m::GenericMERA{N, LT, OT}, endscale=1, startscale=num_trans
         layer = get_layer(m, endscale)
         op_desc = descend(op_pre, layer)
     else
-        op_desc = convert(OT, op)
+        op_desc = convert(operatortype(m), op)
     end
     return op_desc
 end
@@ -538,9 +534,8 @@ This function utilises the cache, to avoid recomputation.
 
 See also: [`fixedpoint_densitymatrix`](@ref), [`densitymatrices`](@ref)
 """
-function densitymatrix(m::GenericMERA{N, LT, OT}, depth, pars=(;)) where {N, LT, OT}
+function densitymatrix(m::GenericMERA, depth, pars=(;))
     if !has_densitymatrix_stored(m.cache, depth)
-        local rho_above::OT, rho::OT
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
             rho = fixedpoint_densitymatrix(m, pars)
@@ -578,7 +573,7 @@ This function utilises the cache, to avoid recomputation.
 
 See also: [`scale_invariant_operator_sum`](@ref)
 """
-function ascended_operator(m::GenericMERA{N, LT, OT}, op, depth) where {N, LT, OT}
+function ascended_operator(m::GenericMERA, op, depth)
     # Note that if depth=1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
     if !has_operator_stored(m.cache, op, depth)
