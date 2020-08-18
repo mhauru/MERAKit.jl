@@ -428,7 +428,7 @@ indices just below the first scale invariant layer.
 """
 function ascend(op, m::GenericMERA{N, LT, OT}, endscale=num_translayers(m)+1, startscale=1
                ) where {N, LT, OT}
-    local op_pre::OT, op_asc::OT
+    # local op_pre::OT, op_asc::OT # not necessary, probably larger compilation time
     if endscale < startscale
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
@@ -581,8 +581,8 @@ function ascended_operator(m::GenericMERA{N, LT, OT}, op, depth) where {N, LT, O
     # Note that if depth=1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
     if !has_operator_stored(m.cache, op, depth)
-        op_below::OT = ascended_operator(m, op, depth-1)
-        opasc::OT = ascend(op_below, m, depth, depth-1)
+        op_below = ascended_operator(m, op, depth-1)
+        opasc = ascend(op_below, m, depth, depth-1)
         # Store this density matrix for future use.
         set_stored_operator!(m.cache, opasc, op, depth)
     end
