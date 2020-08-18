@@ -218,61 +218,10 @@ function ascending_superop_onesite(layer::TernaryLayer)
     return superop
 end
 
-function ascend_left(op::SquareTensorMap{2}, layer::TernaryLayer)
-    u, w = layer
-    # Cost: 2X^8 + 2X^7 + 2X^6
-    @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w[51 52 53; -300 ] * w[54 11 12; -400] *
-            u[41 42; 53 54] *
-            op[31 32; 52 41] *
-            u'[21 55; 32 42] *
-            w'[-100; 51 31 21] * w'[-200; 55 11 12]
-           )
-    return scaled_op
-end
+const TernaryOperator{S} = AbstractTensorMap{S,2,2}
+const ChargedTernaryOperator{S} = AbstractTensorMap{S,2,3}
 
-function ascend_right(op::SquareTensorMap{2}, layer::TernaryLayer)
-    u, w = layer
-    # Cost: 2X^8 + 2X^7 + 2X^6
-    @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w[11 12 65; -300] * w[63 61 62; -400] *
-            u[51 52; 65 63] *
-            op[31 41; 52 61] *
-            u'[64 21; 51 31] *
-            w'[-100; 11 12 64] * w'[-200; 21 41 62]
-           )
-    return scaled_op
-end
-
-function ascend_mid(op::SquareTensorMap{2}, layer::TernaryLayer)
-    u, w = layer
-    # Cost: 6X^6
-    @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w[31 32 41; -300] * w[51 21 22; -400] *
-            u[1 2; 41 51] *
-            op[11 12; 1 2] *
-            u'[42 52; 11 12] *
-            w'[-100; 31 32 42] * w'[-200; 52 21 22]
-           )
-    return scaled_op
-end
-
-function ascend(op::SquareTensorMap{2}, layer::TernaryLayer)
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    m = ascend_mid(op, layer)
-    scaled_op = (l+r+m)/3.
-    return scaled_op
-end
-
-# TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
-# network contractions? @ncon could do it, but Jutho's testing says it's significantly
-# slower. This is only used for diagonalizing in charge sectors, so having tensors with
-# non-trivial charge would also solve this.
-function ascend_left(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+function ascend_left(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -286,7 +235,7 @@ function ascend_left(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {
     return scaled_op
 end
 
-function ascend_right(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+function ascend_right(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -300,7 +249,7 @@ function ascend_right(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where 
     return scaled_op
 end
 
-function ascend_mid(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
@@ -314,21 +263,31 @@ function ascend_mid(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S
     return scaled_op
 end
 
-function ascend(op::AbstractTensorMap{S1,2,3}, layer::TernaryLayer) where {S1}
+function ascend(op::ChargedTernaryOperator, layer::TernaryLayer) where {S1}
     u, w = layer
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     m = ascend_mid(op, layer)
-    scaled_op = (l+r+m)/3.
+    scaled_op = (l+r+m)/3
     return scaled_op
 end
 
-function ascend(op::SquareTensorMap{1}, layer::TernaryLayer)
-    op = expand_support(op, causal_cone_width(TernaryLayer))
-    return ascend(op, layer)
-end
+ascend_left(op::TernaryOperator, layer::TernaryLayer) =
+    remove_dummy_index(ascend_left(append_dummy_index(op), layer))
 
-function descend_left(rho::SquareTensorMap{2}, layer::TernaryLayer)
+ascend_right(op::TernaryOperator, layer::TernaryLayer) =
+    remove_dummy_index(ascend_right(append_dummy_index(op), layer))
+
+ascend_mid(op::TernaryOperator, layer::TernaryLayer) =
+    remove_dummy_index(ascend_mid(append_dummy_index(op), layer))
+
+ascend(op::TernaryOperator, layer::TernaryLayer) =
+    remove_dummy_index(ascend(append_dummy_index(op), layer))
+
+ascend(op::SquareTensorMap{1}, layer::TernaryLayer) =
+    ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
+
+function descend_left(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -342,7 +301,7 @@ function descend_left(rho::SquareTensorMap{2}, layer::TernaryLayer)
     return scaled_rho
 end
 
-function descend_right(rho::SquareTensorMap{2}, layer::TernaryLayer)
+function descend_right(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -356,7 +315,7 @@ function descend_right(rho::SquareTensorMap{2}, layer::TernaryLayer)
     return scaled_rho
 end
 
-function descend_mid(rho::SquareTensorMap{2}, layer::TernaryLayer)
+function descend_mid(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
@@ -370,12 +329,12 @@ function descend_mid(rho::SquareTensorMap{2}, layer::TernaryLayer)
     return scaled_rho
 end
 
-function descend(rho::SquareTensorMap{2}, layer::TernaryLayer)
+function descend(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     l = descend_left(rho, layer)
     r = descend_right(rho, layer)
     m = descend_mid(rho, layer)
-    scaled_rho = (l+r+m)/3.
+    scaled_rho = (l+r+m)/3
     return scaled_rho
 end
 
@@ -400,7 +359,7 @@ function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer;
     return TernaryLayer(u, w)
 end
 
-function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
+function environment_disentangler(h::TernaryOperator, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -438,7 +397,7 @@ function environment_disentangler(h::SquareTensorMap{2}, layer, rho)
     return env
 end
 
-function environment_isometry(h::SquareTensorMap{2}, layer, rho)
+function environment_isometry(h::TernaryOperator, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
