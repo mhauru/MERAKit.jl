@@ -349,8 +349,14 @@ This costs O(D^2) time, where D is the matrix dimension.
 
 See also: [`gershgorin_discs`](@ref)
 """
-function gershgorin_bounds(t::AbstractTensorMap{S, N, N}) where {S, N}
-    return gershgorin_bounds(convert(Array, convert_to_matrix(t)))
+function gershgorin_bounds(t::SquareTensorMap)
+    v = real(first(last(first(blocks(t))))) # get first element from first block
+    lb, ub = v, v
+    largest_bound((lb1,ub1), (lb2,ub2)) = (min(lb1,lb2), max(ub1,ub2))
+    for (c,b) in blocks(t)
+        lb, ub = largest_bound((lb, ub), gershgorin_bounds(b))
+    end
+    return lb, ub
 end
 
 """
@@ -364,8 +370,16 @@ This costs O(D^2) time, where D is the matrix dimension.
 
 See also: [`gershgorin_bounds`](@ref)
 """
-function gershgorin_discs(t::AbstractTensorMap{S, N, N}) where {S, N}
-    return gershgorin_discs(convert(Array, convert_to_matrix(t)))
+function gershgorin_discs(t::SquareTensorMap)
+    alldiscs = Vector{Tuple{eltype(t), real(eltype(t))}}()
+    for (c,b) in blocks(t)
+        discs = gershgorin_discs(b)
+        @assert isinteger(dim(c))
+        for _ = 1:dim(c)
+            append!(alldiscs, discs)
+        end
+    end
+    return alldiscs
 end
 
 function gershgorin_bounds(a::Array{S, 2}) where {S}
@@ -391,7 +405,7 @@ function gershgorin_discs(a::Array{S, 2}) where {S}
     radii1 = dropdims(sum(abs.(a), dims=1), dims=1) .- abs_centres
     radii2 = dropdims(sum(abs.(a), dims=2), dims=2) .- abs_centres
     radii = min.(radii1, radii2)
-    discs = tuple(zip(centres, radii)...)
+    discs = collect(zip(centres, radii))
     return discs
 end
 
