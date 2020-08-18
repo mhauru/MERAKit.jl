@@ -91,6 +91,9 @@ BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 #Base.show(io::IO, ::Type{BinaryMERA}) = print(io, "BinaryMERA")
 #Base.show(io::IO, ::Type{BinaryMERA{N}}) where {N} = print(io, "BinaryMERA{($N)}")
 
+# Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
+_tuple(layer::BinaryLayer) = (layer.disentangler, layer.isometry)
+
 # Given an instance of a type like BinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type BinaryLayer.
 layertype(::BinaryLayer) = BinaryLayer
@@ -100,15 +103,12 @@ function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
 end
 operatortype(::Type{BinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
-Base.eltype(::Type{BinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-Base.eltype(l::BinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
-
-# Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
-_tuple(layer::BinaryLayer) = (layer.disentangler, layer.isometry)
-
 scalefactor(::Type{<:BinaryLayer}) = 2
 
 causal_cone_width(::Type{<:BinaryLayer}) = 3
+
+Base.eltype(::Type{BinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
+
 
 outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'

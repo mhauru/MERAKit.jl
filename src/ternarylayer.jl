@@ -91,6 +91,10 @@ TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 #Base.show(io::IO, ::Type{TernaryMERA}) = print(io, "TernaryMERA")
 #Base.show(io::IO, ::Type{TernaryMERA{N}}) where {N} = print(io, "TernaryMERA{($N)}")
 
+# Implement the iteration and indexing interfaces.
+_tuple(layer::TernaryLayer) =
+    (layer.disentangler, layer.isometry)
+
 # Given an instance of a type like TernaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type TernaryLayer.
 layertype(::TernaryLayer) = TernaryLayer
@@ -100,19 +104,15 @@ function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
 end
 operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
+scalefactor(::Type{<:TernaryLayer}) = 3
+
+causal_cone_width(::Type{<:TernaryLayer}) = 2
+
 Base.eltype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 
 function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
     return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
 end
-
-# Implement the iteration and indexing interfaces.
-_tuple(layer::TernaryLayer) =
-    (layer.disentangler, layer.isometry)
-
-scalefactor(::Type{<:TernaryLayer}) = 3
-
-causal_cone_width(::Type{<:TernaryLayer}) = 2
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
