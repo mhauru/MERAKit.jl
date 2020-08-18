@@ -120,11 +120,8 @@ Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 Base.eltype(l::ModifiedBinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
-Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{1}) = (layer.isometry_left, Val(2))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{2}) = (layer.isometry_right, Val(3))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{3}) = nothing
-Base.length(layer::ModifiedBinaryLayer) = 3
+_tuple(layer::ModifiedBinaryLayer) =
+    (layer.disentangler, layer.isometry_left, layer.isometry_right)
 
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
 scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)

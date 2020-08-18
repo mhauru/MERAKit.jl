@@ -109,10 +109,8 @@ function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, 
 end
 
 # Implement the iteration and indexing interfaces.
-Base.iterate(layer::TernaryLayer) = (layer.disentangler, Val(1))
-Base.iterate(layer::TernaryLayer, ::Val{1}) = (layer.isometry, Val(2))
-Base.iterate(layer::TernaryLayer, ::Val{2}) = nothing
-Base.length(layer::TernaryLayer) = 2
+_tuple(layer::TernaryLayer) =
+    (layer.disentangler, layer.isometry)
 
 scalefactor(::Type{<:TernaryLayer}) = 3
 scalefactor(::Type{TernaryMERA}) = scalefactor(TernaryLayer)

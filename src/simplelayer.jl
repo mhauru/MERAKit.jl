@@ -15,6 +15,12 @@ abstract type SimpleLayer <: Layer end
 Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
 Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
 
+Base.iterate(layer::SimpleLayer, args...) =
+    iterate(_tuple(layer), args...)
+Base.indexed_iterate(layer::SimpleLayer, i::Int, args...) =
+    Base.indexed_iterate(_tuple(layer), i, args...)
+Base.length(layer::SimpleLayer) = _tuple(layer)
+
 function remove_symmetry(layer::SimpleLayer)
     return layertype(layer)((remove_symmetry(x) for x in layer)...)
 end
