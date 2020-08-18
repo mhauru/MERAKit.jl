@@ -100,10 +100,10 @@ end
 A modified binary MERA is a MERA consisting of `ModifiedBinaryLayer`s.
 """
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
-Base.show(io::IO, ::Type{ModifiedBinaryMERA}) = print(io, "ModifiedBinaryMERA")
-function Base.show(io::IO, ::Type{ModifiedBinaryMERA{N}}) where {N}
-    return print(io, "ModifiedBinaryMERA{($N)}")
-end
+#Base.show(io::IO, ::Type{ModifiedBinaryMERA}) = print(io, "ModifiedBinaryMERA")
+#function Base.show(io::IO, ::Type{ModifiedBinaryMERA{N}}) where {N}
+#    return print(io, "ModifiedBinaryMERA{($N)}")
+#end
 
 # Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type ModifiedBinaryLayer.
