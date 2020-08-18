@@ -156,16 +156,15 @@ function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint=Vou
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
     # any way).
-    wr = deepcopy(permute(wl, (2,1), (3,)))
+    wr = permute(wl, (2,1), (3,); copy = true)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
-    V = inputspace(layer)
-    width = causal_cone_width(typeof(layer))
-    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
-    eye = id(Vtotal) / sqrt(dim(Vtotal))
+    width = causal_cone_width(layer)
+    Vtotal = ⊗(ntuple(n->inputspace(layer), Val(width))...)
+    eye = id(storagetype(operatortype(layer)), Vtotal) / sqrt(dim(Vtotal))
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 

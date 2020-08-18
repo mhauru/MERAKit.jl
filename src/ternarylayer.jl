@@ -144,11 +144,9 @@ function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint=Vout;
 end
 
 function ascending_fixedpoint(layer::TernaryLayer)
-    V = inputspace(layer)
-    width = causal_cone_width(typeof(layer))
-    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
-    eye = id(Vtotal) / sqrt(dim(Vtotal))
-    return eye
+    width = causal_cone_width(layer)
+    Vtotal = ⊗(ntuple(n->inputspace(layer), Val(width))...)
+    return id(storagetype(operatortype(layer)), Vtotal) / sqrt(dim(Vtotal))
 end
 
 function gradient(layer::TernaryLayer, env::TernaryLayer; metric=:euclidean)
