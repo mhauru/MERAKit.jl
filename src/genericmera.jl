@@ -472,34 +472,21 @@ To find the fixed point, we use an iterative Krylov solver. The options for the 
 should be in `pars.scaleinvariant_krylovoptions`, they will be passed to
 `KrylovKit.eigsolve`.
 """
-function fixedpoint_densitymatrix(m::GenericMERA{N, LT, OT}, pars=(;)) where {N, LT, OT}
-    f(x) = descend(x, m, num_translayers(m)+1, num_translayers(m)+2)
+function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
+    f(x) = descend(x, get_layer(m, num_translayers(m)+1))
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
-    x0::OT = thermal_densitymatrix(m, Inf)
+    x0 = thermal_densitymatrix(m, Inf)
     old_rho = m.cache.previous_fixedpoint_densitymatrix
     if old_rho !== nothing && space(x0) == space(old_rho)
         x0 = old_rho
     end
     eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
-    vals, vecs, info = eigsolve(f, x0, 1; eigsolve_pars...)
-    rho_cmplx = vecs[1]
+    _, vecs, vals, info = schursolve(f, x0, 1, :LM, Arnoldi(; eigsolve_pars...))
+    rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
-    rho_cmplx = (rho_cmplx + rho_cmplx') / 2.0
-    rho_cmplx /= tr(rho_cmplx)
-    local rho::OT
-    if eltype(m) <: Real
-        # rho isn't generally real for generic matrices, but we know that it should be for
-        # the descending superoperator.
-        imag_norm = norm(imag(rho_cmplx))
-        if imag_norm > 1e-12
-            msg = "The fixed point density matrix has a significant imaginary part, that we discard: $(imag_norm)"
-            @warn(msg)
-        end
-        rho = real(rho_cmplx)
-    else
-        rho = rho_cmplx
-    end
+    rho = (rho + rho') # probably not even necessary
+    rho /= tr(rho)
     m.cache.previous_fixedpoint_densitymatrix = rho
     if :verbosity in keys(pars) && pars[:verbosity] > 3
         msg = "Used $(info.numops) superoperator invocations to find the fixed point density matrix."
