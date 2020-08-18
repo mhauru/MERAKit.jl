@@ -2,7 +2,6 @@ module MERA
 
 using TensorKit
 using TensorKitManifolds
-using TensorOperations  # We need this because TensorKit doesn't reexport @ncon
 using KrylovKit
 using OptimKit
 using TupleTools
