@@ -113,21 +113,18 @@ function binaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
 end
 
 """
-    randomisometry(T, Vout, Vin; symmetry_permutation=nothing)
+    randomisometry(T, Vout, Vin)
 
 Given an element type `T` and two vector spaces, `Vin` for the domain and `Vout` for the
-codomain, return a Haar random isometry. `symmetry_permutation` can be a permutation of the
-indices that should be a symmetry of the isometry.
+codomain, return a Haar random isometry.
 
 The implementation uses a QR decomposition of a Gaussian random matrix.
 """
-function randomisometry(T, Vout, Vin; symmetry_permutation=nothing)
+function randomisometry(::Type{T}, Vout, Vin) where {T}
     temp = TensorMap(randn, T, Vout ← Vin)
-    if symmetry_permutation !== nothing
-        temp = temp + permute(temp, symmetry_permutation...)
-    end
     q, r = leftorth(temp)
-    u = q * isomorphism(domain(q), Vin)
+    iso = isomorphism(domain(q), Vin)
+    u = q * iso
     return u
 end
 
@@ -140,7 +137,7 @@ The returned tensor is Haar random if `random = true`. If `random = false` and `
 it is the identity. If `random = false` and `Vin != Vout` it is the tensor product of two
 one-site Haar random unitaries.
 """
-function initialize_disentangler(T, Vout, Vin, random::Bool)
+function initialize_disentangler(::Type{T}, Vout, Vin, random::Bool) where {T}
     if random
         u = randomisometry(T, Vout ⊗ Vout, Vin ⊗ Vin)
     else

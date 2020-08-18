@@ -159,8 +159,8 @@ function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-function randomlayer(::Type{ModifiedBinaryLayer}, T, Vin, Vout, Vint=Vout;
-                     random_disentangler=false)
+function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint=Vout;
+                     random_disentangler=false) where {T}
     wl = randomisometry(T, Vout ⊗ Vint, Vin)
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
