@@ -211,11 +211,11 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     matching_bonds = ((space(u, 3)', space(wl, 2)),
                       (space(u, 4)', space(wr, 1)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
-    for v in layer
+    allmatch &= all((u, wl, wr)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
-        allmatch = allmatch && infinum(dom, codom) == dom
+        infinum(dom, codom) == dom
     end
     return allmatch
 end
@@ -227,7 +227,7 @@ function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::Modified
                       (space(wl, 3)', space(unext, 2)),
                       (space(wr, 3)', space(unext, 1)),
                       (space(wr, 3)', space(unext, 2)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     return allmatch
 end
 

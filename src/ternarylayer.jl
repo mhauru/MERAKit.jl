@@ -187,11 +187,11 @@ function space_invar_intralayer(layer::TernaryLayer)
     u, w = layer
     matching_bonds = ((space(u, 3)', space(w, 3)),
                       (space(u, 4)', space(w, 1)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
-    for v in layer
+    allmatch &= all((u,w)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
-        allmatch = allmatch && infinum(dom, codom) == dom
+        infinum(dom, codom) == dom
     end
     return allmatch
 end
@@ -202,7 +202,7 @@ function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     matching_bonds = ((space(w, 4)', space(unext, 1)),
                       (space(w, 4)', space(unext, 2)),
                       (space(w, 4)', space(wnext, 2)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     return allmatch
 end
 
