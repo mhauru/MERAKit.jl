@@ -94,7 +94,6 @@ TernaryMERA{N} = GenericMERA{N, T, O} where {T <: TernaryLayer, O}
 # Given an instance of a type like TernaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type TernaryLayer.
 layertype(::TernaryLayer) = TernaryLayer
-layertype(::Type{T}) where T <: TernaryMERA = TernaryLayer
 
 function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
     return tensormaptype(ST, 2, 2, ET)
@@ -102,7 +101,6 @@ end
 operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 Base.eltype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-Base.eltype(l::TernaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
 
 function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
     return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
@@ -113,7 +111,6 @@ _tuple(layer::TernaryLayer) =
     (layer.disentangler, layer.isometry)
 
 scalefactor(::Type{<:TernaryLayer}) = 3
-scalefactor(::Type{TernaryMERA}) = scalefactor(TernaryLayer)
 
 causal_cone_width(::Type{<:TernaryLayer}) = 2
 

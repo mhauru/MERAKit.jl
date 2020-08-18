@@ -108,7 +108,6 @@ ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
 # Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type ModifiedBinaryLayer.
 layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
-layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
 
 function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
                      ) where {ST, ET}
@@ -117,14 +116,12 @@ end
 operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
 Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-Base.eltype(l::ModifiedBinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 _tuple(layer::ModifiedBinaryLayer) =
     (layer.disentangler, layer.isometry_left, layer.isometry_right)
 
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
-scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
 
 causal_cone_width(::Type{<:ModifiedBinaryLayer}) = 2
 

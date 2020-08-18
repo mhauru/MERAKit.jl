@@ -94,7 +94,6 @@ BinaryMERA{N} = GenericMERA{N, T, O} where {T <: BinaryLayer, O}
 # Given an instance of a type like BinaryLayer{ComplexSpace, Float64, true},
 # return the unparametrised type BinaryLayer.
 layertype(::BinaryLayer) = BinaryLayer
-layertype(::Type{T}) where T <: BinaryMERA = BinaryLayer
 
 function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
     return tensormaptype(ST, 3, 3, ET)
@@ -108,7 +107,6 @@ Base.eltype(l::BinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
 _tuple(layer::BinaryLayer) = (layer.disentangler, layer.isometry)
 
 scalefactor(::Type{<:BinaryLayer}) = 2
-scalefactor(::Type{BinaryMERA}) = scalefactor(BinaryLayer)
 
 causal_cone_width(::Type{<:BinaryLayer}) = 3
 

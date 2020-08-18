@@ -89,12 +89,8 @@ end
 
 Return the type of the layers of the MERA.
 """
-layertype(m::GenericMERA) = layertype(typeof(m))
-# typical Julia paradigm, not sure if this is better or equal for inference
 layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
-
-Base.eltype(m::GenericMERA{N, LT, OT}) where {N, LT, OT} = eltype(LT)
 
 """
     operatortype(m::GenericMERA)
@@ -104,7 +100,6 @@ Return the type of operator associate with this MERA or MERA type. That means th
 operator that fits in the causal cone, and is naturally emerges as one ascends local
 operators.
 """
-operatortype(m::GenericMERA) = operatortype(typeof(m))
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 
@@ -114,18 +109,16 @@ operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
 The ratio by which the number of sites changes when one descends by one layer, e.g. 2 for
 binary MERA, 3 for ternary.
 """
-scalefactor(m::GenericMERA) = scalefactor(typeof(m))
-scalefactor(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = scalefactor(LT)
-scalefactor(::Type{GenericMERA{M, LT, OT} where M}) where {LT, OT} = scalefactor(LT)
+scalefactor(M::Type{<:GenericMERA}) = scalefactor(layertype(M))
 
 """
     causal_cone_width(::Type{<: GenericMERA})
 
 Return the width of the stable causal cone for this MERA type.
 """
-function causal_cone_width(::Type{T}) where {T <: GenericMERA}
-    return causal_cone_width(layertype(T))
-end
+causal_cone_width(M::Type{<:GenericMERA}) = causal_cone_width(layertype(M))
+
+Base.eltype(M::Type{<:GenericMERA}) = eltype(layertype(M))
 
 """
     num_translayers(m::GenericMERA)
@@ -133,8 +126,15 @@ end
 Return the number of transition layers, i.e. layers below the scale invariant one, in the
 MERA.
 """
-num_translayers(m::GenericMERA) = num_translayers(typeof(m))
 num_translayers(::Type{<:GenericMERA{N}}) where {N} = N-1
+
+# properties of instances
+layertype(m::Union{GenericMERA,Layer}) = layertype(typeof(m))
+operatortype(m::Union{GenericMERA,Layer}) = operatortype(typeof(m))
+scalefactor(m::Union{GenericMERA,Layer}) = scalefactor(typeof(m))
+causal_cone_width(m::Union{GenericMERA,Layer}) = causal_cone_width(typeof(m))
+num_translayers(m::GenericMERA) = num_translayers(typeof(m))
+Base.eltype(m::Union{GenericMERA,Layer}) = eltype(typeof(m))
 
 """
     get_layer(m::GenericMERA, depth)
