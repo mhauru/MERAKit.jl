@@ -90,12 +90,8 @@ end
 """
 Test type stability, and type stability only, of various methods.
 """
-<<<<<<< HEAD
-function test_type_stability(meratype, spacetype)
-=======
 function test_type_stability(::Type{meratype}, ::Type{S}
                             ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
@@ -163,12 +159,8 @@ For each layer, generate a random operator above and below it (not necessarily H
 and confirm that ascending the lower or descending the upper one both lead to the same
 expectation value (trace of product).
 """
-<<<<<<< HEAD
-function test_ascend_and_descend(meratype, spacetype)
-=======
 function test_ascend_and_descend(::Type{meratype}, ::Type{S}
                                 ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -194,12 +186,8 @@ end
 Test that the expectation value of the identity is 1.0, regardless of which layer we
 evaluate it at.
 """
-<<<<<<< HEAD
-function test_expectation_of_identity(meratype, spacetype)
-=======
 function test_expectation_of_identity(::Type{meratype}, ::Type{S}
                                      ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -215,12 +203,8 @@ end
 Test that the expectation value of a random Hermitian operator does not depend on the layer
 that we evaluate it at.
 """
-<<<<<<< HEAD
-function test_expectation_evalscale(meratype, spacetype)
-=======
 function test_expectation_evalscale(::Type{meratype}, ::Type{S}
                                    ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -239,12 +223,8 @@ end
 Test that pseudoserializing and depseudoserializing back does not change the expectation
 value of a random Hermitian operator.
 """
-<<<<<<< HEAD
-function test_pseudoserialization(meratype, spacetype)
-=======
 function test_pseudoserialization(::Type{meratype}, ::Type{S}
                                  ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -263,12 +243,8 @@ end
 Confirm that expanding bond dimensions does not change the expectation value of a random
 Hermitian operator.
 """
-<<<<<<< HEAD
-function test_expand_bonddim(meratype, spacetype)
-=======
 function test_expand_bonddim(::Type{meratype}, ::Type{S}
                             ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers, 4)
     intspaces = random_internalspaces(spaces, meratype)
@@ -312,11 +288,7 @@ end
 Confirm that releasing a does not change the expectation value of a random Hermitian
 operator.
 """
-<<<<<<< HEAD
-function test_release_layer(meratype, spacetype)
-=======
 function test_release_layer(::Type{meratype}, ::Type{S}) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -334,12 +306,8 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-<<<<<<< HEAD
-function test_remove_symmetry(meratype, spacetype)
-=======
 function test_remove_symmetry(::Type{meratype}, ::Type{S}
                              ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -358,11 +326,7 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-<<<<<<< HEAD
-function test_reset_storage(meratype, spacetype)
-=======
 function test_reset_storage(::Type{meratype}, ::Type{S}) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -390,12 +354,8 @@ Create a MERA that breaks the isometricity condition, by summing up two random M
 Restore isometricity with projectisometric and projectisometric!, and confirm that the
 expectation value of the identity is indeed 1 after this.
 """
-<<<<<<< HEAD
-function test_projectisometric(meratype, spacetype)
-=======
 function test_projectisometric(::Type{meratype}, ::Type{S}
                               ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -420,12 +380,8 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-<<<<<<< HEAD
-function test_optimization(meratype, spacetype, method, precondition=false)
-=======
 function test_optimization(::Type{meratype}, ::Type{S}, method, precondition=false
                           ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
@@ -462,12 +418,8 @@ end
 """
 Test gradients and retraction.
 """
-<<<<<<< HEAD
-function test_gradient_and_retraction(meratype, spacetype, alg, metric)
-=======
 function test_gradient_and_retraction(::Type{meratype}, ::Type{S}, alg, metric
                                      ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -514,12 +466,8 @@ end
 """
 Test vector transport.
 """
-<<<<<<< HEAD
-function test_transport(meratype, spacetype, alg, metric)
-=======
 function test_transport(::Type{meratype}, ::Type{S}, alg, metric
                        ) where {meratype, S}
->>>>>>> simplify random functions, use ntuple, apply fuse to list of elementary spaces without reducing to productspace, use S globally as spacetype
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
