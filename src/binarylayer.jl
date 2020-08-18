@@ -237,7 +237,7 @@ end
 function ascend(op::SquareTensorMap{3}, layer::BinaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
-    scaled_op = (l+r)/2.
+    scaled_op = (l+r)/2
     return scaled_op
 end
 
