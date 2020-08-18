@@ -92,7 +92,6 @@ end
 Test type stability, and type stability only, of various methods.
 """
 function test_type_stability(meratype, spacetype)
-    @info "Checking type stability for $(meratype), $(spacetype)"
     layers = 4
     width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
@@ -146,7 +145,7 @@ function test_type_stability(meratype, spacetype)
     mtan2 = gradient(randomop2, m, pars)
     ltan1 = get_layer(mtan1, 1)
     ltan2 = get_layer(mtan2, 1)
-    @inferred (x -> tuple(ltan1...))(:a)
+    @inferred (x -> tuple(x...))(ltan1)
     @inferred MERA.tensorwise_scale(ltan1, 0.1)
     @inferred MERA.tensorwise_sum(ltan1, ltan2)
     #@inferred inner(l1, ltan1, ltan2)
