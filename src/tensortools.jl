@@ -292,6 +292,15 @@ function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data
     return t
 end
 
+function append_dummy_index(t::TensorMap)
+    return TensorMap(t.data, codomain(t), insertunit(domain(t)))
+end
+function remove_dummy_index(t::TensorMap{S}) where {S}
+    @assert space(t, numind(t)) == oneunit(S)'
+    dom = ProductSpace{S}(Base.front(domain(t).spaces))
+    return TensorMap(t.data, codomain(t), dom)
+end
+
 """
     pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
 
