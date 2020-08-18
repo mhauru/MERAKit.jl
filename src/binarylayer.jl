@@ -202,46 +202,10 @@ function space_invar_interlayer(layer::BinaryLayer, next_layer::BinaryLayer)
 end
 
 # # # Ascending and descending superoperators
+const BinaryOperator{S} = AbstractTensorMap{S,3,3}
+const ChargedBinaryOperator{S} = AbstractTensorMap{S,3,4}
 
-function ascend_left(op::SquareTensorMap{3}, layer::BinaryLayer)
-    u, w = layer
-    @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600] :=
-            w[5 6; -400] * w[9 8; -500] * w[16 15; -600] *
-            u[1 2; 6 9] * u[10 12; 8 16] *
-            op[3 4 14; 1 2 10] *
-            u'[7 13; 3 4] * u'[11 17; 14 12] *
-            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15]
-           )
-    return scaled_op
-end
-
-function ascend_right(op::SquareTensorMap{3}, layer::BinaryLayer)
-    u, w = layer
-    @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600] :=
-            w[15 16; -400] * w[8 9; -500] * w[6 5; -600] *
-            u[12 10; 16 8] * u[1 2; 9 6] *
-            op[14 3 4; 10 1 2] *
-            u'[17 11; 12 14] * u'[13 7; 3 4] *
-            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5]
-           )
-    return scaled_op
-end
-
-function ascend(op::SquareTensorMap{3}, layer::BinaryLayer)
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    scaled_op = (l+r)/2
-    return scaled_op
-end
-
-
-# TODO Would there be a nice way of doing this where I wouldn't have to replicate all the
-# network contractions? @ncon could do it, but Jutho's testing says it's significantly
-# slower. This is only used for diagonalizing in charge sectors, so having tensors with
-# non-trivial charge would also solve this.
-function ascend_left(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {S1}
+function ascend_left(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
@@ -254,7 +218,7 @@ function ascend_left(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {S
     return scaled_op
 end
 
-function ascend_right(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {S1}
+function ascend_right(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
@@ -267,24 +231,26 @@ function ascend_right(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {
     return scaled_op
 end
 
-function ascend(op::AbstractTensorMap{S1,3,4}, layer::BinaryLayer) where {S1}
+function ascend(op::ChargedBinaryOperator, layer::BinaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
-    scaled_op = (l+r)/2.
+    scaled_op = (l+r)/2
     return scaled_op
 end
 
-function ascend(op::SquareTensorMap{2}, layer::BinaryLayer)
-    op = expand_support(op, causal_cone_width(BinaryLayer))
-    return ascend(op, layer)
-end
+ascend_left(op::BinaryOperator, layer::BinaryLayer) =
+    remove_dummy_index(ascend_left(append_dummy_index(op), layer))
 
-function ascend(op::SquareTensorMap{1}, layer::BinaryLayer)
-    op = expand_support(op, causal_cone_width(BinaryLayer))
-    return ascend(op, layer)
-end
+ascend_right(op::BinaryOperator, layer::BinaryLayer) =
+    remove_dummy_index(ascend_right(append_dummy_index(op), layer))
 
-function descend_left(rho::SquareTensorMap{3}, layer::BinaryLayer)
+ascend(op::BinaryOperator, layer::BinaryLayer) =
+    remove_dummy_index(ascend(append_dummy_index(op), layer))
+
+ascend(op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer) =
+    ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
+
+function descend_left(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_rho[-100 -200 -300; -400 -500 -600] :=
@@ -297,7 +263,7 @@ function descend_left(rho::SquareTensorMap{3}, layer::BinaryLayer)
     return scaled_rho
 end
 
-function descend_right(rho::SquareTensorMap{3}, layer::BinaryLayer)
+function descend_right(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_rho[-100 -200 -300; -400 -500 -600] :=
@@ -310,10 +276,10 @@ function descend_right(rho::SquareTensorMap{3}, layer::BinaryLayer)
     return scaled_rho
 end
 
-function descend(rho::SquareTensorMap{3}, layer::BinaryLayer)
+function descend(rho::BinaryOperator, layer::BinaryLayer)
     l = descend_left(rho, layer)
     r = descend_right(rho, layer)
-    scaled_rho = (l+r)/2.
+    scaled_rho = (l+r)/2
     return scaled_rho
 end
 
@@ -338,7 +304,7 @@ function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer;
     return BinaryLayer(u, w)
 end
 
-function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho)
+function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
     u, w = layer
     @tensor(
             env1[-1 -2; -3 -4] :=
@@ -386,17 +352,13 @@ function environment_disentangler(h::SquareTensorMap{3}, layer::BinaryLayer, rho
     return env
 end
 
-function environment_disentangler(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
+function environment_disentangler(h::Union{SquareTensorMap{1}, SquareTensorMap{2}},
+                                    layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_disentangler(h, layer, rho)
 end
 
-function environment_disentangler(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
-    h = expand_support(h, causal_cone_width(BinaryLayer))
-    return environment_disentangler(h, layer, rho)
-end
-
-function environment_isometry(h::SquareTensorMap{3}, layer, rho)
+function environment_isometry(h::BinaryOperator, layer, rho)
     u, w = layer
     @tensor(
             env1[-1 -2; -3] :=
@@ -464,12 +426,8 @@ function environment_isometry(h::SquareTensorMap{3}, layer, rho)
     return env
 end
 
-function environment_isometry(h::SquareTensorMap{2}, layer::BinaryLayer, rho)
-    h = expand_support(h, causal_cone_width(BinaryLayer))
-    return environment_isometry(h, layer, rho)
-end
-
-function environment_isometry(h::SquareTensorMap{1}, layer::BinaryLayer, rho)
+function environment_isometry(h::Union{SquareTensorMap{1}, SquareTensorMap{2}},
+                                layer::BinaryLayer, rho)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_isometry(h, layer, rho)
 end
