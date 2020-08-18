@@ -13,32 +13,32 @@ order in which the constructor takes them in.
 abstract type SimpleLayer <: Layer end
 
 Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
-Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
+Base.copy(layer::SimpleLayer) = typeof(layer)(map(deepcopy, _tuple(layer))...)
 
-Base.iterate(layer::SimpleLayer, args...) =
-    iterate(_tuple(layer), args...)
+Base.iterate(layer::SimpleLayer, args...) = iterate(_tuple(layer), args...)
 Base.indexed_iterate(layer::SimpleLayer, i::Int, args...) =
     Base.indexed_iterate(_tuple(layer), i, args...)
 Base.length(layer::SimpleLayer) = _tuple(layer)
 
 function remove_symmetry(layer::SimpleLayer)
-    return layertype(layer)((remove_symmetry(x) for x in layer)...)
+    layertype(layer)(map(remove_symmetry, _tuple(layer))...)
 end
 
-function TensorKitManifolds.projectisometric(layer::T) where T <: SimpleLayer
-    return T((projectisometric(x) for x in layer)...)
+function TensorKitManifolds.projectisometric(layer::SimpleLayer)
+    typeof(layer)(map(projectisometric, _tuple(layer))...)
 end
 
-function TensorKitManifolds.projectisometric!(layer::T) where T <: SimpleLayer
-    return T((projectisometric!(x) for x in layer)...)
+function TensorKitManifolds.projectisometric!(layer::SimpleLayer)
+    foreach(projectisometric!, _tuple(layer))
+    return layer
 end
 
-function pseudoserialize(layer::T) where T <: SimpleLayer
-    return repr(T), tuple((pseudoserialize(x) for x in layer)...)
+function pseudoserialize(layer::SimpleLayer)
+    return repr(typeof(layer)), map(pseudoserialize, _tuple(layer))
 end
 
 function depseudoserialize(::Type{T}, data) where T <: SimpleLayer
-    return T((depseudoserialize(d...) for d in data)...)
+    return T(map(d->depseudoserialize(d...), data)...)
 end
 
 # TODO Definitions like the following are a little dangerous, since they allow for instance
@@ -47,11 +47,12 @@ end
 # same, fully parametrized type.
 
 function tensorwise_scale(layer::SimpleLayer, alpha::Number)
-    return layertype(layer)((t*alpha for t in layer)...)
+    return layertype(layer)((_tuple(layer) .* alpha)...)
 end
 
 function tensorwise_sum(l1::SimpleLayer, l2::SimpleLayer)
-    return layertype(l1)((t1+t2 for (t1, t2) in zip(l1, l2))...)
+    @assert layertype(l1) == layertype(l2)
+    return layertype(l1)((_tuple(l1) .+ _tuple(l2))...)
 end
 
 # # # Manifold functions
