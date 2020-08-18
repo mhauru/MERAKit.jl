@@ -120,12 +120,7 @@ codomain, return a Haar random isometry.
 
 The implementation uses a QR decomposition of a Gaussian random matrix.
 """
-function randomisometry(::Type{T}, Vout, Vin) where {T}
-    temp = TensorMap(randn, T, Vout ← Vin)
-    q, r = leftorth(temp)
-    u = q * isomorphism(storagetype(q), domain(q), Vin)
-    return u
-end
+randomisometry(::Type{T}, Vout, Vin) where {T} = TensorMap(randhaar, T, Vout ← Vin)
 
 """
     initialize_disentangler(T, Vout, Vin, random::Bool)
@@ -200,10 +195,6 @@ See also: [`support`](@ref)
         return op2
     end
 end
-# TODO: The above generates, for e.g. op acting on 1 site, and n = 4
-# (1 ⊗ 1 ⊗ 1 ⊗ op + 3 * (1 ⊗ 1 ⊗ op ⊗ 1) + 3 * (1 ⊗ op ⊗ 1 ⊗ 1) + op ⊗ 1 ⊗ 1 ⊗ 1) / 8
-# Was this intended or was
-# (1 ⊗ 1 ⊗ 1 ⊗ op + 1 ⊗ 1 ⊗ op ⊗ 1 + 1 ⊗ op ⊗ 1 ⊗ 1 + op ⊗ 1 ⊗ 1 ⊗ 1) / 4 intended
 
 """
     remove_symmetry(V)
