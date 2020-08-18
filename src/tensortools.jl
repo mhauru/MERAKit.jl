@@ -156,7 +156,7 @@ end
     support(op)
 
 Return the number of sites/indices `N` that the operator `op` is supported on, assuming it
-is an operator from `m` sites to `m` sites.
+is an operator from `N` sites to `N` sites.
 
 See also: [`expand_support`](@ref)
 """
