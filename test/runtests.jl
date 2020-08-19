@@ -90,8 +90,7 @@ end
 """
 Test type stability, and type stability only, of various methods.
 """
-function test_type_stability(::Type{meratype}, ::Type{S}
-                            ) where {meratype, S}
+function test_type_stability(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
@@ -159,8 +158,7 @@ For each layer, generate a random operator above and below it (not necessarily H
 and confirm that ascending the lower or descending the upper one both lead to the same
 expectation value (trace of product).
 """
-function test_ascend_and_descend(::Type{meratype}, ::Type{S}
-                                ) where {meratype, S}
+function test_ascend_and_descend(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -186,8 +184,7 @@ end
 Test that the expectation value of the identity is 1.0, regardless of which layer we
 evaluate it at.
 """
-function test_expectation_of_identity(::Type{meratype}, ::Type{S}
-                                     ) where {meratype, S}
+function test_expectation_of_identity(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -203,8 +200,7 @@ end
 Test that the expectation value of a random Hermitian operator does not depend on the layer
 that we evaluate it at.
 """
-function test_expectation_evalscale(::Type{meratype}, ::Type{S}
-                                   ) where {meratype, S}
+function test_expectation_evalscale(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -223,8 +219,7 @@ end
 Test that pseudoserializing and depseudoserializing back does not change the expectation
 value of a random Hermitian operator.
 """
-function test_pseudoserialization(::Type{meratype}, ::Type{S}
-                                 ) where {meratype, S}
+function test_pseudoserialization(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
@@ -243,8 +238,7 @@ end
 Confirm that expanding bond dimensions does not change the expectation value of a random
 Hermitian operator.
 """
-function test_expand_bonddim(::Type{meratype}, ::Type{S}
-                            ) where {meratype, S}
+function test_expand_bonddim(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers, 4)
     intspaces = random_internalspaces(spaces, meratype)
@@ -306,8 +300,7 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-function test_remove_symmetry(::Type{meratype}, ::Type{S}
-                             ) where {meratype, S}
+function test_remove_symmetry(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
