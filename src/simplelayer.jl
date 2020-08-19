@@ -66,24 +66,25 @@ end
 
 function TensorKitManifolds.inner(l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer;
                                   metric=:euclidean)
-    get_metric(t) = isa(t, Stiefel.StiefelTangent) ? metric : :euclidean
-    return sum(inner(t, t1, t2; metric=get_metric(t1)) for (t, t1, t2) in zip(l, l1, l2))
+    custominner(t, t1, t2) =
+        inner(t, t1, t2; metric = isa(t1, Stiefel.StiefelTangent) ? metric : :euclidean)
+    return sum(custominner.(_tuple(l), _tuple(l1), _tuple(l2)))
 end
 
 function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;
                                     alg=:exp)
-    ts_and_ttans = (retract(t..., alpha; alg=alg) for t in zip(l, ltan))
-    ts, ttans = zip(ts_and_ttans...)
-    # TODO The following two lines just work around a compiler bug in Julia < 1.6.
-    ts = tuple(ts...)
-    ttans = tuple(ttans...)
+
+    ts_and_ttans = retract.(_tuple(l), _tuple(ltan), alpha; alg = alg)
+    ts = first.(ts_and_ttans)
+    ttans = last.(ts_and_ttans)
     return baselayertype(l)(ts...), baselayertype(l)(ttans...)
 end
 
 function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer,
                                        alpha::Real, lend::SimpleLayer; alg=:exp)
-    return baselayertype(l)((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
-                                for t in zip(lvec, l, ltan, lend))...)
+    ttans = transport!.(_tuple(lvec), _tuple(l), _tuple(ltan), alpha, _tuple(lend);
+                            alg = alg)
+    return baselayertype(l)(ttans...)
 end
 
 """
