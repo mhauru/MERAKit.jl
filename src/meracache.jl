@@ -39,16 +39,16 @@ mutable struct MERACache{N, LT <: Layer, OT}
     # TODO Should we use NTuple{N}s instead for densitymatrices and environments?
     densitymatrices::Vector{Union{Nothing, OT}}
     # probably a better choice to use IdDicts here
-    operators::IdDict{Any, Vector{OT}}
-    environments::IdDict{Any, Vector{Union{Nothing, LT}}}
+    operators::Dict{Any, Vector{OT}}
+    environments::Dict{Any, Vector{Union{Nothing, LT}}}
     previous_fixedpoint_densitymatrix::Union{Nothing, OT}
     previous_operatorsum::Union{Nothing, OT}
 
     function MERACache{N, LT, OT}() where {N, LT, OT}
         @assert OT === operatortype(LT)
         densitymatrices = Vector{Union{Nothing, OT}}(fill(nothing, N))
-        operators = IdDict{Any, Vector{OT}}()
-        environments = IdDict{Any, Vector{Union{LT}}}()
+        operators = Dict{Any, Vector{OT}}()
+        environments = Dict{Any, Vector{Union{LT}}}()
         previous_fixedpoint_densitymatrix = nothing
         previous_operatorsum = nothing
         new{N, LT, OT}(densitymatrices, operators, environments,

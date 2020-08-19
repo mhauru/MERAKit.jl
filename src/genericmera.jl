@@ -508,7 +508,7 @@ See also: [`fixedpoint_densitymatrix`](@ref)
 function thermal_densitymatrix(m::GenericMERA, depth)
     width = causal_cone_width(typeof(m))
     V = ⊗(ntuple(n->inputspace(m, depth), Val(width))...)
-    return id(storagetype(operatortype(m)), V)
+    return convert(operatortype(m), id(storagetype(operatortype(m)), V))
 end
 
 """
