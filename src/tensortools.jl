@@ -167,13 +167,9 @@ Strip an `AbstractTensorMap` of its internal symmetries, and return the correspo
 function remove_symmetry(t::TensorMap)
     dom = domain(t)
     cod = codomain(t)
-    if field(spacetype(t)) == ℝ
-        domain_nosym = ProductSpace{CartesianSpace}(map(remove_symmetry, tuple(dom...)))
-        codomain_nosym = ProductSpace{CartesianSpace}(map(remove_symmetry, tuple(cod...)))
-    else
-        domain_nosym = ProductSpace{ComplexSpace}(map(remove_symmetry, tuple(dom...)))
-        codomain_nosym = ProductSpace{ComplexSpace}(map(remove_symmetry, tuple(cod...)))
-    end
+    S = field(spacetype(t)) === ℝ ? CartesianSpace : ComplexSpace
+    domain_nosym = ProductSpace{S}(map(remove_symmetry, tuple(dom...)))
+    codomain_nosym = ProductSpace{S}(map(remove_symmetry, tuple(cod...)))
     t_nosym = TensorMap(convert(Array, t), codomain_nosym ← domain_nosym)
     return t_nosym
 end
