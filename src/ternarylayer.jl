@@ -93,8 +93,8 @@ layertype(::Type{TernaryMERA}) = TernaryLayer
 #Base.show(io::IO, ::Type{TernaryMERA{N}}) where {N} = print(io, "TernaryMERA{($N)}")
 
 # Implement the iteration and indexing interfaces.
-_tuple(layer::TernaryLayer) =
-    (layer.disentangler, layer.isometry)
+# See simplelayer.jl for details.
+_tuple(layer::TernaryLayer) = (layer.disentangler, layer.isometry)
 
 function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
     return tensormaptype(ST, 2, 2, ET)
@@ -106,10 +106,6 @@ scalefactor(::Type{<:TernaryLayer}) = 3
 causal_cone_width(::Type{<:TernaryLayer}) = 2
 
 Base.eltype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-
-function Base.convert(::Type{TernaryLayer{T1, T2}}, l::TernaryLayer) where {T1, T2}
-    return TernaryLayer(convert(T1, l.disentangler), convert(T2, l.isometry))
-end
 
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
