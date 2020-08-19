@@ -98,7 +98,7 @@ layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
 Return the generic type of the layers of the MERA, without specific type parameters
 """
-baselayertype(M::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = baselayertype(LT)
+baselayertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = baselayertype(LT)
 baselayertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = baselayertype(LT)
 
 """
@@ -487,7 +487,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
     _, vecs, vals, info = schursolve(f, x0, 1, :LM, Arnoldi(; eigsolve_pars...))
     rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
-    rho = (rho + rho') # probably not even necessary
+    rho = (rho + rho')  # probably not even necessary
     rho /= tr(rho)
     m.cache.previous_fixedpoint_densitymatrix = rho
     if :verbosity in keys(pars) && pars[:verbosity] > 3
