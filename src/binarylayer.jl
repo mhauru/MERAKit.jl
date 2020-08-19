@@ -93,6 +93,7 @@ layertype(::Type{BinaryMERA}) = BinaryLayer
 #Base.show(io::IO, ::Type{BinaryMERA{N}}) where {N} = print(io, "BinaryMERA{($N)}")
 
 # Implement the iteration and indexing interfaces. Allows things like `u, w = layer`.
+# See simplelayer.jl for details.
 _tuple(layer::BinaryLayer) = (layer.disentangler, layer.isometry)
 
 function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
@@ -105,7 +106,6 @@ scalefactor(::Type{<:BinaryLayer}) = 2
 causal_cone_width(::Type{<:BinaryLayer}) = 3
 
 Base.eltype(::Type{BinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-
 
 outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
@@ -236,6 +236,7 @@ function ascend(op::ChargedBinaryOperator, layer::BinaryLayer)
     return scaled_op
 end
 
+# Turn any BinaryOperator into a ChargedBinaryOperator with trivial charge, and then back.
 ascend_left(op::BinaryOperator, layer::BinaryLayer) =
     remove_dummy_index(ascend_left(append_dummy_index(op), layer))
 
