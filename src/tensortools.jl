@@ -177,7 +177,7 @@ See also: [`support`](@ref)
 #     return op
 # end
 @inline expand_support(op::SquareTensorMap, n::Int) = _expand_support(op, Val(n))
-@noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N,n}
+@noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N, n}
     if n <= N
         return op
     else
@@ -190,7 +190,8 @@ See also: [`support`](@ref)
             eyes2 = Base.fill_to_length((), eye, Val(n-N-k))
             coeff = factorial(n-N)/(factorial(k)*factorial(n-N-k)) / 2^(n-N)
             axpy!(coeff, ⊗(eyes1..., op, eyes2...), op2)
-            # axpy!(1/(n-N+1), ⊗(eyes1..., op, eyes2...), op2) # this would generate the uniform sum
+            # TODO This would generate the uniform sum. See if it changes something.
+            # axpy!(1/(n-N+1), ⊗(eyes1..., op, eyes2...), op2)
         end
         return op2
     end
@@ -300,7 +301,8 @@ end
 """
     pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
 
-Transform `t` to change the vector spaces of its indices, by throwing elements away or padding the tensor with zeros.
+Transform `t` to change the vector spaces of its indices, by throwing elements away or
+padding the tensor with zeros.
 
 `spacedict` is a dictionary with index labels (1, 2, 3, ...) as keys, and `VectorSpace`s as
 values. It tells us which indices should have their space changed, and to what. Instead of a
@@ -333,7 +335,7 @@ function pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
     newcodomain = ProductSpace{S}(newcodomainspaces)
     newdomain = ProductSpace{S}(newdomainspaces)
     tnew = fill!(similar(t, newcodomain, newdomain), zero(eltype(t)))
-    for (f1,f2) in fusiontrees(t)
+    for (f1, f2) in fusiontrees(t)
         a = t[f1, f2]
         anew = tnew[f1, f2]
         axes = Base.OneTo.(min.(size(a), size(anew)))
