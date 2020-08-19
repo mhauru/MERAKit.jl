@@ -101,7 +101,7 @@ function replace_layer!(c::MERACache{N}, depth) where N
     c.densitymatrices[1:depth] .= nothing
     for v in values(c.operators)
         last_index = min(depth, length(v))
-        delete!(v, last_index+1:length(v))
+        deleteat!(v, last_index+1:length(v))
     end
     # Changing anything always invalidates all environments, since they depend on things
     # both above and below.
