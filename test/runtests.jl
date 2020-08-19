@@ -81,7 +81,7 @@ function random_internalspaces(extspaces, meratype)
         # Check that we didn't accidentally make the isometric part
         # non-isometric. If we did, just make Vint = Vext.
         Vint_fusion = fuse(fill(Vint, width)...)
-        infinum(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
+        infimum(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
         Vint
     end
     return intspaces
