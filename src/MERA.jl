@@ -81,5 +81,4 @@ scalefactor(m::Union{GenericMERA,MERACache,Layer}) = scalefactor(typeof(m))
 causal_cone_width(m::Union{GenericMERA,MERACache,Layer}) = causal_cone_width(typeof(m))
 Base.eltype(m::Union{GenericMERA,MERACache,Layer}) = eltype(typeof(m))
 
-
 end  # module
