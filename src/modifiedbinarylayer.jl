@@ -107,11 +107,11 @@ layertype(::Type{ModifiedBinaryMERA}) = ModifiedBinaryLayer
 #end
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
+# See simplelayer.jl for details.
 _tuple(layer::ModifiedBinaryLayer) =
     (layer.disentangler, layer.isometry_left, layer.isometry_right)
 
-function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
-                     ) where {ST, ET}
+function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}) where {ST, ET}
     return ModifiedBinaryOp{tensormaptype(ST, 2, 2, ET)}
 end
 operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
