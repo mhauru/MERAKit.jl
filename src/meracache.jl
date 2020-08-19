@@ -67,11 +67,6 @@ layertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = LT
 baselayertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = baselayertype(LT)
 causal_cone_width(C::Type{<:MERACache}) = causal_cone_width(layertype(C))
 
-operatortype(c::MERACache) = operatortype(typeof(c))
-layertype(c::MERACache) = layertype(typeof(c))
-baselayertype(c::MERACache) = baselayertype(typeof(c))
-causal_cone_width(c::MERACache) = causal_cone_width(typeof(c))
-
 function Base.copy!(dst::MERACache, src::MERACache)
     dst.densitymatrices = copy(src.densitymatrices)
     dst.operators = Dict()
@@ -146,7 +141,7 @@ function get_stored_densitymatrix(c::MERACache{N}, depth) where N
     depth = Int(min(N, depth))
     rho = c.densitymatrices[depth]
     @assert rho !== nothing
-    return rho#::operatortype(c)
+    return rho
 end
 
 """

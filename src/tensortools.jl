@@ -12,42 +12,6 @@ A `Union` type of the different `TensorKitManifolds` tangent types: `GrassmannTa
 """
 Tangent = Union{Grassmann.GrassmannTangent, Stiefel.StiefelTangent, Unitary.UnitaryTangent}
 
-# TODO These belong in TensorKit => should be done now
-# Base.convert(::Type{TensorMap}, t::TensorKit.AdjointTensorMap) = copy(t)
-# function Base.convert(::Type{TensorMap{S, N1, N2, G, A, F1, F2}},
-#                       t::TensorKit.AdjointTensorMap{S, N1, N2, G, A, F1, F2}
-#                      ) where {S, N1, N2, G, A, F1, F2}
-#     return convert(TensorMap, t)
-# end
-#
-# function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
-#                       t::TensorMap{S, N1, N2, G, Matrix{E2}, F1, F2}
-#                      ) where {S, N1, N2, G, E1, E2, F1, F2}
-#     return copyto!(similar(t, E1), t)
-# end
-#
-# function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
-#                       t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
-#                      ) where {S, N1, N2, G, E1, E2, F1, F2}
-#     return copyto!(similar(t, E1), t)
-# end
-
-# """
-#     tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET})
-#
-# Given the `IndexSpace` type `ST`, number of codomain (`N1`) and domain (`N2`) indices, and
-# storage type `ET` (typically `Matrix{M}` for some M <: Number`), return the corresponding
-# concrete `TensorMap` type.
-# """
-# function tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET}) where {ST, N1, N2, ET}
-#     G = sectortype(ST)
-#     A = G === Trivial ? Matrix{ET} : TensorKit.SectorDict{G, Matrix{ET}}
-#     staticN1, staticN2 = TupleTools.StaticLength{N1}(), TupleTools.StaticLength{N2}()
-#     F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN1)
-#     F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN2)
-#     return TensorMap{ST, N1, N2, G, A, F1, F2}
-# end
-
 """
     disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool)
 
@@ -164,18 +128,6 @@ e.g. I ⊗ op and op ⊗ I, are averaged over.
 
 See also: [`support`](@ref)
 """
-# function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
-#     V = space(op, 1)
-#     eye = id(V)
-#     op_support = N
-#     while op_support < n
-#         opeye = op ⊗ eye
-#         eyeop = eye ⊗ op
-#         op = (opeye + eyeop)/2
-#         op_support += 1
-#     end
-#     return op
-# end
 @inline expand_support(op::SquareTensorMap, n::Int) = _expand_support(op, Val(n))
 @noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N, n}
     if n <= N
@@ -347,19 +299,6 @@ end
 pad_with_zeros_to(t::AbstractTensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
 
 """
-    convert_to_matrix(t::AbstractTensorMap)
-
-Fuse the domain and codomain of `t`, and return the resulting matrix (as a `TensorMap`).
-"""
-function convert_to_matrix(t::AbstractTensorMap)
-    dom, codom = domain(t), codomain(t)
-    domainfuser = isomorphism(dom, fuse(dom))
-    codomainfuser = isomorphism(codom, fuse(codom))
-    mt = codomainfuser' * t * domainfuser
-    return mt
-end
-
-"""
     gershgorin_bounds(t::AbstractTensorMap)
 
 For a Hermitian square tensor (a square matrix after fusing the domain and codomain into
@@ -379,28 +318,28 @@ function gershgorin_bounds(t::SquareTensorMap)
     return lb, ub
 end
 
-"""
-    gershgorin_discs(t::AbstractTensorMap)
-
-For a square tensor (a square matrix after fusing the domain and codomain into single
-indices), return a list of its Gershgorin discs, as pairs (c, r) where c is the centre and r
-is the radius.
-
-This costs O(D^2) time, where D is the matrix dimension.
-
-See also: [`gershgorin_bounds`](@ref)
-"""
-function gershgorin_discs(t::SquareTensorMap)
-    alldiscs = Vector{Tuple{eltype(t), real(eltype(t))}}()
-    for (c,b) in blocks(t)
-        discs = gershgorin_discs(b)
-        @assert isinteger(dim(c))
-        for _ = 1:dim(c)
-            append!(alldiscs, discs)
-        end
-    end
-    return alldiscs
-end
+# """
+#     gershgorin_discs(t::AbstractTensorMap)
+#
+# For a square tensor (a square matrix after fusing the domain and codomain into single
+# indices), return a list of its Gershgorin discs, as pairs (c, r) where c is the centre and r
+# is the radius.
+#
+# This costs O(D^2) time, where D is the matrix dimension.
+#
+# See also: [`gershgorin_bounds`](@ref)
+# """
+# function gershgorin_discs(t::SquareTensorMap)
+#     alldiscs = Vector{Tuple{eltype(t), real(eltype(t))}}()
+#     for (c,b) in blocks(t)
+#         discs = gershgorin_discs(b)
+#         @assert isinteger(dim(c))
+#         for _ = 1:dim(c)
+#             append!(alldiscs, discs)
+#         end
+#     end
+#     return alldiscs
+# end
 
 function gershgorin_bounds(a::Array{S, 2}) where {S}
     nonhermiticity = norm(a - a')/norm(a)
