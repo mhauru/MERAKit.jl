@@ -28,7 +28,7 @@ Base.indexed_iterate(layer::SimpleLayer, i::Int, args...) =
 Base.length(layer::SimpleLayer) = _tuple(layer)
 
 function remove_symmetry(layer::SimpleLayer)
-    layertype(layer)(map(remove_symmetry, _tuple(layer))...)
+    baselayertype(layer)(map(remove_symmetry, _tuple(layer))...)
 end
 
 function TensorKitManifolds.projectisometric(layer::SimpleLayer)
@@ -54,12 +54,12 @@ end
 # same, fully parametrized type.
 
 function tensorwise_scale(layer::SimpleLayer, alpha::Number)
-    return layertype(layer)((_tuple(layer) .* alpha)...)
+    return baselayertype(layer)((_tuple(layer) .* alpha)...)
 end
 
 function tensorwise_sum(l1::SimpleLayer, l2::SimpleLayer)
-    @assert layertype(l1) == layertype(l2)
-    return layertype(l1)((_tuple(l1) .+ _tuple(l2))...)
+    @assert baselayertype(l1) == baselayertype(l2)
+    return baselayertype(l1)((_tuple(l1) .+ _tuple(l2))...)
 end
 
 # # # Manifold functions
@@ -77,13 +77,13 @@ function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Re
     # TODO The following two lines just work around a compiler bug in Julia < 1.6.
     ts = tuple(ts...)
     ttans = tuple(ttans...)
-    return layertype(l)(ts...), layertype(l)(ttans...)
+    return baselayertype(l)(ts...), baselayertype(l)(ttans...)
 end
 
 function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer,
                                        alpha::Real, lend::SimpleLayer; alg=:exp)
-    return layertype(l)((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
-                         for t in zip(lvec, l, ltan, lend))...)
+    return baselayertype(l)((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
+                                for t in zip(lvec, l, ltan, lend))...)
 end
 
 """

@@ -93,6 +93,15 @@ layertype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = LT
 layertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = LT
 
 """
+    baselayertype(m::GenericMERA)
+    baselayertype(::Type{<:GenericMERA})
+
+Return the generic type of the layers of the MERA, without specific type parameters
+"""
+baselayertype(M::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = baselayertype(LT)
+baselayertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = baselayertype(LT)
+
+"""
     operatortype(m::GenericMERA)
     operatortype(::Type{<: GenericMERA})
 
@@ -130,14 +139,7 @@ Return the number of transition layers, i.e. layers below the scale invariant on
 MERA.
 """
 num_translayers(::Type{<:GenericMERA{N}}) where {N} = N-1
-
-# properties of instances
-layertype(m::Union{GenericMERA,Layer}) = layertype(typeof(m))
-operatortype(m::Union{GenericMERA,Layer}) = operatortype(typeof(m))
-scalefactor(m::Union{GenericMERA,Layer}) = scalefactor(typeof(m))
-causal_cone_width(m::Union{GenericMERA,Layer}) = causal_cone_width(typeof(m))
 num_translayers(m::GenericMERA) = num_translayers(typeof(m))
-Base.eltype(m::Union{GenericMERA,Layer}) = eltype(typeof(m))
 
 """
     get_layer(m::GenericMERA, depth)
@@ -401,7 +403,7 @@ function space_invar(m::GenericMERA)
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_intralayer has no method for type $(layertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_intralayer has no method for type $(baselayertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
 
@@ -411,7 +413,7 @@ function space_invar(m::GenericMERA)
                 throw(ArgumentError(errmsg))
             end
         else
-            msg = "space_invar_interlayer has no method for type $(layertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
+            msg = "space_invar_interlayer has no method for type $(baselayertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
         layer = next_layer

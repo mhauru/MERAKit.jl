@@ -64,10 +64,12 @@ end
 
 operatortype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = OT
 layertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = LT
+baselayertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = baselayertype(LT)
 causal_cone_width(C::Type{<:MERACache}) = causal_cone_width(layertype(C))
 
 operatortype(c::MERACache) = operatortype(typeof(c))
 layertype(c::MERACache) = layertype(typeof(c))
+baselayertype(c::MERACache) = baselayertype(typeof(c))
 causal_cone_width(c::MERACache) = causal_cone_width(typeof(c))
 
 function Base.copy!(dst::MERACache, src::MERACache)
