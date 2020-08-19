@@ -23,9 +23,7 @@ Base.copy(layer::SimpleLayer) = typeof(layer)(map(deepcopy, _tuple(layer))...)
         return t[i], Val(i+1)
     end
 end
-Base.indexed_iterate(layer::SimpleLayer, i::Int, args...) =
-    Base.indexed_iterate(_tuple(layer), i, args...)
-Base.length(layer::SimpleLayer) = _tuple(layer)
+Base.length(layer::SimpleLayer) = length(_tuple(layer))
 
 function remove_symmetry(layer::SimpleLayer)
     return baselayertype(layer)(map(remove_symmetry, _tuple(layer))...)
