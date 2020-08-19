@@ -929,8 +929,7 @@ end
 Scale all the tensors of `m` by `alpha`.
 """
 function tensorwise_scale(m::GenericMERA, alpha::Number)
-    t = (tensorwise_scale(l, alpha) for l in m.layers)
-    return GenericMERA(t)
+    return GenericMERA(tensorwise_scale.(m.layers, alpha))
 end
 
 """
@@ -941,7 +940,9 @@ Return a MERA for which each tensor is the sum of the corresponding tensors of `
 """
 function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    layers = (tensorwise_sum(get_layer(m1, i), get_layer(m2, i)) for i in 1:n)
+    layers = ntuple(Val(n)) do i
+        tensorwise_sum(get_layer(m1, i), get_layer(m2, i))
+    end
     return GenericMERA(layers)
 end
 
@@ -979,12 +980,11 @@ corresponding gradients for each tensor.
 """
 function gradient(h, m::GenericMERA{N}, pars::NamedTuple; vary_disentanglers=true) where {N}
     nt = num_translayers(m)
-    layers = (begin
-                  layer = get_layer(m, l)
-                  env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
-                  gradient(layer, env; metric=pars[:metric])
-              end
-              for l in 1:nt+1)
+    layers = ntuple(Val(nt+1)) do l
+        layer = get_layer(m, l)
+        env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
+        gradient(layer, env; metric=pars[:metric])
+    end
     g = GenericMERA(layers)
     return g
 end
