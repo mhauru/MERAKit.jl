@@ -363,8 +363,8 @@ written and read from e.g. disk, without having to worry about quirks of the typ
 
 See also: [`depseudoserialize`](@ref)
 """
-function pseudoserialize(m::T) where T <: GenericMERA
-    return (repr(T), map(pseudoserialize, m.layers))
+function pseudoserialize(m::GenericMERA)
+    return (repr(typeof(m)), map(pseudoserialize, m.layers))
 end
 
 """
@@ -376,7 +376,7 @@ Reconstruct an object given the output of `pseudoserialize`:
 See also: [`pseudoserialize`](@ref)
 """
 function depseudoserialize(::Type{T}, args) where T <: GenericMERA
-    return GenericMERA([depseudoserialize(d...) for d in args])
+    return GenericMERA(map(d->depseudoserialize(d...), args))
 end
 
 # # # Invariants
@@ -640,7 +640,6 @@ See also: [`fixedpoint_densitymatrix`](@ref), [`scale_invariant_operator_sum`](@
 function environment(m::GenericMERA{N, LT, OT}, op, depth, pars; vary_disentanglers=true
                     ) where {N, LT, OT}
     if !has_environment_stored(m.cache, op, depth)
-        local op_below::OT
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
         else
@@ -912,13 +911,12 @@ end
 Change the additive normalisation of a local Hamiltonian term `h` to make it suitable for
 computing an Evenbly-Vidal update environment.
 
-More specifically, return `h - ub*eye`, where `eye` is the identity operator, and `ub` is an
-upper bound for the largest eigenvalue of `h`
+More specifically, return `h - ub*one(h)`, where `one(h)` is the identity operator, and
+`ub` is an upper bound for the largest eigenvalue of `h`
 """
 function normalise_hamiltonian(h)
     lb, ub = gershgorin_bounds(h)
-    eye = id(domain(h))
-    return h - ub*eye
+    return h - ub*one(h)
 end
 
 # # # Gradient optimization
@@ -1001,14 +999,13 @@ For details on how the preconditioning is done, see https://arxiv.org/abs/2007.0
 """
 function precondition_tangent(m::GenericMERA, tan::GenericMERA, pars::NamedTuple)
     nt = num_translayers(m)
-    tanlayers_prec = (begin
+    tanlayers_prec = ntuple(Val(nt+1)) do l
                           layer = get_layer(m, l)
                           tanlayer = get_layer(tan, l)
                           rho = densitymatrix(m, l+1, pars)
                           precondition_tangent(layer, tanlayer, rho)
                       end
-                      for l in 1:nt+1)
-    tan_prec = typeof(tan)(tanlayers_prec)
+    tan_prec = GenericMERA(tanlayers_prec)
     return tan_prec
 end
 
@@ -1026,14 +1023,12 @@ See `TensorKitManifolds.retract` for more details.
 
 See also: [`transport!`](@ref)
 """
-function TensorKitManifolds.retract(m::T1, mtan::T2, alpha::Real; kwargs...
-                                   ) where {T1 <: GenericMERA, T2 <: GenericMERA}
-    layers, layers_tan = zip((retract(l, ltan, alpha; kwargs...)
-                              for (l, ltan) in zip(m.layers, mtan.layers))...)
-    # TODO The following two lines just work around a compiler bug in Julia < 1.6.
-    layers = tuple(layers...)
-    layers_tan = tuple(layers_tan...)
-    return T1(layers), T2(layers_tan)
+function TensorKitManifolds.retract(m::GenericMERA{N}, mtan::GenericMERA{N}, alpha::Real;
+                                    kwargs...) where N
+    layers_and_layers_tan = retract.(m.layers, mtan.layers, alpha; kwargs...)
+    layers = first.(layers_and_layers_tan)
+    layers_tan = last.(layers_and_layers_tan)
+    return GenericMERA(layers), GenericMERA(layers_tan)
 end
 
 """
@@ -1052,13 +1047,11 @@ See `TensorKitManifolds.transport!` for more details.
 
 See also: [`retract`](@ref)
 """
-function TensorKitManifolds.transport!(mvec::T2, m::T1, mtan::T2, alpha::Real, mend::T1;
-                                       kwargs...) where {T1 <: GenericMERA,
-                                                         T2 <: GenericMERA}
-    layers = (transport!(lvec, l, ltan, alpha, lend; kwargs...)
-              for (lvec, l, ltan, lend)
-              in zip(mvec.layers, m.layers, mtan.layers, mend.layers))
-    return T2(layers)
+function TensorKitManifolds.transport!(mvec::GenericMERA, m::GenericMERA,
+                                        mtan::GenericMERA, alpha::Real,
+                                        mend::GenericMERA; kwargs...)
+    layers = transport!.(mvec.layers, m.layers, mtan.layers, alpha, mend.layers; kwargs...)
+    return GenericMERA(layers)
 end
 
 """
