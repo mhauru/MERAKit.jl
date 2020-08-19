@@ -28,11 +28,11 @@ Base.indexed_iterate(layer::SimpleLayer, i::Int, args...) =
 Base.length(layer::SimpleLayer) = _tuple(layer)
 
 function remove_symmetry(layer::SimpleLayer)
-    baselayertype(layer)(map(remove_symmetry, _tuple(layer))...)
+    return baselayertype(layer)(map(remove_symmetry, _tuple(layer))...)
 end
 
 function TensorKitManifolds.projectisometric(layer::SimpleLayer)
-    typeof(layer)(map(projectisometric, _tuple(layer))...)
+    return typeof(layer)(map(projectisometric, _tuple(layer))...)
 end
 
 function TensorKitManifolds.projectisometric!(layer::SimpleLayer)
@@ -47,11 +47,6 @@ end
 function depseudoserialize(::Type{T}, data) where T <: SimpleLayer
     return T(map(d->depseudoserialize(d...), data)...)
 end
-
-# TODO Definitions like the following are a little dangerous, since they allow for instance
-# summing a BinaryLayer with a TernaryLayer. Unfortunately I haven't been able to come up
-# with a better implementation, because l1 and l2 can not be restricted to be of the exact
-# same, fully parametrized type.
 
 function tensorwise_scale(layer::SimpleLayer, alpha::Number)
     return baselayertype(layer)((_tuple(layer) .* alpha)...)
