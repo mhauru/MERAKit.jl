@@ -307,23 +307,34 @@ then `t` is padded with zeros to fill in the new elements. Otherwise some elemen
 will be truncated away.
 """
 function pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
-    # Expanders are the matrices by which each index will be multiplied to change the space.
-    idmat(T, shp) = Array{T}(I, shp)
-    expanders = (TensorMap(idmat, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict)
-    sizedomain = length(domain(t))
-    sizecodomain = length(codomain(t))
-    # Prepare the @ncon call that contracts each index of `t` with the corresponding
-    # expander, if one exists.
-    numinds = sizedomain + sizecodomain
-    inds_t = [ind in keys(spacedict) ? ind : -ind for ind in 1:numinds]
-    inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
-    tensors = [t, expanders...]
-    inds = [inds_t, inds_expanders...]
-    t_new_unpermuted = @ncon(tensors, inds)
-    # Permute inds to have the codomain and domain match with those of the input.
-    t_new = permute(t_new_unpermuted, tuple(1:sizecodomain...),
-                    tuple(sizecodomain+1:numinds...))
-    return t_new
+    S = spacetype(t)
+    newcodomainspaces = tuple(codomain(t)...)
+    for i = 1:length(newcodomainspaces)
+        if haskey(spacedict, i)
+            @assert isdual(spacedict[i]) == isdual(space(t, i))
+            # unpredictable behaviour otherwise
+            newcodomainspaces = Base.setindex(newcodomainspaces, spacedict[i], i)
+        end
+    end
+    newdomainspaces = tuple(domain(t)...)
+    for i = 1:length(newdomainspaces)
+        j = i + numout(t)
+        if haskey(spacedict, j)
+            @assert isdual(spacedict[j]) == isdual(space(t, j))
+            # unpredictable behaviour otherwise
+            newdomainspaces = Base.setindex(newdomainspaces, spacedict[j]', i)
+        end
+    end
+    newcodomain = ProductSpace{S}(newcodomainspaces)
+    newdomain = ProductSpace{S}(newdomainspaces)
+    tnew = fill!(similar(t, newcodomain, newdomain), zero(eltype(t)))
+    for (f1,f2) in fusiontrees(t)
+        a = t[f1, f2]
+        anew = tnew[f1, f2]
+        axes = Base.OneTo.(min.(size(a), size(anew)))
+        copyto!(view(anew, axes...), view(a, axes...))
+    end
+    return tnew
 end
 
 pad_with_zeros_to(t::AbstractTensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
@@ -502,7 +513,7 @@ function symmetric_sylvester(E::AbstractTensorMap, U::AbstractTensorMap,
     return TensorMap(data, cod ← dom)
 end
 
-function symmetric_sylvester(E::AbstractArray, U::AbstractArray, C::AbstractArray, delta)
+function symmetric_sylvester(E::AbstractVector, U::AbstractMatrix, C::AbstractMatrix, delta)
     temp1 = typeof(C)(undef, size(C))
     temp2 = typeof(C)(undef, size(C))
     mul!(temp1, U', C)
