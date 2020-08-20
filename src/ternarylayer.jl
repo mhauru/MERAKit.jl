@@ -142,7 +142,7 @@ end
 function ascending_fixedpoint(layer::TernaryLayer)
     width = causal_cone_width(layer)
     Vtotal = ⊗(ntuple(n->inputspace(layer), Val(width))...)
-    return id(storagetype(operatortype(layer)), Vtotal)# / sqrt(dim(Vtotal))
+    return id(storagetype(operatortype(layer)), Vtotal)
 end
 
 function gradient(layer::TernaryLayer, env::TernaryLayer; metric=:euclidean)
