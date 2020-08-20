@@ -595,25 +595,27 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
-    function f(x::OT)
-        xasc::OT = ascend(x, m, nt+2, nt+1)
-        xnorm::OT = xasc - fp * dot(fp, xasc)
-        return xnorm
+    rhop = fixedpoint_densitymatrix(m, pars)
+    f = let fp = fp, rhop = rhop, lscaleinv = get_layer(m, nt+1)
+        function (x)
+            xasc = ascend(x, lscaleinv)
+            return axpy!(-dot(rhop, xasc), fp, xasc)
+        end
     end
     op_top = ascended_operator(m, op, nt+1)
-    x0::OT = op_top
+    x0 = op_top
     old_opsum = m.cache.previous_operatorsum
     if old_opsum !== nothing && space(x0) == space(old_opsum)
         x0 = old_opsum
     end
     linsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
     one_ = one(eltype(m))
-    opsum::OT, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
+    opsum, info = linsolve(f, op_top, x0, one_, -one_; linsolve_pars...)
     # We know the result should always be Hermitian.
-    opsum = (opsum + opsum') / 2.0
+    opsum = (opsum + opsum') / 2
     m.cache.previous_operatorsum = opsum
     # We are not interested in the component along fp.
-    opsum = opsum - fp * dot(fp, opsum)
+    opsum = opsum - fp * dot(rhop, opsum)
     if :verbosity in keys(pars) && pars[:verbosity] > 3
         msg = "Used $(info.numops) superoperator invocations to find the scale invariant operator sum."
         @info(msg)

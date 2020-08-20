@@ -164,7 +164,7 @@ end
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     width = causal_cone_width(layer)
     Vtotal = ⊗(ntuple(n->inputspace(layer), Val(width))...)
-    eye = id(storagetype(operatortype(layer)), Vtotal) / sqrt(dim(Vtotal))
+    eye = id(storagetype(operatortype(layer)), Vtotal)# / sqrt(dim(Vtotal))
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
