@@ -439,7 +439,9 @@ function ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
         layer = get_layer(m, endscale-1)
         op_asc = ascend(op_pre, layer)
     else
-        op_asc = convert(operatortype(m), op)
+        # op_asc = convert(operatortype(m), op)
+        # what if it is a charged operator, or one living on a smaller width?
+        op_asc = op
     end
     return op_asc
 end
@@ -461,6 +463,7 @@ function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1
         op_desc = descend(op_pre, layer)
     else
         op_desc = convert(operatortype(m), op)
+        # here this makes sence, I don't think there is any point in descending anything but a density matrix living exactly on the width of the causal cone.
     end
     return op_desc
 end
@@ -674,22 +677,19 @@ function scalingdimensions(m::GenericMERA, howmany=20)
     V = inputspace(m, Inf)
     chi = dim(V)
     width = causal_cone_width(typeof(m))
-    # Don't even try to get more than half of the eigenvalues. Its too expensive, and they
-    # are garbage anyway.
-    maxmany = Int(ceil(chi^width/2))
-    howmany = min(maxmany, howmany)
     # Define a function that takes an operator and ascends it once through the scale
     # invariant layer.
     nm = num_translayers(m)
-    toplayer = get_layer(m, Inf)
-    f(x) = ascend(x, toplayer)
+    f(x) = ascend(x, get_layer(m, Inf)) # closures are more type stable if they only depend on arguments of the function (I also don't understand why)
     # Find out which symmetry sectors we should do the diagonalization in.
-    interlayer_space = ⊗(Iterators.repeated(V, width)...)
-    sects = sectors(fuse(interlayer_space))
+    interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     scaldim_dict = Dict()
-    for irrep in sects
+    for irrep in blocksectors(interlayer_space)
         # Diagonalize in each irrep sector.
         x0 = scalingoperator_initialguess(m, interlayer_space, irrep)
+        # Don't even try to get more than half of the eigenvalues. Its too expensive, and
+        # they are garbage anyway.
+        howmanysector = min(howmany, div(blockdim(interlayer_space, irrep), 2))
         S, U, info = eigsolve(f, x0, howmany, :LM)
         # sfact is the ratio by which the number of sites changes at each coarse-graining.
         sfact = scalefactor(typeof(m))
@@ -705,17 +705,20 @@ end
 Return an initial guess to be used in the iterative eigensolver that solves for scaling
 operators.
 """
-function scalingoperator_initialguess(m::GenericMERA{N, LT, OT}, interlayer_space, irrep
-                                     ) where {N, LT, OT}
+function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
     typ = eltype(m)
     inspace = interlayer_space
     outspace = interlayer_space
-    # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-    irrep !== Trivial() && (inspace = inspace ⊗ spacetype(inspace)(irrep => 1))
     # The initial guess for the eigenvalue search. Also defines the type for
     # eigenvectors.
-    x0::OT = convert(OT, TensorMap(randn, typ, outspace ← inspace))
-    return x0
+    if irrep !== Trivial()
+        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
+        return TensorMap(randn, typ, outspace ← (inspace ⊗ spacetype(inspace)(irrep => 1)))
+    else
+        return TensorMap(randn, typ, outspace ← inspace)
+    end
+    # x0::OT = convert(OT, TensorMap(randn, typ, outspace ← inspace))
+    # this cannot work; if there is an extra irrep index, it cannot be converted to OT
 end
 
 # # # Evaluation
