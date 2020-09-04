@@ -389,7 +389,6 @@ function test_optimization(::Type{meratype}, ::Type{S}, method, precondition=fal
             verbosity = 0,
             scaleinvariant_krylovoptions = (
                                             tol = 1e-8,
-                                            krylovdim = 4,
                                             verbosity = 0,
                                             maxiter = 20,
                                            ),

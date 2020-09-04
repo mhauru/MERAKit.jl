@@ -487,7 +487,7 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
         x0 = old_rho
     end
     eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
-    _, vecs, vals, info = schursolve(f, x0, 1, :LM, Arnoldi(; eigsolve_pars...))
+    _, vecs, vals, info = schursolve(f, x0, 1, :LM, Arnoldi(; eager=true, eigsolve_pars...))
     rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
     rho = (rho + rho')  # probably not even necessary
@@ -766,8 +766,6 @@ const default_pars = (method = :lbfgs,
                       verbosity = 2,
                       scaleinvariant_krylovoptions = (
                                                       tol = 1e-13,
-                                                      krylovdim = 4,
-                                                      # krylovdim 4 sounds very small, especially for linsolve. Is there any advantage over just using smaller maxiter and larger krylovdim, maybe in combination with eager = true for eigsolve/schursolve
                                                       verbosity = 0,
                                                       maxiter = 20,
                                                      ),
