@@ -674,20 +674,20 @@ scaling dimensions in this symmetry sector.
 `howmany` controls how many of lowest scaling dimensions are computed.
 """
 function scalingdimensions(m::GenericMERA, howmany=20)
+    width = causal_cone_width(m)
     V = inputspace(m, Inf)
-    chi = dim(V)
-    width = causal_cone_width(typeof(m))
+    interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     # Define a function that takes an operator and ascends it once through the scale
     # invariant layer.
-    nm = num_translayers(m)
+    nt = num_translayers(m)
     # Closures are more type stable if they only depend on arguments of the function.
-    f(x) = ascend(x, get_layer(m, Inf))
+    f(x) = ascend(x, get_layer(m, nt+1))
     # Find out which symmetry sectors we should do the diagonalization in.
-    interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     scaldim_dict = Dict()
+    l = get_layer(m, nt+1)
     for irrep in blocksectors(interlayer_space)
         # Diagonalize in each irrep sector.
-        x0 = scalingoperator_initialguess(m, interlayer_space, irrep)
+        x0 = scalingoperator_initialguess(l, irrep)
         # Don't even try to get more than half of the eigenvalues. Its too expensive, and
         # they are garbage anyway.
         howmanysector = min(howmany, div(blockdim(interlayer_space, irrep), 2, RoundUp))
@@ -698,26 +698,6 @@ function scalingdimensions(m::GenericMERA, howmany=20)
         scaldim_dict[irrep] = scaldims
     end
     return scaldim_dict
-end
-
-"""
-    scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
-
-Return an initial guess to be used in the iterative eigensolver that solves for scaling
-operators.
-"""
-function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
-    typ = eltype(m)
-    inspace = interlayer_space
-    outspace = interlayer_space
-    # The initial guess for the eigenvalue search. Also defines the type for
-    # eigenvectors.
-    if irrep !== Trivial()
-        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-        return TensorMap(randn, typ, outspace ← (inspace ⊗ spacetype(inspace)(irrep => 1)))
-    else
-        return TensorMap(randn, typ, outspace ← inspace)
-    end
 end
 
 # # # Evaluation

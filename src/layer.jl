@@ -116,6 +116,14 @@ layer, normalised to have norm 1.
 function ascending_fixedpoint end
 
 """
+    scalingoperator_initialguess(l::Layer, irrep)
+
+Return an initial guess to be used in the iterative eigensolver that solves for scaling
+operators of the layer `l`.
+"""
+function scalingoperator_initialguess end
+
+"""
     ascend(op, layer::Layer)
 Ascend a local operator `op` from the bottom of `layer` to the top.
 """

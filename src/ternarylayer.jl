@@ -145,6 +145,23 @@ function ascending_fixedpoint(layer::TernaryLayer)
     return id(storagetype(operatortype(layer)), Vtotal)
 end
 
+function scalingoperator_initialguess(l::TernaryLayer, irrep)
+    width = causal_cone_width(l)
+    V = inputspace(l)
+    interlayer_space = ⊗(ntuple(n->V, Val(width))...)
+    outspace = interlayer_space
+    local inspace
+    if irrep !== Trivial()
+        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
+        inspace = interlayer_space ⊗ spacetype(V)(irrep => 1)
+    else
+        inspace = interlayer_space
+    end
+    typ = eltype(l)
+    t = TensorMap(randn, typ, outspace ← inspace)
+    return t
+end
+
 function gradient(layer::TernaryLayer, env::TernaryLayer; metric=:euclidean)
     u, w = layer
     uenv, wenv = env
