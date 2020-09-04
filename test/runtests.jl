@@ -370,6 +370,18 @@ function test_projectisometric(::Type{meratype}, ::Type{S}
 end
 
 """
+Create a random MERA and compute its scaling dimensions. The numbers will be nonsense, but
+at least we know the function runs.
+"""
+function test_scalingdimensions(::Type{M}, ::Type{S}) where {M, S}
+    layers = 4
+    spaces = random_layerspaces(S, M, layers)
+    intspaces = random_internalspaces(spaces, M)
+    m = random_MERA(M, ComplexF64, spaces, intspaces; random_disentangler=true)
+    scalingdimensions(m)
+end
+
+"""
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
@@ -531,6 +543,9 @@ end
 end
 @testset "Projectisometric" begin
     test_with_all_types(test_projectisometric, meratypes, spacetypes)
+end
+@testset "Scaling dimensions" begin
+    test_with_all_types(test_scalingdimensions, meratypes, spacetypes)
 end
 
 # Manifold operations
