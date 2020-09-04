@@ -314,29 +314,6 @@ function gershgorin_bounds(t::SquareTensorMap)
     return lb, ub
 end
 
-# """
-#     gershgorin_discs(t::AbstractTensorMap)
-#
-# For a square tensor (a square matrix after fusing the domain and codomain into single
-# indices), return a list of its Gershgorin discs, as pairs (c, r) where c is the centre and r
-# is the radius.
-#
-# This costs O(D^2) time, where D is the matrix dimension.
-#
-# See also: [`gershgorin_bounds`](@ref)
-# """
-# function gershgorin_discs(t::SquareTensorMap)
-#     alldiscs = Vector{Tuple{eltype(t), real(eltype(t))}}()
-#     for (c,b) in blocks(t)
-#         discs = gershgorin_discs(b)
-#         @assert isinteger(dim(c))
-#         for _ = 1:dim(c)
-#             append!(alldiscs, discs)
-#         end
-#     end
-#     return alldiscs
-# end
-
 function gershgorin_bounds(a::Array{S, 2}) where {S}
     nonhermiticity = norm(a - a')/norm(a)
     if nonhermiticity > 1e-12

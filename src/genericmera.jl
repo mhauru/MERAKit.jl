@@ -463,7 +463,6 @@ function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1
         op_desc = descend(op_pre, layer)
     else
         op_desc = convert(operatortype(m), op)
-        # here this makes sence, I don't think there is any point in descending anything but a density matrix living exactly on the width of the causal cone.
     end
     return op_desc
 end
@@ -544,7 +543,8 @@ end
 """
     densitymatrices(m::GenericMERA, pars=(;))
 
-Return all the distinct density matrices of the MERA, starting with the one at the physical level, and ending with the scale invariant one.
+Return all the distinct density matrices of the MERA, starting with the one at the physical
+level, and ending with the scale invariant one.
 
 `pars` maybe a `NamedTuple` of options, passed on to the function
 `fixedpoint_densitymatrix`.
@@ -629,10 +629,10 @@ end
 """
     environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
 
-Return a `Layer` consisting of the environments of the various tensors of `m` at `depth`, with respect to
-the expectation value of `op`. Note the return value isn't really a proper MERA layer, i.e.
-the tensors are not isometric, it just has the same structure, and hence the same data
-structure is used.
+Return a `Layer` consisting of the environments of the various tensors of `m` at `depth`,
+with respect to the expectation value of `op`. Note the return value isn't really a proper
+MERA layer, i.e. the tensors are not isometric, it just has the same structure, and hence
+the same data structure is used.
 
 `pars` are parameters that are passed to `scale_invariant_operator_sum` and
 `fixedpoint_densitymatrix`. `vary_disentanglers` gives the option of computing the
@@ -680,7 +680,8 @@ function scalingdimensions(m::GenericMERA, howmany=20)
     # Define a function that takes an operator and ascends it once through the scale
     # invariant layer.
     nm = num_translayers(m)
-    f(x) = ascend(x, get_layer(m, Inf)) # closures are more type stable if they only depend on arguments of the function (I also don't understand why)
+    # Closures are more type stable if they only depend on arguments of the function.
+    f(x) = ascend(x, get_layer(m, Inf))
     # Find out which symmetry sectors we should do the diagonalization in.
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     scaldim_dict = Dict()
@@ -717,8 +718,6 @@ function scalingoperator_initialguess(m::GenericMERA, interlayer_space, irrep)
     else
         return TensorMap(randn, typ, outspace ← inspace)
     end
-    # x0::OT = convert(OT, TensorMap(randn, typ, outspace ← inspace))
-    # this cannot work; if there is an extra irrep index, it cannot be converted to OT
 end
 
 # # # Evaluation
@@ -742,8 +741,6 @@ function expect(op, m::GenericMERA, pars=(;), opscale=1, evalscale=1)
     if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")
     end
-    # value = real(value) # not great for type stability
-    # return value # the compiler can probably deal with this now, but this is simpler
     return real(value)
 end
 
@@ -793,17 +790,22 @@ as the initial guess.
 * `scaleinvariant_krylovoptions`: A `NamedTuple` of keyword arguments passed to
   `KrylovKit.linsolve` and `KrylovKit.eigsolve`, when solving for the fixed-point density
   matrix and the scale invariant operator sum. The default is
-  `(tol = 1e-13, krylovdim = 4, verbosity = 0, maxiter = 20)`.
-  * `retraction`: Which retraction method to use. Options are `:exp` for geodesics (default), and `:cayley` for Cayley transforms. Only affects gradient methods.
+  `(tol = 1e-13, verbosity = 0, maxiter = 20)`.
+* `retraction`: Which retraction method to use. Options are `:exp` for geodesics
+  (default), and `:cayley` for Cayley transforms. Only affects gradient methods.
 * transport: Which vector transport method to use. Currently each retraction` method only
   comes with a single compatible transport, so one should always use `transport` to be the
   same as `retraction`. This may change. Only affects gradient methods.
 * `metric`: Which metric to use for Stiefel manifold. Options are `:euclidean`
   (default) and `:canonical`. Only affects gradient methods.
-* `ls_epsilon`: The ϵ parameter for the Hager-Zhang line search. `1e-6` be default. Only affects gradient methods.
-* `lbfgs_m`: The rank of the approximation of the inverse Hessian in L-BFGS. 8 by default. Only affects the `:lbfgs` method.
-* `cg_flavor`: The "flavor" of conjguate gradient to use. `:HagerZhang` by default. Only affects the `:cg:` method.
-* `ev_layer_iters`: How many times a single layer is optimised before moving to the next layer in the Evenbly-Vidal algorithm. `1` by default. Only affects the `:ev` method.
+* `ls_epsilon`: The ϵ parameter for the Hager-Zhang line search. `1e-6` be default. Only
+  affects gradient methods.
+* `lbfgs_m`: The rank of the approximation of the inverse Hessian in L-BFGS. 8 by default.
+  Only affects the `:lbfgs` method.
+* `cg_flavor`: The "flavor" of conjguate gradient to use. `:HagerZhang` by default. Only
+  affects the `:cg:` method.
+* `ev_layer_iters`: How many times a single layer is optimised before moving to the next
+  layer in the Evenbly-Vidal algorithm. `1` by default. Only affects the `:ev` method.
 If any of these are specified in `pars`, the specified values override the defaults.
 
 `finalize!` is a function that will be called at every iteration. It can be used to for

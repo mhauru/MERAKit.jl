@@ -6,8 +6,9 @@
 
 The type for layers of a modified binary MERA.
 
-Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, and two 2-to-1
-isometries, often called `wl` and `wr`, for left and right. Their relative locations are
+Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, and two
+2-to-1 isometries, often called `wl` and `wr`, for left and right. Their relative locations
+are
 ```
 |     |
 wl   wr
