@@ -742,8 +742,9 @@ function expect(op, m::GenericMERA, pars=(;), opscale=1, evalscale=1)
     if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")
     end
-    value = real(value)
-    return value
+    # value = real(value) # not great for type stability
+    # return value # the compiler can probably deal with this now, but this is simpler
+    return real(value)
 end
 
 
@@ -755,6 +756,7 @@ const default_pars = (method = :lbfgs,
                       metric = :euclidean,
                       precondition = true,
                       gradient_delta = 1e-14,
+                      # that's very small, maybe something like 1e-10 to 1e-12 more reasonable?
                       isometries_only_iters = 0,
                       maxiter = 2000,
                       ev_layer_iters = 1,
@@ -765,6 +767,7 @@ const default_pars = (method = :lbfgs,
                       scaleinvariant_krylovoptions = (
                                                       tol = 1e-13,
                                                       krylovdim = 4,
+                                                      # krylovdim 4 sounds very small, especially for linsolve. Is there any advantage over just using smaller maxiter and larger krylovdim, maybe in combination with eager = true for eigsolve/schursolve
                                                       verbosity = 0,
                                                       maxiter = 20,
                                                      ),

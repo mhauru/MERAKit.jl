@@ -136,7 +136,7 @@ See also: [`support`](@ref)
         dom = ProductSpace(ntuple(i->space(op, 1), n)...)
         op2 = fill!(similar(op, dom, dom), 0)
         V = space(op, 1)
-        eye = id(V)
+        eye = id(storagetype(op), V)
         for k = 0:n-N
             eyes1 = Base.fill_to_length((), eye, Val(k))
             eyes2 = Base.fill_to_length((), eye, Val(n-N-k))
