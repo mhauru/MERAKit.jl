@@ -168,8 +168,8 @@ function test_ascend_and_descend(::Type{meratype}, ::Type{S}) where {meratype, S
     for i in 1:layers
         Vin = inputspace(m, i)
         Vout = outputspace(m, i)
-        upper_space = reduce(⊗, repeat([Vin], width))
-        lower_space = reduce(⊗, repeat([Vout], width))
+        upper_space = ⊗(fill(Vin, width)...)
+        lower_space = ⊗(fill(Vout, width)...)
         randomop1 = TensorMap(randn, ComplexF64, upper_space ← upper_space)
         randomop2 = TensorMap(randn, ComplexF64, lower_space ← lower_space)
         down1 = MERA.descend(randomop1, m, i, i+1)
@@ -253,10 +253,10 @@ function test_expand_bonddim(::Type{meratype}, ::Type{S}) where {meratype, S}
     for i in 1:(layers-1)
         V = inputspace(m, i)
         expandable_sectors = sectors(V)
-        Vint = fuse(⊗(repeat([internalspace(m, i)], sf)...))
+        Vint = fuse(⊗(fill(internalspace(m, i), sf)...))
         expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         if i == layers-1
-            Vint = fuse(⊗(repeat([internalspace(m, i+1)], sf)...))
+            Vint = fuse(⊗(fill(internalspace(m, i+1), sf)...))
             expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         end
         newdims = Dict(s => dim(V, s) + 1 for s in expandable_sectors)
@@ -398,7 +398,7 @@ function test_optimization(::Type{meratype}, ::Type{S}, method, precondition=fal
     op = particle_number_operator(S)
     width = causal_cone_width(meratype)
     V = domain(op)
-    ham = -reduce(⊗, repeat([op], width))
+    ham = -1*⊗(fill(op, width)...)
     spaces = random_layerspaces(S, meratype, layers-1, dlow, dhigh)
     spaces = (V, spaces...)
     intspaces = random_internalspaces(spaces, meratype)
@@ -420,7 +420,7 @@ function test_gradient_and_retraction(::Type{meratype}, ::Type{S}, alg, metric
 
     width = causal_cone_width(meratype)
     V = outputspace(morig, 1)
-    hamspace = reduce(⊗, repeat([V], width))
+    hamspace = ⊗(fill(V, width)...)
     ham = TensorMap(randn, ComplexF64, hamspace ← hamspace)
     ham = ham + ham'
     eye = id(V)
@@ -468,7 +468,7 @@ function test_transport(::Type{meratype}, ::Type{S}, alg, metric
 
     width = causal_cone_width(meratype)
     V = outputspace(m, 1)
-    hamspace = reduce(⊗, repeat([V], width))
+    hamspace = ⊗(fill(V, width)...)
     # Make three different random Hamiltonians.
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
