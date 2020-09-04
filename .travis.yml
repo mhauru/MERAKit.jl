@@ -5,8 +5,8 @@ os:
   - linux
 
 julia:
-  - 1
   - nightly
+  - 1
 
 jobs:
   include:
