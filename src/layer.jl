@@ -6,6 +6,16 @@ Abstract supertype of all layer types, e.g. `BinaryLayer` and `TernaryLayer`.
 """
 abstract type Layer end
 
+layertype(::Type{L}) where {L<:Layer} = L
+
+"""
+    baselayertype(::Type{<:Layer})
+
+Return the unparametrised layer type, e.g. for `BinaryLayer{ComplexSpace, Float64, false}`,
+return just `BinaryLayer`.
+"""
+baselayertype(::Type{L}) where {L<:Layer} = Base.typename(L).wrapper
+
 """
     randomlayer(::Type{T <: Layer}, T, Vin, Vout, Vint=Vout; random_disentangler=false)
 

@@ -2,7 +2,6 @@ module MERA
 
 using TensorKit
 using TensorKitManifolds
-using TensorOperations  # We need this because TensorKit doesn't reexport @ncon
 using KrylovKit
 using OptimKit
 using TupleTools
@@ -29,6 +28,7 @@ export fixedpoint_densitymatrix
 export environment
 export remove_symmetry
 export layertype
+export baselayertype
 export operatortype
 export get_layer
 export get_disentangler
@@ -72,5 +72,13 @@ include("ternarylayer.jl")
 include("binarylayer.jl")
 include("modifiedbinaryop.jl")
 include("modifiedbinarylayer.jl")
+
+# properties of instances
+layertype(m::Union{GenericMERA,MERACache,Layer}) = layertype(typeof(m))
+baselayertype(m::Union{GenericMERA,MERACache,Layer}) = baselayertype(typeof(m))
+operatortype(m::Union{GenericMERA,MERACache,Layer}) = operatortype(typeof(m))
+scalefactor(m::Union{GenericMERA,MERACache,Layer}) = scalefactor(typeof(m))
+causal_cone_width(m::Union{GenericMERA,MERACache,Layer}) = causal_cone_width(typeof(m))
+Base.eltype(m::Union{GenericMERA,MERACache,Layer}) = eltype(typeof(m))
 
 end  # module

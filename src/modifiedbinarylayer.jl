@@ -6,8 +6,9 @@
 
 The type for layers of a modified binary MERA.
 
-Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, and two 2-to-1
-isometries, often called `wl` and `wr`, for left and right. Their relative locations are
+Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, and two
+2-to-1 isometries, often called `wl` and `wr`, for left and right. Their relative locations
+are
 ```
 |     |
 wl   wr
@@ -100,36 +101,27 @@ end
 A modified binary MERA is a MERA consisting of `ModifiedBinaryLayer`s.
 """
 ModifiedBinaryMERA{N} = GenericMERA{N, T, O} where {T <: ModifiedBinaryLayer, O}
+layertype(::Type{ModifiedBinaryMERA}) = ModifiedBinaryLayer
 #Base.show(io::IO, ::Type{ModifiedBinaryMERA}) = print(io, "ModifiedBinaryMERA")
 #function Base.show(io::IO, ::Type{ModifiedBinaryMERA{N}}) where {N}
 #    return print(io, "ModifiedBinaryMERA{($N)}")
 #end
 
-# Given an instance of a type like ModifiedBinaryLayer{ComplexSpace, Float64, true},
-# return the unparametrised type ModifiedBinaryLayer.
-layertype(::ModifiedBinaryLayer) = ModifiedBinaryLayer
-layertype(::Type{T}) where T <: ModifiedBinaryMERA = ModifiedBinaryLayer
+# Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
+# See simplelayer.jl for details.
+_tuple(layer::ModifiedBinaryLayer) =
+    (layer.disentangler, layer.isometry_left, layer.isometry_right)
 
-function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}
-                     ) where {ST, ET}
-    return ModifiedBinaryOp{tensortype(ST, Val(2), Val(2), ET)}
+function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}) where {ST, ET}
+    return ModifiedBinaryOp{tensormaptype(ST, 2, 2, ET)}
 end
 operatortype(::Type{ModifiedBinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
-Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
-Base.eltype(l::ModifiedBinaryLayer{ST, ET, Tan}) where {ST, ET, Tan} = ET
-
-# Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
-Base.iterate(layer::ModifiedBinaryLayer) = (layer.disentangler, Val(1))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{1}) = (layer.isometry_left, Val(2))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{2}) = (layer.isometry_right, Val(3))
-Base.iterate(layer::ModifiedBinaryLayer, ::Val{3}) = nothing
-Base.length(layer::ModifiedBinaryLayer) = 3
-
 scalefactor(::Type{<:ModifiedBinaryLayer}) = 2
-scalefactor(::Type{ModifiedBinaryMERA}) = scalefactor(ModifiedBinaryLayer)
 
 causal_cone_width(::Type{<:ModifiedBinaryLayer}) = 2
+
+Base.eltype(::Type{ModifiedBinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 
 outputspace(layer::ModifiedBinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::ModifiedBinaryLayer) = space(layer.isometry_left, 3)'
@@ -165,16 +157,15 @@ function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint=Vou
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
     # any way).
-    wr = deepcopy(permute(wl, (2,1), (3,)))
+    wr = permute(wl, (2,1), (3,); copy = true)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
 function ascending_fixedpoint(layer::ModifiedBinaryLayer)
-    V = inputspace(layer)
-    width = causal_cone_width(typeof(layer))
-    Vtotal = ⊗(Iterators.repeated(V, width)...)::ProductSpace{typeof(V), width}
-    eye = id(Vtotal) / sqrt(dim(Vtotal))
+    width = causal_cone_width(layer)
+    Vtotal = ⊗(ntuple(n->inputspace(layer), Val(width))...)
+    eye = id(storagetype(operatortype(layer)), Vtotal)
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
@@ -217,11 +208,11 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     matching_bonds = ((space(u, 3)', space(wl, 2)),
                       (space(u, 4)', space(wr, 1)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
-    for v in layer
+    allmatch &= all((u, wl, wr)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
-        allmatch = allmatch && infinum(dom, codom) == dom
+        infimum(dom, codom) == dom
     end
     return allmatch
 end
@@ -233,7 +224,7 @@ function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::Modified
                       (space(wl, 3)', space(unext, 2)),
                       (space(wr, 3)', space(unext, 1)),
                       (space(wr, 3)', space(unext, 2)))
-    allmatch = all([==(pair...) for pair in matching_bonds])
+    allmatch = all(pair->==(pair...), matching_bonds)
     return allmatch
 end
 
@@ -682,4 +673,3 @@ function environment_isometry_right(h::SquareTensorMap{1}, layer::ModifiedBinary
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_right(h, layer, rho)
 end
-

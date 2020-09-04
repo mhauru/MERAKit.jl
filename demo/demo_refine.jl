@@ -69,7 +69,6 @@ function main()
                 verbosity = pars[:verbosity],
                 scaleinvariant_krylovoptions = (
                                                 tol = scale_invariant_eps,
-                                                krylovdim = 4,
                                                 verbosity = 0,
                                                 maxiter = 20,
                                                ),

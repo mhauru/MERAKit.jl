@@ -35,6 +35,10 @@ Base.copy(op::ModifiedBinaryOp) = ModifiedBinaryOp((deepcopy(x) for x in op)...)
 Base.adjoint(op::ModifiedBinaryOp) = ModifiedBinaryOp((x' for x in op)...)
 Base.imag(op::ModifiedBinaryOp) = ModifiedBinaryOp((imag(x) for x in op)...)
 Base.real(op::ModifiedBinaryOp) = ModifiedBinaryOp((real(x) for x in op)...)
+# The below could just as well use op.gap.
+Base.one(op::ModifiedBinaryOp) = ModifiedBinaryOp(one(op.mid))
+
+TensorKit.storagetype(::Type{ModifiedBinaryOp{T}}) where {T} = storagetype(T)
 
 function pad_with_zeros_to(op::ModifiedBinaryOp, args...)
     return ModifiedBinaryOp((pad_with_zeros_to(x, args...) for x in op)...)

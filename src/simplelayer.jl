@@ -13,63 +13,71 @@ order in which the constructor takes them in.
 abstract type SimpleLayer <: Layer end
 
 Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
-Base.copy(layer::T) where T <: SimpleLayer = T((deepcopy(x) for x in layer)...)
+Base.copy(layer::SimpleLayer) = typeof(layer)(map(deepcopy, _tuple(layer))...)
+
+@inline function Base.iterate(layer::SimpleLayer, ::Val{i} = Val(1)) where {i}
+    t = _tuple(layer)
+    if i > length(t)
+        return nothing
+    else
+        return t[i], Val(i+1)
+    end
+end
+Base.length(layer::SimpleLayer) = length(_tuple(layer))
 
 function remove_symmetry(layer::SimpleLayer)
-    return layertype(layer)((remove_symmetry(x) for x in layer)...)
+    return baselayertype(layer)(map(remove_symmetry, _tuple(layer))...)
 end
 
-function TensorKitManifolds.projectisometric(layer::T) where T <: SimpleLayer
-    return T((projectisometric(x) for x in layer)...)
+function TensorKitManifolds.projectisometric(layer::SimpleLayer)
+    return typeof(layer)(map(projectisometric, _tuple(layer))...)
 end
 
-function TensorKitManifolds.projectisometric!(layer::T) where T <: SimpleLayer
-    return T((projectisometric!(x) for x in layer)...)
+function TensorKitManifolds.projectisometric!(layer::SimpleLayer)
+    foreach(projectisometric!, _tuple(layer))
+    return layer
 end
 
-function pseudoserialize(layer::T) where T <: SimpleLayer
-    return repr(T), tuple((pseudoserialize(x) for x in layer)...)
+function pseudoserialize(layer::SimpleLayer)
+    return repr(typeof(layer)), map(pseudoserialize, _tuple(layer))
 end
 
 function depseudoserialize(::Type{T}, data) where T <: SimpleLayer
-    return T((depseudoserialize(d...) for d in data)...)
+    return T(map(d->depseudoserialize(d...), data)...)
 end
 
-# TODO Definitions like the following are a little dangerous, since they allow for instance
-# summing a BinaryLayer with a TernaryLayer. Unfortunately I haven't been able to come up
-# with a better implementation, because l1 and l2 can not be restricted to be of the exact
-# same, fully parametrized type.
-
 function tensorwise_scale(layer::SimpleLayer, alpha::Number)
-    return layertype(layer)((t*alpha for t in layer)...)
+    return baselayertype(layer)((_tuple(layer) .* alpha)...)
 end
 
 function tensorwise_sum(l1::SimpleLayer, l2::SimpleLayer)
-    return layertype(l1)((t1+t2 for (t1, t2) in zip(l1, l2))...)
+    @assert baselayertype(l1) == baselayertype(l2)
+    return baselayertype(l1)((_tuple(l1) .+ _tuple(l2))...)
 end
 
 # # # Manifold functions
 
 function TensorKitManifolds.inner(l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer;
                                   metric=:euclidean)
-    get_metric(t) = isa(t, Stiefel.StiefelTangent) ? metric : :euclidean
-    return sum(inner(t, t1, t2; metric=get_metric(t1)) for (t, t1, t2) in zip(l, l1, l2))
+    custominner(t, t1, t2) =
+        inner(t, t1, t2; metric = isa(t1, Stiefel.StiefelTangent) ? metric : :euclidean)
+    return sum(custominner.(_tuple(l), _tuple(l1), _tuple(l2)))
 end
 
 function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;
                                     alg=:exp)
-    ts_and_ttans = (retract(t..., alpha; alg=alg) for t in zip(l, ltan))
-    ts, ttans = zip(ts_and_ttans...)
-    # TODO The following two lines just work around a compiler bug in Julia < 1.6.
-    ts = tuple(ts...)
-    ttans = tuple(ttans...)
-    return layertype(l)(ts...), layertype(l)(ttans...)
+
+    ts_and_ttans = retract.(_tuple(l), _tuple(ltan), alpha; alg = alg)
+    ts = first.(ts_and_ttans)
+    ttans = last.(ts_and_ttans)
+    return baselayertype(l)(ts...), baselayertype(l)(ttans...)
 end
 
 function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer,
                                        alpha::Real, lend::SimpleLayer; alg=:exp)
-    return layertype(l)((transport!(t[1], t[2], t[3], alpha, t[4]; alg=alg)
-                         for t in zip(lvec, l, ltan, lend))...)
+    ttans = transport!.(_tuple(lvec), _tuple(l), _tuple(ltan), alpha, _tuple(lend);
+                            alg = alg)
+    return baselayertype(l)(ttans...)
 end
 
 """

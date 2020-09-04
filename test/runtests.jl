@@ -37,27 +37,27 @@ function random_space(::Type{ComplexSpace}, dlow=1, dhigh=8)
 end
 
 """
-Generate vector spaces for a MERA of `meratype`, with `n` layers, and `T` vector space type.
+Generate vector spaces for a MERA of `meratype`, with `n` layers, and `S` vector space type.
 """
-function random_layerspaces(::Type{T}, ::Type{meratype}, n, dlow=3, dhigh=6
-                           ) where {T, meratype}
+function random_layerspaces(::Type{S}, ::Type{meratype}, n, dlow=3, dhigh=6
+                           ) where {S, meratype}
     width = causal_cone_width(meratype)
-    V = random_space(T, dlow, dhigh)
-    spaces = tuple(V, (begin
-                           V_prev = V
-                           V_prev_fusion = fuse(reduce(⊗, repeat([V_prev], width)))
-                           V = random_space(T, dlow, dhigh)
-                           # If a layer from V_prev to V would be of such a dimension that
-                           # it couldn't be isometric, try generating another V until
-                           # success.  Since V = V_prev is a valid choice, this will
-                           # eventually terminate.
-                           while infinum(V_prev_fusion, V) != V
-                               V = random_space(T, dlow, dhigh)
-                           end
-                           V
-                       end
-                       for i in 1:(n-1))...)
-    return spaces
+    V = random_space(S, dlow, dhigh)
+    spaces = S[V]
+    for i = 2:n
+        V_prev = V
+        V_prev_fusion = fuse(fill(V_prev, width)...)
+        V = random_space(S, dlow, dhigh)
+        # If a layer from V_prev to V would be of such a dimension that
+        # it couldn't be isometric, try generating another V until
+        # success.  Since V = V_prev is a valid choice, this will
+        # eventually terminate.
+        while infimum(V_prev_fusion, V) != V
+            V = random_space(S, dlow, dhigh)
+        end
+        push!(spaces, V)
+    end
+    return tuple(spaces...)::NTuple{n,S}
 end
 
 """
@@ -66,36 +66,35 @@ Generate vector spaces for the layer-internal indices of a MERA of `meratype`, t
 """
 function random_internalspaces(extspaces, meratype)
     width = (meratype == TernaryMERA ? 3 :
-             meratype in (BinaryMERA, ModifiedBinaryMERA) ? 2 : nothing)
-    intspaces = tuple((begin
-                           # The fuse just removes nested product state structure.
-                           Vext = fuse(extspaces[i])
-                           Vnext = i == length(extspaces) ? Vext : extspaces[i+1]
-                           sects = Dict()
-                           for s in sectors(Vext)
-                               d = dim(Vext, s)
-                               rand(Bool) && d > 1 && (d = d - 1)
-                               sects[s] = d
-                           end
-                           Vint = spacetype(Vext)(sects...)
-                           # Check that we didn't accidentally make the isometric part
-                           # non-isometric. If we did, just make Vint = Vext.
-                           Vint_fusion = fuse(reduce(⊗, repeat([Vint], width)))
-                           infinum(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
-                           Vint
-                       end
-                       for i in 1:length(extspaces))...)
+    meratype in (BinaryMERA, ModifiedBinaryMERA) ? 2 : nothing)
+    intspaces = ntuple(length(extspaces)) do i
+        # The fuse just removes nested product state structure.
+        Vext = fuse(extspaces[i])
+        Vnext = i == length(extspaces) ? Vext : extspaces[i+1]
+        sects = Dict()
+        for s in sectors(Vext)
+            d = dim(Vext, s)
+            rand(Bool) && d > 1 && (d = d - 1)
+            sects[s] = d
+        end
+        Vint = spacetype(Vext)(sects...)
+        # Check that we didn't accidentally make the isometric part
+        # non-isometric. If we did, just make Vint = Vext.
+        Vint_fusion = fuse(fill(Vint, width)...)
+        infimum(Vint_fusion, Vnext) != Vnext && (Vint = Vext)
+        Vint
+    end
     return intspaces
 end
 
 """
 Test type stability, and type stability only, of various methods.
 """
-function test_type_stability(meratype, spacetype)
+function test_type_stability(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
     width = @inferred causal_cone_width(meratype)
     L = layertype(meratype)
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
 
@@ -159,9 +158,9 @@ For each layer, generate a random operator above and below it (not necessarily H
 and confirm that ascending the lower or descending the upper one both lead to the same
 expectation value (trace of product).
 """
-function test_ascend_and_descend(meratype, spacetype)
+function test_ascend_and_descend(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     width = causal_cone_width(meratype)
@@ -169,8 +168,8 @@ function test_ascend_and_descend(meratype, spacetype)
     for i in 1:layers
         Vin = inputspace(m, i)
         Vout = outputspace(m, i)
-        upper_space = reduce(⊗, repeat([Vin], width))
-        lower_space = reduce(⊗, repeat([Vout], width))
+        upper_space = ⊗(fill(Vin, width)...)
+        lower_space = ⊗(fill(Vout, width)...)
         randomop1 = TensorMap(randn, ComplexF64, upper_space ← upper_space)
         randomop2 = TensorMap(randn, ComplexF64, lower_space ← lower_space)
         down1 = MERA.descend(randomop1, m, i, i+1)
@@ -185,9 +184,9 @@ end
 Test that the expectation value of the identity is 1.0, regardless of which layer we
 evaluate it at.
 """
-function test_expectation_of_identity(meratype, spacetype)
+function test_expectation_of_identity(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -201,9 +200,9 @@ end
 Test that the expectation value of a random Hermitian operator does not depend on the layer
 that we evaluate it at.
 """
-function test_expectation_evalscale(meratype, spacetype)
+function test_expectation_evalscale(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -220,9 +219,9 @@ end
 Test that pseudoserializing and depseudoserializing back does not change the expectation
 value of a random Hermitian operator.
 """
-function test_pseudoserialization(meratype, spacetype)
+function test_pseudoserialization(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -239,9 +238,9 @@ end
 Confirm that expanding bond dimensions does not change the expectation value of a random
 Hermitian operator.
 """
-function test_expand_bonddim(meratype, spacetype)
+function test_expand_bonddim(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers, 4)
+    spaces = random_layerspaces(S, meratype, layers, 4)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -254,10 +253,10 @@ function test_expand_bonddim(meratype, spacetype)
     for i in 1:(layers-1)
         V = inputspace(m, i)
         expandable_sectors = sectors(V)
-        Vint = fuse(⊗(repeat([internalspace(m, i)], sf)...))
+        Vint = fuse(⊗(fill(internalspace(m, i), sf)...))
         expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         if i == layers-1
-            Vint = fuse(⊗(repeat([internalspace(m, i+1)], sf)...))
+            Vint = fuse(⊗(fill(internalspace(m, i+1), sf)...))
             expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         end
         newdims = Dict(s => dim(V, s) + 1 for s in expandable_sectors)
@@ -283,9 +282,9 @@ end
 Confirm that releasing a does not change the expectation value of a random Hermitian
 operator.
 """
-function test_release_layer(meratype, spacetype)
+function test_release_layer(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -301,9 +300,9 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-function test_remove_symmetry(meratype, spacetype)
+function test_remove_symmetry(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -320,9 +319,9 @@ end
 Create a random MERA and operator, evaluate the expectation values, strip both of their
 symmetry structure, and confirm that the expectation value hasn't changed.
 """
-function test_reset_storage(meratype, spacetype)
+function test_reset_storage(::Type{meratype}, ::Type{S}) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -348,9 +347,10 @@ Create a MERA that breaks the isometricity condition, by summing up two random M
 Restore isometricity with projectisometric and projectisometric!, and confirm that the
 expectation value of the identity is indeed 1 after this.
 """
-function test_projectisometric(meratype, spacetype)
+function test_projectisometric(::Type{meratype}, ::Type{S}
+                              ) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m1 = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
     m2 = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
@@ -373,7 +373,8 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-function test_optimization(meratype, spacetype, method, precondition=false)
+function test_optimization(::Type{meratype}, ::Type{S}, method, precondition=false
+                          ) where {meratype, S}
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
@@ -388,17 +389,16 @@ function test_optimization(meratype, spacetype, method, precondition=false)
             verbosity = 0,
             scaleinvariant_krylovoptions = (
                                             tol = 1e-8,
-                                            krylovdim = 4,
                                             verbosity = 0,
                                             maxiter = 20,
                                            ),
            )
 
-    op = particle_number_operator(spacetype)
+    op = particle_number_operator(S)
     width = causal_cone_width(meratype)
     V = domain(op)
-    ham = -reduce(⊗, repeat([op], width))
-    spaces = random_layerspaces(spacetype, meratype, layers-1, dlow, dhigh)
+    ham = -1*⊗(fill(op, width)...)
+    spaces = random_layerspaces(S, meratype, layers-1, dlow, dhigh)
     spaces = (V, spaces...)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces)
@@ -410,15 +410,16 @@ end
 """
 Test gradients and retraction.
 """
-function test_gradient_and_retraction(meratype, spacetype, alg, metric)
+function test_gradient_and_retraction(::Type{meratype}, ::Type{S}, alg, metric
+                                     ) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     morig = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
 
     width = causal_cone_width(meratype)
     V = outputspace(morig, 1)
-    hamspace = reduce(⊗, repeat([V], width))
+    hamspace = ⊗(fill(V, width)...)
     ham = TensorMap(randn, ComplexF64, hamspace ← hamspace)
     ham = ham + ham'
     eye = id(V)
@@ -457,15 +458,16 @@ end
 """
 Test vector transport.
 """
-function test_transport(meratype, spacetype, alg, metric)
+function test_transport(::Type{meratype}, ::Type{S}, alg, metric
+                       ) where {meratype, S}
     layers = 4
-    spaces = random_layerspaces(spacetype, meratype, layers)
+    spaces = random_layerspaces(S, meratype, layers)
     intspaces = random_internalspaces(spaces, meratype)
     m = random_MERA(meratype, ComplexF64, spaces, intspaces; random_disentangler=true)
 
     width = causal_cone_width(meratype)
     V = outputspace(m, 1)
-    hamspace = reduce(⊗, repeat([V], width))
+    hamspace = ⊗(fill(V, width)...)
     # Make three different random Hamiltonians.
     hams = [TensorMap(randn, ComplexF64, hamspace ← hamspace) for i in 1:3]
     hams = [ham + ham' for ham in hams]
@@ -488,8 +490,8 @@ end
 
 function test_with_all_types(testfunc, meratypes, spacetypes, args...)
     for meratype in meratypes
-        for spacetype in spacetypes
-            testfunc(meratype, spacetype, args...)
+        for S in spacetypes
+            testfunc(meratype, S, args...)
         end
     end
 end

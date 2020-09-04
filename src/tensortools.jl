@@ -12,42 +12,6 @@ A `Union` type of the different `TensorKitManifolds` tangent types: `GrassmannTa
 """
 Tangent = Union{Grassmann.GrassmannTangent, Stiefel.StiefelTangent, Unitary.UnitaryTangent}
 
-# TODO These belong in TensorKit
-Base.convert(::Type{TensorMap}, t::TensorKit.AdjointTensorMap) = copy(t)
-function Base.convert(::Type{TensorMap{S, N1, N2, G, A, F1, F2}},
-                      t::TensorKit.AdjointTensorMap{S, N1, N2, G, A, F1, F2}
-                     ) where {S, N1, N2, G, A, F1, F2}
-    return convert(TensorMap, t)
-end
-
-function Base.convert(::Type{TensorMap{S, N1, N2, G, Matrix{E1}, F1, F2}},
-                      t::TensorMap{S, N1, N2, G, Matrix{E2}, F1, F2}
-                     ) where {S, N1, N2, G, E1, E2, F1, F2}
-    return copyto!(similar(t, E1), t)
-end
-
-function Base.convert(::Type{TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E1}}, F1, F2}},
-                      t::TensorMap{S, N1, N2, G, TensorKit.SectorDict{G, Matrix{E2}}, F1, F2}
-                     ) where {S, N1, N2, G, E1, E2, F1, F2}
-    return copyto!(similar(t, E1), t)
-end
-
-"""
-    tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET})
-
-Given the `IndexSpace` type `ST`, number of codomain (`N1`) and domain (`N2`) indices, and
-storage type `ET` (typically `Matrix{M}` for some M <: Number`), return the corresponding
-concrete `TensorMap` type.
-"""
-function tensortype(::Type{ST}, ::Val{N1}, ::Val{N2}, ::Type{ET}) where {ST, N1, N2, ET}
-    G = sectortype(ST)
-    A = G === Trivial ? Matrix{ET} : TensorKit.SectorDict{G, Matrix{ET}}
-    staticN1, staticN2 = TupleTools.StaticLength{N1}(), TupleTools.StaticLength{N2}()
-    F1 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN1)
-    F2 = G === Trivial ? Nothing : TensorKit.fusiontreetype(G, staticN2)
-    return TensorMap{ST, N1, N2, G, A, F1, F2}
-end
-
 """
     disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool)
 
@@ -58,9 +22,9 @@ false`) or the corresponding tangent type, i.e. a `StiefelTangent`.
 See also: [`ternaryisometry_type`](@ref), [`binaryisometry_type`](@ref)
 """
 function disentangler_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(2), Val(2), ET)
+    TensorType = tensormaptype(ST, 2, 2, ET)
     if Tan
-        TA = tensortype(ST, Val(2), Val(2), ET)
+        TA = tensormaptype(ST, 2, 2, ET)
         DisType = Stiefel.StiefelTangent{TensorType, TA}
     else
         DisType = TensorType
@@ -78,11 +42,11 @@ false`) or the corresponding tangent type, i.e. a `GrassmannTangent`.
 See also: [`disentangler_type`](@ref), [`binaryisometry_type`](@ref)
 """
 function ternaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(3), Val(1), ET)
+    TensorType = tensormaptype(ST, 3, 1, ET)
     if Tan
-        TU = tensortype(ST, Val(3), Val(1), ET)
-        TS = tensortype(ST, Val(1), Val(1), real(ET))
-        TV = tensortype(ST, Val(1), Val(1), ET)
+        TU = tensormaptype(ST, 3, 1, ET)
+        TS = tensormaptype(ST, 1, 1, real(ET))
+        TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
         IsoType = TensorType
@@ -100,11 +64,11 @@ false`) or the corresponding tangent type, i.e. a `GrassmannTangent`.
 See also: [`disentangler_type`](@ref), [`ternaryinaryisometry_type`](@ref)
 """
 function binaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
-    TensorType = tensortype(ST, Val(2), Val(1), ET)
+    TensorType = tensormaptype(ST, 2, 1, ET)
     if Tan
-        TU = tensortype(ST, Val(2), Val(1), ET)
-        TS = tensortype(ST, Val(1), Val(1), real(ET))
-        TV = tensortype(ST, Val(1), Val(1), ET)
+        TU = tensormaptype(ST, 2, 1, ET)
+        TS = tensormaptype(ST, 1, 1, real(ET))
+        TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
         IsoType = TensorType
@@ -120,13 +84,7 @@ codomain, return a Haar random isometry.
 
 The implementation uses a QR decomposition of a Gaussian random matrix.
 """
-function randomisometry(::Type{T}, Vout, Vin) where {T}
-    temp = TensorMap(randn, T, Vout ← Vin)
-    q, r = leftorth(temp)
-    iso = isomorphism(domain(q), Vin)
-    u = q * iso
-    return u
-end
+randomisometry(::Type{T}, Vout, Vin) where {T} = TensorMap(randhaar, T, Vout ← Vin)
 
 """
     initialize_disentangler(T, Vout, Vin, random::Bool)
@@ -142,8 +100,7 @@ function initialize_disentangler(::Type{T}, Vout, Vin, random::Bool) where {T}
         u = randomisometry(T, Vout ⊗ Vout, Vin ⊗ Vin)
     else
         if Vin == Vout
-            u = isomorphism(Vout ⊗ Vout, Vin ⊗ Vin)
-            T <: Complex && (u = complex(u))
+            u = isomorphism(Matrix{T}, Vout ⊗ Vout, Vin ⊗ Vin)
         else
             uhalf = randomisometry(T, Vout, Vin)
             u = uhalf ⊗ uhalf
@@ -171,17 +128,25 @@ e.g. I ⊗ op and op ⊗ I, are averaged over.
 
 See also: [`support`](@ref)
 """
-function expand_support(op::SquareTensorMap{N}, n::Integer) where {N}
-    V = space(op, 1)
-    eye = id(V)
-    op_support = N
-    while op_support < n
-        opeye = op ⊗ eye
-        eyeop = eye ⊗ op
-        op = (opeye + eyeop)/2
-        op_support += 1
+@inline expand_support(op::SquareTensorMap, n::Int) = _expand_support(op, Val(n))
+@noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N, n}
+    if n <= N
+        return op
+    else
+        dom = ProductSpace(ntuple(i->space(op, 1), n)...)
+        op2 = fill!(similar(op, dom, dom), 0)
+        V = space(op, 1)
+        eye = id(storagetype(op), V)
+        for k = 0:n-N
+            eyes1 = Base.fill_to_length((), eye, Val(k))
+            eyes2 = Base.fill_to_length((), eye, Val(n-N-k))
+            coeff = factorial(n-N)/(factorial(k)*factorial(n-N-k)) / 2^(n-N)
+            axpy!(coeff, ⊗(eyes1..., op, eyes2...), op2)
+            # TODO This would generate the uniform sum. See if it changes something.
+            # axpy!(1/(n-N+1), ⊗(eyes1..., op, eyes2...), op2)
+        end
+        return op2
     end
-    return op
 end
 
 """
@@ -200,10 +165,12 @@ Strip an `AbstractTensorMap` of its internal symmetries, and return the correspo
 `TensorMap` that operators on `ComplexSpace` or `CartesianSpace`.
 """
 function remove_symmetry(t::TensorMap)
-    domain_nosym = ⊗((remove_symmetry(x) for x in domain(t))...)
-    codomain_nosym = ⊗((remove_symmetry(x) for x in codomain(t))...)
-    t_nosym = TensorMap(zeros, eltype(t), codomain_nosym ← domain_nosym)
-    t_nosym.data[:] = convert(Array, t)
+    dom = domain(t)
+    cod = codomain(t)
+    S = field(spacetype(t)) === ℝ ? CartesianSpace : ComplexSpace
+    domain_nosym = ProductSpace{S}(map(remove_symmetry, tuple(dom...)))
+    codomain_nosym = ProductSpace{S}(map(remove_symmetry, tuple(cod...)))
+    t_nosym = TensorMap(convert(Array, t), codomain_nosym ← domain_nosym)
     return t_nosym
 end
 
@@ -229,7 +196,7 @@ function expand_vectorspace(V::GeneralSpace, newdim)
     return typeof(V)(d, V.dual, V.conj)
 end
 
-function expand_vectorspace(V::RepresentationSpace, newdims)
+function expand_vectorspace(V::GradedSpace, newdims)
     olddims = Dict(s => dim(V, s) for s in sectors(V))
     sectordict = merge(olddims, newdims)
     return typeof(V)(sectordict; dual=V.dual)
@@ -270,10 +237,20 @@ function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data
     return t
 end
 
+function append_dummy_index(t::TensorMap)
+    return TensorMap(t.data, codomain(t), insertunit(domain(t)))
+end
+function remove_dummy_index(t::TensorMap{S}) where {S}
+    @assert space(t, numind(t)) == oneunit(S)'
+    dom = ProductSpace{S}(Base.front(domain(t).spaces))
+    return TensorMap(t.data, codomain(t), dom)
+end
+
 """
     pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
 
-Transform `t` to change the vector spaces of its indices, by throwing elements away or padding the tensor with zeros.
+Transform `t` to change the vector spaces of its indices, by throwing elements away or
+padding the tensor with zeros.
 
 `spacedict` is a dictionary with index labels (1, 2, 3, ...) as keys, and `VectorSpace`s as
 values. It tells us which indices should have their space changed, and to what. Instead of a
@@ -285,39 +262,37 @@ then `t` is padded with zeros to fill in the new elements. Otherwise some elemen
 will be truncated away.
 """
 function pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
-    # Expanders are the matrices by which each index will be multiplied to change the space.
-    idmat(T, shp) = Array{T}(I, shp)
-    expanders = (TensorMap(idmat, eltype(t), V ← space(t, ind)) for (ind, V) in spacedict)
-    sizedomain = length(domain(t))
-    sizecodomain = length(codomain(t))
-    # Prepare the @ncon call that contracts each index of `t` with the corresponding
-    # expander, if one exists.
-    numinds = sizedomain + sizecodomain
-    inds_t = [ind in keys(spacedict) ? ind : -ind for ind in 1:numinds]
-    inds_expanders = [[-ind, ind] for ind in keys(spacedict)]
-    tensors = [t, expanders...]
-    inds = [inds_t, inds_expanders...]
-    t_new_unpermuted = @ncon(tensors, inds)
-    # Permute inds to have the codomain and domain match with those of the input.
-    t_new = permute(t_new_unpermuted, tuple(1:sizecodomain...),
-                    tuple(sizecodomain+1:numinds...))
-    return t_new
+    S = spacetype(t)
+    newcodomainspaces = tuple(codomain(t)...)
+    for i = 1:length(newcodomainspaces)
+        if haskey(spacedict, i)
+            @assert isdual(spacedict[i]) == isdual(space(t, i))
+            # unpredictable behaviour otherwise
+            newcodomainspaces = Base.setindex(newcodomainspaces, spacedict[i], i)
+        end
+    end
+    newdomainspaces = tuple(domain(t)...)
+    for i = 1:length(newdomainspaces)
+        j = i + numout(t)
+        if haskey(spacedict, j)
+            @assert isdual(spacedict[j]) == isdual(space(t, j))
+            # unpredictable behaviour otherwise
+            newdomainspaces = Base.setindex(newdomainspaces, spacedict[j]', i)
+        end
+    end
+    newcodomain = ProductSpace{S}(newcodomainspaces)
+    newdomain = ProductSpace{S}(newdomainspaces)
+    tnew = fill!(similar(t, newcodomain, newdomain), zero(eltype(t)))
+    for (f1, f2) in fusiontrees(t)
+        a = t[f1, f2]
+        anew = tnew[f1, f2]
+        axes = Base.OneTo.(min.(size(a), size(anew)))
+        copyto!(view(anew, axes...), view(a, axes...))
+    end
+    return tnew
 end
 
 pad_with_zeros_to(t::AbstractTensorMap, spaces...) = pad_with_zeros_to(t, Dict(spaces))
-
-"""
-    convert_to_matrix(t::AbstractTensorMap)
-
-Fuse the domain and codomain of `t`, and return the resulting matrix (as a `TensorMap`).
-"""
-function convert_to_matrix(t::AbstractTensorMap)
-    dom, codom = domain(t), codomain(t)
-    domainfuser = isomorphism(dom, fuse(dom))
-    codomainfuser = isomorphism(codom, fuse(codom))
-    mt = codomainfuser' * t * domainfuser
-    return mt
-end
 
 """
     gershgorin_bounds(t::AbstractTensorMap)
@@ -329,23 +304,14 @@ This costs O(D^2) time, where D is the matrix dimension.
 
 See also: [`gershgorin_discs`](@ref)
 """
-function gershgorin_bounds(t::AbstractTensorMap{S, N, N}) where {S, N}
-    return gershgorin_bounds(convert(Array, convert_to_matrix(t)))
-end
-
-"""
-    gershgorin_discs(t::AbstractTensorMap)
-
-For a square tensor (a square matrix after fusing the domain and codomain into single
-indices), return a list of its Gershgorin discs, as pairs (c, r) where c is the centre and r
-is the radius.
-
-This costs O(D^2) time, where D is the matrix dimension.
-
-See also: [`gershgorin_bounds`](@ref)
-"""
-function gershgorin_discs(t::AbstractTensorMap{S, N, N}) where {S, N}
-    return gershgorin_discs(convert(Array, convert_to_matrix(t)))
+function gershgorin_bounds(t::SquareTensorMap)
+    v = real(first(last(first(blocks(t))))) # get first element from first block
+    lb, ub = v, v
+    largest_bound((lb1,ub1), (lb2,ub2)) = (min(lb1,lb2), max(ub1,ub2))
+    for (c,b) in blocks(t)
+        lb, ub = largest_bound((lb, ub), gershgorin_bounds(b))
+    end
+    return lb, ub
 end
 
 function gershgorin_bounds(a::Array{S, 2}) where {S}
@@ -371,7 +337,7 @@ function gershgorin_discs(a::Array{S, 2}) where {S}
     radii1 = dropdims(sum(abs.(a), dims=1), dims=1) .- abs_centres
     radii2 = dropdims(sum(abs.(a), dims=2), dims=2) .- abs_centres
     radii = min.(radii1, radii2)
-    discs = tuple(zip(centres, radii)...)
+    discs = collect(zip(centres, radii))
     return discs
 end
 
@@ -466,7 +432,7 @@ function symmetric_sylvester(E::AbstractTensorMap, U::AbstractTensorMap,
     return TensorMap(data, cod ← dom)
 end
 
-function symmetric_sylvester(E::AbstractArray, U::AbstractArray, C::AbstractArray, delta)
+function symmetric_sylvester(E::AbstractVector, U::AbstractMatrix, C::AbstractMatrix, delta)
     temp1 = typeof(C)(undef, size(C))
     temp2 = typeof(C)(undef, size(C))
     mul!(temp1, U', C)
