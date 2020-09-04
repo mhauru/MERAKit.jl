@@ -1,6 +1,6 @@
 name = "MERA"
 uuid = "002f668d-dbf0-4230-86cd-7736498d5b3f"
-authors = ["Markus Hauru <markus@mhauru.org>"]
+authors = ["Markus Hauru <markus@mhauru.org>", "Jutho Haegeman <jutho.haegeman@ugent.be>"]
 version = "0.1.0"
 
 [deps]
