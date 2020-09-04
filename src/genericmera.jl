@@ -598,7 +598,7 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
     # merely the representation of the identity operator.
     fp = ascending_fixedpoint(get_layer(m, nt+1))
-    rhop = fixedpoint_densitymatrix(m, pars)
+    rhop = densitymatrix(m, Inf, pars)
     f = let fp = fp, rhop = rhop, lscaleinv = get_layer(m, nt+1)
         function (x)
             xasc = ascend(x, lscaleinv)
