@@ -689,8 +689,8 @@ function scalingdimensions(m::GenericMERA, howmany=20)
         x0 = scalingoperator_initialguess(m, interlayer_space, irrep)
         # Don't even try to get more than half of the eigenvalues. Its too expensive, and
         # they are garbage anyway.
-        howmanysector = min(howmany, div(blockdim(interlayer_space, irrep), 2))
-        S, U, info = eigsolve(f, x0, howmany, :LM)
+        howmanysector = min(howmany, div(blockdim(interlayer_space, irrep), 2, RoundUp))
+        S, U, info = eigsolve(f, x0, howmanysector, :LM)
         # sfact is the ratio by which the number of sites changes at each coarse-graining.
         sfact = scalefactor(typeof(m))
         scaldims = sort(-log.(sfact, abs.(real(S))))
