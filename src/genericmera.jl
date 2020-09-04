@@ -623,7 +623,10 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
         msg = "Used $(info.numops) superoperator invocations to find the scale invariant operator sum."
         @info(msg)
     end
-    return opsum
+    # TODO The type assertion should be removed once 1.6 is out. This is inferred fine
+    # without it in 1.6, but not in 1.5, and I just use this to silence the failure in
+    # tests.
+    return opsum::operatortype(m)
 end
 
 """
