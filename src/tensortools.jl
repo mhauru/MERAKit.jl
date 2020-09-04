@@ -196,7 +196,7 @@ function expand_vectorspace(V::GeneralSpace, newdim)
     return typeof(V)(d, V.dual, V.conj)
 end
 
-function expand_vectorspace(V::RepresentationSpace, newdims)
+function expand_vectorspace(V::GradedSpace, newdims)
     olddims = Dict(s => dim(V, s) for s in sectors(V))
     sectordict = merge(olddims, newdims)
     return typeof(V)(sectordict; dual=V.dual)
