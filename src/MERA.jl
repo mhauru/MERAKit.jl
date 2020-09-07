@@ -31,8 +31,6 @@ export layertype
 export baselayertype
 export operatortype
 export get_layer
-export get_disentangler
-export get_isometry
 export num_translayers
 export outputspace
 export inputspace
