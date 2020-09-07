@@ -10,11 +10,11 @@ Each layer consists of three tensors, a 2-to-2 disentangler, often called `u`, a
 2-to-1 isometries, often called `wl` and `wr`, for left and right. Their relative locations
 are
 ```
-|     |
+│     │
 wl   wr
-| \\ / |
-|  u  |
-| / \\ |
+│ ╲ ╱ │
+│  u  │
+│ ╱ ╲ │
 ```
 
 The type parameters are `ST` for space type, e.g. `ComplexSpace` or `SU2Space`; `ET` for
@@ -26,20 +26,20 @@ tensors.
 Index numbering convention is as follows, where the physical indices are at the bottom:
 Disentangler:
 ```
- 3|   4|
- +------+
- |  u   |
- +------+
- 1|   2|
+ 3│    4│
+ ┌┴─────┴┐
+ │   u   │
+ └┬─────┬┘
+ 1│    2│
 ```
 
 Isometries:
 ```
-   3|
- +------+
- |  w   |
- +------+
- 1|   2|
+    3│
+ ┌───┴───┐
+ │ wl/wr │
+ └┬─────┬┘
+ 1│    2│
 ```
 """
 struct ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer

@@ -18,20 +18,20 @@ tensors.
 Index numbering convention is as follows, where the physical indices are at the bottom:
 Disentangler:
 ```
- 3|   4|
- +------+
- |  u   |
- +------+
- 1|   2|
+ 3│    4│
+ ┌┴─────┴┐
+ │   u   │
+ └┬─────┬┘
+ 1│    2│
 ```
 
 Isometry:
 ```
-   3|
- +------+
- |  w   |
- +------+
- 1|   2|
+    3│
+ ┌───┴───┐
+ │   w   │
+ └┬─────┬┘
+ 1│    2│
 ```
 """
 struct BinaryLayer{ST, ET, Tan} <: SimpleLayer
