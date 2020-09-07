@@ -630,7 +630,7 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
 end
 
 """
-    environment(m::GenericMERA, op, depth, pars; vary_disentanglers=true)
+    environment(m::GenericMERA, op, depth, pars)
 
 Return a `Layer` consisting of the environments of the various tensors of `m` at `depth`,
 with respect to the expectation value of `op`. Note the return value isn't really a proper
@@ -638,15 +638,15 @@ MERA layer, i.e. the tensors are not isometric, it just has the same structure, 
 the same data structure is used.
 
 `pars` are parameters that are passed to `scale_invariant_operator_sum` and
-`fixedpoint_densitymatrix`. `vary_disentanglers` gives the option of computing the
-environments only for the isometries, setting the environments of the disentanglers to zero.
+`fixedpoint_densitymatrix`. `pars[:vary_disentanglers] = false` gives the option of
+computing the environments only for the isometries, setting the environments of the
+disentanglers to zero.
 
 This function utilises the cache to avoid recomputation.
 
 See also: [`fixedpoint_densitymatrix`](@ref), [`scale_invariant_operator_sum`](@ref)
 """
-function environment(m::GenericMERA{N, LT, OT}, op, depth, pars; vary_disentanglers=true
-                    ) where {N, LT, OT}
+function environment(m::GenericMERA{N, LT, OT}, op, depth, pars) where {N, LT, OT}
     if !has_environment_stored(m.cache, op, depth)
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
@@ -656,7 +656,8 @@ function environment(m::GenericMERA{N, LT, OT}, op, depth, pars; vary_disentangl
         op_below = normalise_hamiltonian(op_below)
         rho_above = densitymatrix(m, depth+1, pars)
         l = getlayer(m, depth)
-        env = environment(l, op_below, rho_above; vary_disentanglers=vary_disentanglers)
+        env = environment(l, op_below, rho_above;
+                          vary_disentanglers=pars[:vary_disentanglers])
         set_stored_environment!(m.cache, env, op, depth)
     end
     return get_stored_environment(m.cache, op, depth)
@@ -735,6 +736,7 @@ const default_pars = (method = :lbfgs,
                       transport = :exp,
                       metric = :euclidean,
                       precondition = true,
+                      vary_disentanglers = true,
                       gradient_delta = 1e-12,
                       isometries_only_iters = 0,
                       maxiter = 2000,
@@ -752,8 +754,7 @@ const default_pars = (method = :lbfgs,
 
 """
     minimize_expectation(m::GenericMERA, h, pars=(;);
-                         finalize! = OptimKit._finalize!, vary_disentanglers=true,
-                         kwargs...)
+                         finalize! = OptimKit._finalize!, kwargs...)
 
 Return a MERA optimized to minimize the expectation value of operator `h`, starting with `m`
 as the initial guess.
@@ -789,6 +790,8 @@ as the initial guess.
   affects the `:cg:` method.
 * `ev_layer_iters`: How many times a single layer is optimised before moving to the next
   layer in the Evenbly-Vidal algorithm. `1` by default. Only affects the `:ev` method.
+* `vary_disentanglers`: If `false`, the optimisation is run only for the
+  isometries, leaving the disentanglers as they are. `true` by default.
 If any of these are specified in `pars`, the specified values override the defaults.
 
 `finalize!` is a function that will be called at every iteration. It can be used to for
@@ -800,29 +803,24 @@ iteration number. It should return the possibly modified `m`, `f`, and `g`. If `
 :ev`, then it should also be able to handle the case `g = nothing`, since the Evenbly-Vidal
 algorithm does not use gradients.
 
-`vary_disentanglers` gives the option of running the optimisation but only for the
-isometries, leaving the disentanglers as they are.
 """
-function minimize_expectation(m::GenericMERA, h, pars=(;); finalize! = OptimKit._finalize!,
-                              vary_disentanglers=true)
+function minimize_expectation(m::GenericMERA, h, pars=(;); finalize! = OptimKit._finalize!)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
     # disentanglers, with pars[:isometries_only_iters] as the maximum iteration count,
     # before moving on to the main optimization with all tensors varying.
-    if vary_disentanglers && pars[:isometries_only_iters] > 0
-        temp_pars = merge(pars, (maxiter = pars[:isometries_only_iters],))
-        m = minimize_expectation(m, h, temp_pars; finalize! = finalize!,
-                                 vary_disentanglers=false)
+    if pars[:vary_disentanglers] && pars[:isometries_only_iters] > 0
+        temp_pars = merge(pars, (maxiter = pars[:isometries_only_iters],
+                                 vary_disentanglers = false))
+        m = minimize_expectation(m, h, temp_pars; finalize! = finalize!)
     end
 
     method = pars[:method]
     if method in (:cg, :conjugategradient, :gd, :gradientdescent, :lbfgs)
-        return minimize_expectation_grad(m, h, pars; vary_disentanglers=vary_disentanglers,
-                                         finalize! = finalize!)
+        return minimize_expectation_grad(m, h, pars; finalize! = finalize!)
     elseif method == :ev || method == :evenblyvidal
-        return minimize_expectation_ev(m, h, pars; vary_disentanglers=vary_disentanglers,
-                                       finalize! = finalize!)
+        return minimize_expectation_ev(m, h, pars; finalize! = finalize!)
     else
         msg = "Unknown optimization method $(method)."
         throw(ArgumentError(msg))
@@ -830,15 +828,13 @@ function minimize_expectation(m::GenericMERA, h, pars=(;); finalize! = OptimKit.
 end
 
 """
-    minimize_expectation_ev(m::GenericMERA, h, pars;
-                            finalize! = OptimKit._finalize!, vary_disentanglers=true)
+    minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._finalize!)
 
 Return a MERA optimized with the Evenbly-Vidal method to minimize the expectation value of
 operator `h`, starting with `m` as the initial guess. See [`minimize_expectation`](@ref) for
 details.
 """
-function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._finalize!,
-                                 vary_disentanglers=true)
+function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._finalize!)
     nt = num_translayers(m)
     rhos = densitymatrices(m, pars)
     expectation = expect(h, m, pars)
@@ -857,10 +853,10 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
         for i in 1:nt+1
             local env, l
             for j in 1:pars[:ev_layer_iters]
-                env = environment(m, h, i, pars; vary_disentanglers=vary_disentanglers)
+                env = environment(m, h, i, pars)
                 l = getlayer(m, i)
                 new_l = minimize_expectation_ev(l, env;
-                                                vary_disentanglers=vary_disentanglers)
+                                                vary_disentanglers=pars[:vary_disentanglers])
                 m = replace_layer(m, new_l, i)
             end
             # We use the latest env and the corresponding layer to compute the norm of the
@@ -950,26 +946,25 @@ function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericME
 end
 
 """
-    gradient(h, m::GenericMERA, pars::NamedTuple; vary_disentanglers=true)
+    gradient(h, m::GenericMERA, pars::NamedTuple)
 
 Compute the gradient of the expectation value of `h` at the point `m`.
 
 `pars` should have `pars.metric` that specifies whether to use the `:euclidean` or
 `:canonical` metric for the Stiefel manifold, and `pars.scaleinvariant_krylovoptions` that
-is passed on to [`environment`](@ref).
-
-`vary_disentanglers` allows computing the gradients only for the isometries, and setting the
+is passed on to [`environment`](@ref). It should also have `pars.vary_disentanglers`, which
+being `false` means that we should only compute gradients for the isometries, and set the
 gradients for the disentanglers to zero.
 
 The return value is a "tangent MERA": An object of a similar type as `m`, but instead of
 regular layers with tensors that have isometricity constraints, instead each layer holds the
 corresponding gradients for each tensor.
 """
-function gradient(h, m::GenericMERA{N}, pars::NamedTuple; vary_disentanglers=true) where {N}
+function gradient(h, m::GenericMERA{N}, pars::NamedTuple) where {N}
     nt = num_translayers(m)
     layers = ntuple(Val(nt+1)) do i
         l = getlayer(m, i)
-        env = environment(m, h, i, pars; vary_disentanglers=vary_disentanglers)
+        env = environment(m, h, i, pars)
         gradient(l, env; metric=pars[:metric])
     end
     g = GenericMERA(layers)
@@ -1044,18 +1039,16 @@ function TensorKitManifolds.transport!(mvec::GenericMERA, m::GenericMERA,
 end
 
 """
-    minimize_expectation_grad(m, h, pars;
-                              finalize! = OptimKit._finalize!, vary_disentanglers=true)
+    minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
 
 Return a MERA optimized with one of the gradient methods to minimize the expectation value
 of operator `h`, starting with `m` as the initial guess. See [`minimize_expectation`](@ref)
 for details.
 """
-function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!,
-                                   vary_disentanglers=true)
+function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
     function fg(x)
         f = expect(h, x, pars)
-        g = gradient(h, x, pars; vary_disentanglers=vary_disentanglers)
+        g = gradient(h, x, pars)
         return f, g
     end
 
