@@ -1,5 +1,5 @@
 # MERA.jl
-[![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
+[![][docs-img]][docs-url] [![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
 
 MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. At the moment it only implements infinite, translation invariant MERAs. It has implementations of ternary, binary, and modified binary MERAs, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions. Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient based optimization methods](https://arxiv.org/abs/2007.03638). MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
 
@@ -21,6 +21,8 @@ See the source code for more details.
 
 The actual library is obviously in `src`. The type system is based on an abstract type `GenericMERA{N, LT} where LT <: Layer`, and its concrete subtypes such as `TernaryMERA{N} = GenericMERA{N, TernaryLayer}` and `BinaryMERA{N} = GenericMERA{N, BinaryLayer}`. The file `src/genericmera.jl` implements functions that are independent of the exact type of MERA. `src/simplelayer.jl` implements methods for the abstract type `SimpleLayer` that all the concrete `Layer` types are subtypes of, that just assumes that each layer consists of a finite number of `TensorMap`s. `src/ternarylayer.jl`, `src/binarylayer.jl`, and `src/modifiedbinarylayer.jl` provide the details of things like ascending/descending superoperators, that depend on the specific MERA. `src/tensortools.jl` supplies some functions for TensorKit objects such as `TensorMap`s and vector spaces that the rest of the package needs.
 
+[docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[docs-url]: https://mhauru.github.io/MERA.jl/dev/
 [travis-img]: https://travis-ci.org/mhauru/MERA.jl.svg?branch=master
 [travis-url]: https://travis-ci.org/mhauru/MERA.jl
 [codecov-img]: https://codecov.io/gh/mhauru/MERA.jl/branch/master/graph/badge.svg
