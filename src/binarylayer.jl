@@ -110,7 +110,7 @@ Base.eltype(::Type{BinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 outputspace(layer::BinaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::BinaryLayer) = space(layer.isometry, 3)'
 internalspace(layer::BinaryLayer) = space(layer.isometry, 1)
-internalspace(m::BinaryMERA, depth) = internalspace(get_layer(m, depth))
+internalspace(m::BinaryMERA, depth) = internalspace(getlayer(m, depth))
 
 function expand_inputspace(layer::BinaryLayer, V_new)
     u, w = layer

@@ -141,8 +141,8 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     pars = merge(MERA.default_pars, pars)
     mtan1 = gradient(randomop1, m, pars)
     mtan2 = gradient(randomop2, m, pars)
-    ltan1 = get_layer(mtan1, 1)
-    ltan2 = get_layer(mtan2, 1)
+    ltan1 = getlayer(mtan1, 1)
+    ltan2 = getlayer(mtan2, 1)
     @inferred (x -> tuple(x...))(ltan1)
     @inferred MERA.tensorwise_scale(ltan1, 0.1)
     @inferred MERA.tensorwise_sum(ltan1, ltan2)
@@ -328,7 +328,7 @@ function test_reset_storage(::Type{M}, ::Type{S}) where {M, S}
     randomop = (randomop + randomop')/2
     expectation_orig = expect(randomop, m)
 
-    m = replace_layer(m, get_layer(m, 2), 2)
+    m = replace_layer(m, getlayer(m, 2), 2)
     expectation_reset = expect(randomop, m)
     @test expectation_orig ≈ expectation_reset
 

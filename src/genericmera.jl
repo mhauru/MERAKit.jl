@@ -142,12 +142,12 @@ num_translayers(::Type{<:GenericMERA{N}}) where {N} = N-1
 num_translayers(m::GenericMERA) = num_translayers(typeof(m))
 
 """
-    get_layer(m::GenericMERA, depth)
+    getlayer(m::GenericMERA, depth)
 
 Return the layer at the given depth. 1 is the lowest layer, i.e. the one with physical
 indices.
 """
-function get_layer(m::GenericMERA, depth)
+function getlayer(m::GenericMERA, depth)
     return (depth > num_translayers(m) ?  m.layers[end] : m.layers[depth])
 end
 
@@ -157,10 +157,10 @@ end
 Replace `depth` layer of `m` with `layer`. If check_invar=true, check that the indices match
 afterwards.
 """
-function replace_layer(m::GenericMERA{N, LT}, layer::LT, depth; check_invar=true
+function replace_layer(m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar=true
                       ) where {N, LT}
     index = min(num_translayers(m)+1, depth)
-    new_layers = Base.setindex(m.layers, layer, index)
+    new_layers = Base.setindex(m.layers, newlayer, index)
     new_cache = replace_layer(m.cache, depth)
     new_m = GenericMERA(new_layers, new_cache)
     check_invar && space_invar(new_m)
@@ -206,7 +206,7 @@ physical level) indices of the layer at that depth.
 
 See also: [`inputspace`](@ref)
 """
-outputspace(m::GenericMERA, depth) = outputspace(get_layer(m, depth))
+outputspace(m::GenericMERA, depth) = outputspace(getlayer(m, depth))
 
 """
     inputspace(m::GenericMERA, depth)
@@ -216,7 +216,7 @@ invariance) indices of the layer at that depth.
 
 See also: [`outputspace`](@ref)
 """
-inputspace(m::GenericMERA, depth) = inputspace(get_layer(m, depth))
+inputspace(m::GenericMERA, depth) = inputspace(getlayer(m, depth))
 
 """
     densitymatrix_entropies(m::GenericMERA)
@@ -292,17 +292,17 @@ function expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
     end
     V = inputspace(m, depth)
     V = expand_vectorspace(V, newdims)
-    layer = get_layer(m, depth)
-    layer = expand_inputspace(layer, V)
-    next_layer = get_layer(m, depth+1)
-    next_layer = expand_outputspace(next_layer, V)
+    l = getlayer(m, depth)
+    l = expand_inputspace(l, V)
+    next_l = getlayer(m, depth+1)
+    next_l = expand_outputspace(next_l, V)
     if depth == num_translayers(m)
         # next_layer is the scale invariant part, so we need to change its top index too
         # since we changed the bottom.
-        next_layer = expand_inputspace(next_layer, V)
+        next_l = expand_inputspace(next_l, V)
     end
-    m = replace_layer(m, layer, depth; check_invar=false)
-    m = replace_layer(m, next_layer, depth+1; check_invar=check_invar)
+    m = replace_layer(m, l, depth; check_invar=false)
+    m = replace_layer(m, next_l, depth+1; check_invar=check_invar)
     expand_bonddim!(m.cache, depth, V)
     return m
 end
@@ -328,9 +328,9 @@ the function `expand_internalspace`, defined for each `Layer` type.
 function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
     V = internalspace(m, depth)
     V = expand_vectorspace(V, newdims)
-    layer = get_layer(m, depth)
-    layer = expand_internalspace(layer, V)
-    m = replace_layer(m, layer, depth; check_invar=check_invar)
+    l = getlayer(m, depth)
+    l = expand_internalspace(l, V)
+    m = replace_layer(m, l, depth; check_invar=check_invar)
     return m
 end
 
@@ -392,13 +392,13 @@ This relies on two checks, `space_invar_intralayer` for checking indices within 
 for each subtype of `Layer`.
 """
 function space_invar(m::GenericMERA)
-    layer = get_layer(m, 1)
+    l = getlayer(m, 1)
     # We go to num_translayers(m)+2, to check that the scale invariant layer is consistent
     # with itself.
     for i in 2:(num_translayers(m)+2)
-        next_layer = get_layer(m, i)
-        if applicable(space_invar_intralayer, layer)
-            if !space_invar_intralayer(layer)
+        next_l = getlayer(m, i)
+        if applicable(space_invar_intralayer, l)
+            if !space_invar_intralayer(l)
                 errmsg = "Mismatching bonds in MERA within layer $(i-1)."
                 throw(ArgumentError(errmsg))
             end
@@ -407,8 +407,8 @@ function space_invar(m::GenericMERA)
             @warn(msg)
         end
 
-        if applicable(space_invar_interlayer, layer, next_layer)
-            if !space_invar_interlayer(layer, next_layer)
+        if applicable(space_invar_interlayer, l, next_l)
+            if !space_invar_interlayer(l, next_l)
                 errmsg = "Mismatching bonds in MERA between layers $(i-1) and $i."
                 throw(ArgumentError(errmsg))
             end
@@ -416,7 +416,7 @@ function space_invar(m::GenericMERA)
             msg = "space_invar_interlayer has no method for type $(baselayertype(m)). Please consider writing one, to enable checking for space mismatches when assigning tensors."
             @warn(msg)
         end
-        layer = next_layer
+        l = next_l
     end
     return true
 end
@@ -436,8 +436,8 @@ function ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
         op_pre = ascend(op, m, endscale-1, startscale)
-        layer = get_layer(m, endscale-1)
-        op_asc = ascend(op_pre, layer)
+        l = getlayer(m, endscale-1)
+        op_asc = ascend(op_pre, l)
     else
         # op_asc = convert(operatortype(m), op)
         # what if it is a charged operator, or one living on a smaller width?
@@ -459,8 +459,8 @@ function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1
         throw(ArgumentError("endscale > startscale"))
     elseif endscale < startscale
         op_pre = descend(op, m, endscale+1, startscale)
-        layer = get_layer(m, endscale)
-        op_desc = descend(op_pre, layer)
+        l = getlayer(m, endscale)
+        op_desc = descend(op_pre, l)
     else
         op_desc = convert(operatortype(m), op)
     end
@@ -477,7 +477,7 @@ should be in `pars.scaleinvariant_krylovoptions`, they will be passed to
 `KrylovKit.eigsolve`.
 """
 function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
-    f(x) = descend(x, get_layer(m, num_translayers(m)+1))
+    f(x) = descend(x, getlayer(m, num_translayers(m)+1))
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
     x0 = thermal_densitymatrix(m, Inf)
@@ -597,9 +597,9 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
     # fp is the dominant eigenvector of the ascending superoperator. We are not interested
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
     # merely the representation of the identity operator.
-    fp = ascending_fixedpoint(get_layer(m, nt+1))
+    fp = ascending_fixedpoint(getlayer(m, nt+1))
     rhop = densitymatrix(m, nt+1, pars)
-    f = let fp = fp, rhop = rhop, lscaleinv = get_layer(m, nt+1)
+    f = let fp = fp, rhop = rhop, lscaleinv = getlayer(m, nt+1)
         function (x)
             xasc = ascend(x, lscaleinv)
             return axpy!(-dot(rhop, xasc), fp, xasc)
@@ -655,8 +655,8 @@ function environment(m::GenericMERA{N, LT, OT}, op, depth, pars; vary_disentangl
         end
         op_below = normalise_hamiltonian(op_below)
         rho_above = densitymatrix(m, depth+1, pars)
-        layer = get_layer(m, depth)
-        env = environment(layer, op_below, rho_above; vary_disentanglers=vary_disentanglers)
+        l = getlayer(m, depth)
+        env = environment(l, op_below, rho_above; vary_disentanglers=vary_disentanglers)
         set_stored_environment!(m.cache, env, op, depth)
     end
     return get_stored_environment(m.cache, op, depth)
@@ -684,10 +684,10 @@ function scalingdimensions(m::GenericMERA, howmany=20)
     # invariant layer.
     nt = num_translayers(m)
     # Closures are more type stable if they only depend on arguments of the function.
-    f(x) = ascend(x, get_layer(m, nt+1))
+    f(x) = ascend(x, getlayer(m, nt+1))
     # Find out which symmetry sectors we should do the diagonalization in.
     scaldim_dict = Dict()
-    l = get_layer(m, nt+1)
+    l = getlayer(m, nt+1)
     for irrep in blocksectors(interlayer_space)
         # Diagonalize in each irrep sector.
         x0 = scalingoperator_initialguess(l, irrep)
@@ -854,20 +854,19 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
         old_expectation = expectation
         gradnorm_sq = 0.0
 
-        for l in 1:nt+1
-            local env, layer
+        for i in 1:nt+1
+            local env, l
             for i in 1:pars[:ev_layer_iters]
-                env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
-                layer = get_layer(m, l)
-                new_layer = minimize_expectation_ev(layer, env;
-                                                    vary_disentanglers=vary_disentanglers)
-                m = replace_layer(m, new_layer, l)
+                env = environment(m, h, i, pars; vary_disentanglers=vary_disentanglers)
+                l = getlayer(m, i)
+                new_l = minimize_expectation_ev(l, env;
+                                                vary_disentanglers=vary_disentanglers)
+                m = replace_layer(m, new_l, i)
             end
             # We use the latest env and the corresponding layer to compute the norm of the
             # gradient. This isn't quite the gradient at the end point, which is what we
             # would want, but close enough.
-            gradnorm_sq += gradient_normsq(layer, env;
-                                           metric=pars[:metric])
+            gradnorm_sq += gradient_normsq(l, env; metric=pars[:metric])
         end
 
         gradnorm = sqrt(gradnorm_sq)
@@ -929,7 +928,7 @@ Return a MERA for which each tensor is the sum of the corresponding tensors of `
 function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
     n = max(num_translayers(m1), num_translayers(m2)) + 1
     layers = ntuple(Val(n)) do i
-        tensorwise_sum(get_layer(m1, i), get_layer(m2, i))
+        tensorwise_sum(getlayer(m1, i), getlayer(m2, i))
     end
     return GenericMERA(layers)
 end
@@ -945,7 +944,7 @@ See `TensorKitManifolds.inner` for more details.
 function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
                                   metric=:euclidean)
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    res = sum([inner(get_layer(m, i), get_layer(m1, i), get_layer(m2, i); metric=metric)
+    res = sum([inner(getlayer(m, i), getlayer(m1, i), getlayer(m2, i); metric=metric)
                for i in 1:n])
     return res
 end
@@ -968,10 +967,10 @@ corresponding gradients for each tensor.
 """
 function gradient(h, m::GenericMERA{N}, pars::NamedTuple; vary_disentanglers=true) where {N}
     nt = num_translayers(m)
-    layers = ntuple(Val(nt+1)) do l
-        layer = get_layer(m, l)
-        env = environment(m, h, l, pars; vary_disentanglers=vary_disentanglers)
-        gradient(layer, env; metric=pars[:metric])
+    layers = ntuple(Val(nt+1)) do i
+        l = getlayer(m, i)
+        env = environment(m, h, i, pars; vary_disentanglers=vary_disentanglers)
+        gradient(l, env; metric=pars[:metric])
     end
     g = GenericMERA(layers)
     return g
@@ -989,11 +988,11 @@ For details on how the preconditioning is done, see https://arxiv.org/abs/2007.0
 """
 function precondition_tangent(m::GenericMERA, tan::GenericMERA, pars::NamedTuple)
     nt = num_translayers(m)
-    tanlayers_prec = ntuple(Val(nt+1)) do l
-                          layer = get_layer(m, l)
-                          tanlayer = get_layer(tan, l)
-                          rho = densitymatrix(m, l+1, pars)
-                          precondition_tangent(layer, tanlayer, rho)
+    tanlayers_prec = ntuple(Val(nt+1)) do i
+                          l = getlayer(m, i)
+                          tanl = getlayer(tan, i)
+                          rho = densitymatrix(m, i+1, pars)
+                          precondition_tangent(l, tanl, rho)
                       end
     tan_prec = GenericMERA(tanlayers_prec)
     return tan_prec

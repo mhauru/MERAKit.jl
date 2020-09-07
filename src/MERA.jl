@@ -30,7 +30,7 @@ export remove_symmetry
 export layertype
 export baselayertype
 export operatortype
-export get_layer
+export getlayer
 export num_translayers
 export outputspace
 export inputspace

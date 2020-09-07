@@ -110,7 +110,7 @@ Base.eltype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ET
 outputspace(layer::TernaryLayer) = space(layer.disentangler, 1)
 inputspace(layer::TernaryLayer) = space(layer.isometry, 4)'
 internalspace(layer::TernaryLayer) = space(layer.isometry, 1)
-internalspace(m::TernaryMERA, depth) = internalspace(get_layer(m, depth))
+internalspace(m::TernaryMERA, depth) = internalspace(getlayer(m, depth))
 
 function expand_inputspace(layer::TernaryLayer, V_new)
     u, w = layer
@@ -221,7 +221,7 @@ Return the ascending superoperator of the one site in the middle of the isometri
 TernaryMERA, as a TensorMap. Unlike most ascending superoperators, this one is actually
 affordable to construct as a full tensor.
 """
-ascending_superop_onesite(m::TernaryMERA) = ascending_superop_onesite(get_layer(m, Inf))
+ascending_superop_onesite(m::TernaryMERA) = ascending_superop_onesite(getlayer(m, Inf))
 
 function ascending_superop_onesite(layer::TernaryLayer)
     w = layer.isometry
