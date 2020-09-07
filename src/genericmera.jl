@@ -856,7 +856,7 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
 
         for i in 1:nt+1
             local env, l
-            for i in 1:pars[:ev_layer_iters]
+            for j in 1:pars[:ev_layer_iters]
                 env = environment(m, h, i, pars; vary_disentanglers=vary_disentanglers)
                 l = getlayer(m, i)
                 new_l = minimize_expectation_ev(l, env;
