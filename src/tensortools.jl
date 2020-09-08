@@ -237,9 +237,21 @@ function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data
     return t
 end
 
+"""
+    append_dummy_index(t::TensorMap)
+
+Create a copy of `t`, but with an extra, trivial index as the last index of the domain.
+"""
 function append_dummy_index(t::TensorMap)
     return TensorMap(t.data, codomain(t), insertunit(domain(t)))
 end
+
+"""
+    remove_dummy_index(t::TensorMap)
+
+Assuming the last index of the domain of `t` is a trivial dummy index, return a `t` but with
+that index removed.
+"""
 function remove_dummy_index(t::TensorMap{S}) where {S}
     @assert space(t, numind(t)) == oneunit(S)'
     dom = ProductSpace{S}(Base.front(domain(t).spaces))
