@@ -296,22 +296,25 @@ function reset_environment_storage!(c::MERACache)
 end
 
 function expand_bonddim!(c::MERACache{N, LT}, depth, V) where {N, LT}
-    depth < N && return c
+    # The replacement of layers has already caused the removal of of all necessary stored
+    # operators. This only needs to take care of the stuff related to the scale invariant
+    # layer.
+    depth < N - 1 && return c
     width = causal_cone_width(LT)
     # Pad the stored scale invariant initial guesses.
-    old_rho = m.previous_fixedpoint_densitymatrix[1]
+    old_rho = c.previous_fixedpoint_densitymatrix
     if old_rho !== nothing
         for i in 1:width
             old_rho = pad_with_zeros_to(old_rho, i => V, (i+width) => V')
         end
-        m.previous_fixedpoint_densitymatrix[1] = old_rho
+        c.previous_fixedpoint_densitymatrix = old_rho
     end
-    old_opsum = m.previous_operatorsum[1]
+    old_opsum = c.previous_operatorsum
     if old_opsum !== nothing
         for i in 1:width
             old_opsum = pad_with_zeros_to(old_opsum, i => V, (i+width) => V')
         end
-        m.previous_operatorsum[1] = old_opsum
+        c.previous_operatorsum = old_opsum
     end
     return c
 end
