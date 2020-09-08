@@ -1035,8 +1035,8 @@ See `TensorKitManifolds.transport!` for more details.
 See also: [`retract`](@ref)
 """
 function TensorKitManifolds.transport!(mvec::GenericMERA, m::GenericMERA,
-                                        mtan::GenericMERA, alpha::Real,
-                                        mend::GenericMERA; kwargs...)
+                                       mtan::GenericMERA, alpha::Real,
+                                       mend::GenericMERA; kwargs...)
     layers = transport!.(mvec.layers, m.layers, mtan.layers, alpha, mend.layers; kwargs...)
     return GenericMERA(layers)
 end
