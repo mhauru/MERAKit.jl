@@ -322,8 +322,8 @@ Confirm that expanding bond dimensions does not change the expectation value of 
 Hermitian operator.
 """
 function test_expand_bonddim(::Type{M}, ::Type{S}) where {M, S}
-    layers = 4
-    spaces = random_layerspaces(S, M, layers, 4)
+    num_layers = 4
+    spaces = random_layerspaces(S, M, num_layers, 4)
     intspaces = random_internalspaces(spaces, M)
     m = random_MERA(M, ComplexF64, spaces, intspaces; random_disentangler=true)
     V = outputspace(m, 1)
@@ -333,12 +333,12 @@ function test_expand_bonddim(::Type{M}, ::Type{S}) where {M, S}
     sf = scalefactor(M)
 
     # Expand the interlayer spaces, check that expectation value is preserved.
-    for i in 1:(layers-1)
+    for i in 1:(num_layers-1)
         V = inputspace(m, i)
         expandable_sectors = sectors(V)
         Vint = fuse(⊗(fill(internalspace(m, i), sf)...))
         expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
-        if i == layers-1
+        if i == num_layers-1
             Vint = fuse(⊗(fill(internalspace(m, i+1), sf)...))
             expandable_sectors = [s for s in expandable_sectors if dim(V, s) < dim(Vint, s)]
         end
@@ -349,7 +349,7 @@ function test_expand_bonddim(::Type{M}, ::Type{S}) where {M, S}
     @test new_expectation ≈ expectation
 
     # Expand the intralayer spaces, check that expectation value is preserved.
-    for i in 1:(layers-1)
+    for i in 1:(num_layers)
         V = internalspace(m, i)
         Vout = outputspace(m, i)
         newdims = Dict(s => dim(V, s) < dim(Vout, s) ? dim(V, s) + 1 : dim(V, s)
@@ -593,7 +593,7 @@ spacetypes = (ComplexSpace, Z2Space)
 
 # Run the tests on different MERAs and vector spaces.
 # Basics
-@testset "Type ModifiedBinaryOp" begin
+@testset "ModifiedBinaryOp" begin
     for S in spacetypes
         test_modifiedbinaryop(S)
     end
