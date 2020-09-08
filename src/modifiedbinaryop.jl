@@ -51,6 +51,7 @@ function gershgorin_bounds(op::ModifiedBinaryOp)
 end
 
 support(op::ModifiedBinaryOp) = support(op.mid)  # Could equally well be op.gap.
+
 function expand_support(op::ModifiedBinaryOp, n::Integer)
     mid = expand_support(op.mid, n)
     gap = expand_support(op.gap, n)
@@ -67,8 +68,13 @@ TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
 TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
 TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
 
-# TODO This whole thing is very messy and ad hoc, with the interplay of TensorMaps and
-# ModifiedBinaryOps.
+function Base.:(==)(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
+    return (op1.mid == op2.mid) && (op1.gap == op2.gap)
+end
+
+function Base.isapprox(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
+    return (op1.mid ≈ op2.mid) && (op1.gap ≈ op2.gap)
+end
 
 # Pass element-wise arithmetic down onto the AbstractTensorMaps. Promote AbstractTensorMaps
 # to ModifiedBinaryOps if necessary.
@@ -147,13 +153,6 @@ end
 
 function BLAS.axpy!(a::Number, X::ModifiedBinaryOp, Y::AbstractTensorMap)
     return axpy!(a, X, ModifiedBinaryOp(Y))
-end
-
-function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::ModifiedBinaryOp, B::ModifiedBinaryOp,
-                            α, β)
-    mul!(C.mid, A.mid, B.mid, α, β)
-    mul!(C.gap, A.gap, B.gap, α, β)
-    return C
 end
 
 function LinearAlgebra.mul!(C::ModifiedBinaryOp, A::ModifiedBinaryOp, B::Number)

@@ -19,6 +19,11 @@ BinaryLayer
 ModifiedBinaryLayer
 ```
 
+## Operator types
+```@docs
+ModifiedBinaryOp
+```
+
 ## Utility functions
 ```@docs
 num_translayers

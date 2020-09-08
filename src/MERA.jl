@@ -19,6 +19,7 @@ export ModifiedBinaryMERA
 export TernaryLayer
 export BinaryLayer
 export ModifiedBinaryLayer
+export ModifiedBinaryOp
 export SquareTensorMap
 export ascend
 export ascended_operator

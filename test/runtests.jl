@@ -87,6 +87,90 @@ function random_internalspaces(extspaces, M)
 end
 
 """
+Test ModifiedBinaryOp.
+"""
+function test_modifiedbinaryop(::Type{S}) where {S}
+    V = random_space(S, 3)  # Use a minimum dimension of 3.
+    # Unary operations
+    a = 0.1
+    for f in (
+              copy,
+              adjoint,
+              imag,
+              real,
+              one,
+              (x) -> MERA.expand_support(x, 2),
+              (x) -> a * x,
+              (x) -> x * a,
+              (x) -> x / a,
+              (x) -> fill!(x, a),
+              (x) -> rmul!(x, a),
+              (x) -> lmul!(a, x),
+             )
+        mid = TensorMap(randn, ComplexF64, V, V)
+        gap = TensorMap(randn, ComplexF64, V, V)
+        m = ModifiedBinaryOp(mid, gap)
+        res_t = ModifiedBinaryOp(f(mid), f(gap))
+        res_m = f(m)
+        @test res_t == res_m
+    end
+
+    # Binary operations
+    a = 0.1
+    b = 2.7
+    for f in (
+              *,
+              +,
+              -,
+              /,
+              (x, y) -> axpby!(a, x, b, y),
+              (x, y) -> axpy!(a, x, y),
+              (x, y) -> mul!(x, a, y),
+              (x, y) -> mul!(x, y, b),
+             )
+        t1 = TensorMap(randn, ComplexF64, V, V)
+        t2 = TensorMap(randn, ComplexF64, V, V)
+        m1 = ModifiedBinaryOp(t1)
+        m2 = ModifiedBinaryOp(t2)
+        res_tt = ModifiedBinaryOp(f(t1, t2))
+        res_mm = f(m1, m2)
+        res_mt = f(m1, t2)
+        res_tm = f(t1, m2)
+        @test res_tt == res_mm
+        @test res_tt == res_mt
+        @test res_tt == res_tm
+
+        mid1 = TensorMap(randn, ComplexF64, V, V)
+        gap1 = TensorMap(randn, ComplexF64, V, V)
+        mid2 = TensorMap(randn, ComplexF64, V, V)
+        gap2 = TensorMap(randn, ComplexF64, V, V)
+        m1 = ModifiedBinaryOp(mid1, gap1)
+        m2 = ModifiedBinaryOp(mid2, gap2)
+        res_t = ModifiedBinaryOp(f(mid1, mid2), f(gap1, gap2))
+        res_m = f(m1, m2)
+        @test res_t == res_m
+    end
+
+    # Ones that didn't fit the above patterns.
+    mid1 = TensorMap(randn, ComplexF64, V, V)
+    gap1 = TensorMap(randn, ComplexF64, V, V)
+    mid2 = TensorMap(randn, ComplexF64, V, V)
+    gap2 = TensorMap(randn, ComplexF64, V, V)
+    m1 = ModifiedBinaryOp(mid1, gap1)
+    m2 = ModifiedBinaryOp(mid2, gap2)
+    res_t = (dot(mid1, mid2) + dot(gap1, gap2)) / 2
+    res_m = dot(m1, m2)
+    @test res_t == res_m
+    res_t = (tr(mid1) + tr(gap1)) / 2
+    res_m = tr(m1)
+    @test res_t == res_m
+
+    res_t = ModifiedBinaryOp(copyto!(mid1, mid2), copyto!(gap1, gap2))
+    res_m = copyto!(m1, m2)
+    @test res_t == res_m
+end
+
+"""
 Test type stability, and type stability only, of various methods.
 """
 function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
@@ -509,6 +593,11 @@ spacetypes = (ComplexSpace, Z2Space)
 
 # Run the tests on different MERAs and vector spaces.
 # Basics
+@testset "Type ModifiedBinaryOp" begin
+    for S in spacetypes
+        test_modifiedbinaryop(S)
+    end
+end
 @testset "Type stability" begin
     test_with_all_types(test_type_stability, meratypes, spacetypes)
 end
