@@ -15,6 +15,9 @@ or not.  If `Tan = false`, the layer is question is an actual MERA layer. If `Ta
 consists, instead of the actual tensors, of Stiefel/Grassmann tangent vectors of these
 tensors.
 
+`BinaryLayer` implements the iteration interface, returning first the disentangler, then the
+isometry.
+
 Index numbering convention is as follows, where the physical indices are at the bottom:
 Disentangler:
 ```
