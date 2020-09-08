@@ -238,7 +238,7 @@ reset_storage(m::GenericMERA) = typeof(m)(m.layers, typeof(m.cache)())
 # # # Generating random MERAs
 
 """
-    random_MERA(::Type{T <: GenericMERA}, ET, Vouts, Vints = Vouts; kwargs...)
+    random_MERA(::Type{T <: GenericMERA}, ::Type{ET}, Vouts, Vints = Vouts; kwargs...)
 
 Generate a random MERA of type `T`.
 
@@ -253,7 +253,8 @@ for each layer.
 
 See also: [`randomlayer`](@ref)
 """
-function random_MERA(::Type{T}, ET, Vouts, Vints = Vouts; kwargs...) where T <: GenericMERA
+function random_MERA(::Type{T}, ::Type{ET}, Vouts, Vints = Vouts; kwargs...
+                    ) where {T <: GenericMERA, ET}
     L = layertype(T)
     Vins = tuple(Vouts[2:end]..., Vouts[end])
     layers = ntuple(length(Vouts)) do i
