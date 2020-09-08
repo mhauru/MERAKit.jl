@@ -31,7 +31,7 @@ layertype
 operatortype
 scalefactor
 causal_cone_width
-get_layer
+getlayer
 outputspace
 inputspace
 internalspace
