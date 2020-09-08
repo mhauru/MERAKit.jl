@@ -475,7 +475,7 @@ function test_optimization(::Type{M}, ::Type{S}, method, precondition=false) whe
     dlow = 2
     dhigh = 3
     pars = (method = method,
-            gradient_delta = 1e-4,
+            gradient_delta = 1e-6,
             maxiter = 500,
             isometries_only_iters = 30,
             precondition = precondition,
@@ -498,6 +498,8 @@ function test_optimization(::Type{M}, ::Type{S}, method, precondition=false) whe
     m = minimize_expectation(m, ham, pars)
     expectation = expect(ham, m)
     @test abs(expectation + 1.0) < eps
+    entropies = densitymatrix_entropies(m)
+    @test all(entropies .< 1e-6)
 end
 
 """
