@@ -199,7 +199,7 @@ end
 function expand_vectorspace(V::GradedSpace, newdims)
     olddims = Dict(s => dim(V, s) for s in sectors(V))
     sectordict = merge(olddims, newdims)
-    return typeof(V)(sectordict; dual=V.dual)
+    return typeof(V)(sectordict; dual = V.dual)
 end
 
 # If the first argument given to depseudoserialize is a String, we assume its a
@@ -334,8 +334,8 @@ function gershgorin_discs(a::Array{S, 2}) where {S}
     end
     centres = diag(a)
     abs_centres = abs.(centres)
-    radii1 = dropdims(sum(abs.(a), dims=1), dims=1) .- abs_centres
-    radii2 = dropdims(sum(abs.(a), dims=2), dims=2) .- abs_centres
+    radii1 = dropdims(sum(abs.(a), dims = 1), dims = 1) .- abs_centres
+    radii2 = dropdims(sum(abs.(a), dims = 2), dims = 2) .- abs_centres
     radii = min.(radii1, radii2)
     discs = collect(zip(centres, radii))
     return discs
@@ -358,7 +358,8 @@ function densitymatrix_entropy(rho)
 end
 
 """
-    precondition_tangent(X::Tangent, rho::AbstractTensorMap, delta=precondition_regconst(X))
+    precondition_tangent(X::Tangent, rho::AbstractTensorMap,
+                         delta = precondition_regconst(X))
 
 Precondition the tangent vector `X` with the metrix g(X, Y) =  Tr[X' Y rho], where `rho`
 positive definite tensor.
@@ -371,7 +372,7 @@ that inverse. The regularised inverse is S -> 1/sqrt(S^2 + delta^2).
 See also: [`precondition_regconst`](@ref)
 """
 function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap,
-                              delta=precondition_regconst(X))
+                              delta = precondition_regconst(X))
     W, A, Z = X.W, X.A, X.Z
     E, U = eigh(rho)
     Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))
@@ -382,7 +383,7 @@ function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap,
 end
 
 function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensorMap,
-                              delta=precondition_regconst(X))
+                              delta = precondition_regconst(X))
     W, Z = X.W, X.Z
     E, U = eigh(rho)
     Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))
@@ -392,7 +393,7 @@ function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensor
 end
 
 function precondition_tangent(X::Unitary.UnitaryTangent, rho::AbstractTensorMap,
-                              delta=precondition_regconst(X))
+                              delta = precondition_regconst(X))
     W, A = X.W, X.A
     E, U = eigh(rho)
     Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))

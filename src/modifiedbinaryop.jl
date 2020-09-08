@@ -57,7 +57,7 @@ function expand_support(op::ModifiedBinaryOp, n::Integer)
     return ModifiedBinaryOp(mid, gap)
 end
 
-function Base.similar(op::ModifiedBinaryOp, ::Type{elementT}=eltype(op)) where {elementT}
+function Base.similar(op::ModifiedBinaryOp, ::Type{elementT} = eltype(op)) where {elementT}
     mid = similar(op.mid, elementT)
     gap = similar(op.gap, elementT)
     return ModifiedBinaryOp(mid, gap)

@@ -132,8 +132,8 @@ function expand_internalspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint=Vout;
-                     random_disentangler=false)
+function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint = Vout;
+                     random_disentangler = false)
     w = randomisometry(T, Vint ⊗ Vout ⊗ Vint, Vin)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return TernaryLayer(u, w)
@@ -162,14 +162,14 @@ function scalingoperator_initialguess(l::TernaryLayer, irrep)
     return t
 end
 
-function gradient(layer::TernaryLayer, env::TernaryLayer; metric=:euclidean)
+function gradient(layer::TernaryLayer, env::TernaryLayer; metric = :euclidean)
     u, w = layer
     uenv, wenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
     # The factor of two is from the partial_x + i partial_y derivative of the cost function,
     # and how it depends on both v and v^dagger.
-    ugrad = Stiefel.project!(2*uenv, u; metric=metric)
+    ugrad = Stiefel.project!(2*uenv, u; metric = metric)
     wgrad = Grassmann.project!(2*wenv, w)
     return TernaryLayer(ugrad, wgrad)
 end
@@ -195,7 +195,7 @@ function space_invar_intralayer(layer::TernaryLayer)
     u, w = layer
     matching_bonds = ((space(u, 3)', space(w, 3)),
                       (space(u, 4)', space(w, 1)))
-    allmatch = all(pair->==(pair...), matching_bonds)
+    allmatch = all(pair -> ==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
     allmatch &= all((u,w)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
@@ -210,7 +210,7 @@ function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     matching_bonds = ((space(w, 4)', space(unext, 1)),
                       (space(w, 4)', space(unext, 2)),
                       (space(w, 4)', space(wnext, 2)))
-    allmatch = all(pair->==(pair...), matching_bonds)
+    allmatch = all(pair -> ==(pair...), matching_bonds)
     return allmatch
 end
 
@@ -351,7 +351,7 @@ end
 
 # # # Optimization
 
-function environment(layer::TernaryLayer, op, rho; vary_disentanglers=true)
+function environment(layer::TernaryLayer, op, rho; vary_disentanglers = true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else
@@ -363,10 +363,10 @@ function environment(layer::TernaryLayer, op, rho; vary_disentanglers=true)
 end
 
 function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer;
-                                 vary_disentanglers=true)
-    u = (vary_disentanglers ? projectisometric(env.disentangler; alg=Polar())
+                                 vary_disentanglers = true)
+    u = (vary_disentanglers ? projectisometric(env.disentangler; alg = Polar())
          : layer.disentangler)
-    w = projectisometric(env.isometry; alg=Polar())
+    w = projectisometric(env.isometry; alg = Polar())
     return TernaryLayer(u, w)
 end
 

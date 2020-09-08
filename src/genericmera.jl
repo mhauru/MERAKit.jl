@@ -152,12 +152,12 @@ function getlayer(m::GenericMERA, depth)
 end
 
 """
-    replace_layer(m::GenericMERA, layer, depth; check_invar=true)
+    replace_layer(m::GenericMERA, layer, depth; check_invar = true)
 
-Replace `depth` layer of `m` with `layer`. If check_invar=true, check that the indices match
-afterwards.
+Replace `depth` layer of `m` with `layer`. If check_invar = true, check that the indices
+match afterwards.
 """
-function replace_layer(m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar=true
+function replace_layer(m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar = true
                       ) where {N, LT}
     index = min(num_translayers(m)+1, depth)
     new_layers = Base.setindex(m.layers, newlayer, index)
@@ -238,7 +238,7 @@ reset_storage(m::GenericMERA) = typeof(m)(m.layers, typeof(m.cache)())
 # # # Generating random MERAs
 
 """
-    random_MERA(::Type{T <: GenericMERA}, ET, Vouts, Vints=Vouts; kwargs...)
+    random_MERA(::Type{T <: GenericMERA}, ET, Vouts, Vints = Vouts; kwargs...)
 
 Generate a random MERA of type `T`.
 
@@ -253,7 +253,7 @@ for each layer.
 
 See also: [`randomlayer`](@ref)
 """
-function random_MERA(::Type{T}, ET, Vouts, Vints=Vouts; kwargs...) where T <: GenericMERA
+function random_MERA(::Type{T}, ET, Vouts, Vints = Vouts; kwargs...) where T <: GenericMERA
     L = layertype(T)
     Vins = tuple(Vouts[2:end]..., Vouts[end])
     layers = ntuple(length(Vouts)) do i
@@ -267,11 +267,11 @@ end
 # output bond of layer `depth`, instead of input? Would maybe be more consistent.
 # TODO Replace the newdims Dict thing with just a vector space. Or allow for both?
 """
-    expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
+    expand_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
 
 Expand the bond dimension of the MERA at the given depth.
 
-The indices to expand are the input indices of the layer at `depth`, i.e. `depth=1` means
+The indices to expand are the input indices of the layer at `depth`, i.e. `depth = 1` means
 the lowest virtual indices. The new bond dimension is given by `newdims`, which for a
 non-symmetric MERA is just a number, and for a symmetric MERA is a dictionary of `irrep =>
 block dimension`. Not all irreps for a bond need to be listed, the ones left out are left
@@ -285,9 +285,9 @@ tensor, or `projectisometric` can be called to do so explicitly.
 If `check_invar = true` the function checks that the bond dimensions of various layers match
 after the expansion.
 """
-function expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
+function expand_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
     if depth > num_translayers(m)
-        msg = "expand_bonddim called with too large depth. To change the scale invariant bond dimension, use depth=num_translayers(m)."
+        msg = "expand_bonddim called with too large depth. To change the scale invariant bond dimension, use depth = num_translayers(m)."
         throw(ArgumentError(msg))
     end
     V = inputspace(m, depth)
@@ -301,14 +301,14 @@ function expand_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
         # since we changed the bottom.
         next_l = expand_inputspace(next_l, V)
     end
-    m = replace_layer(m, l, depth; check_invar=false)
-    m = replace_layer(m, next_l, depth+1; check_invar=check_invar)
+    m = replace_layer(m, l, depth; check_invar = false)
+    m = replace_layer(m, next_l, depth+1; check_invar = check_invar)
     expand_bonddim!(m.cache, depth, V)
     return m
 end
 
 """
-    expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
+    expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
 
 Expand the bond dimension of the layer-internal indices of the MERA at the given depth.
 
@@ -325,12 +325,12 @@ Note that not all MERAs have an internal bond dimension, and some may have sever
 function will not make sense for all MERA types. Implementation relies on
 the function `expand_internalspace`, defined for each `Layer` type.
 """
-function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar=true)
+function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
     V = internalspace(m, depth)
     V = expand_vectorspace(V, newdims)
     l = getlayer(m, depth)
     l = expand_internalspace(l, V)
-    m = replace_layer(m, l, depth; check_invar=check_invar)
+    m = replace_layer(m, l, depth; check_invar = check_invar)
     return m
 end
 
@@ -424,14 +424,14 @@ end
 # # # Scaling superoperators
 
 """
-    ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
+    ascend(op, m::GenericMERA, endscale = num_translayers(m)+1, startscale = 1)
 
 Ascend the operator `op`, that lives on the layer `startscale`, through the MERA `m` to the
 layer `endscale`. Living "on" a layer means living on the indices right below it, so
-`startscale=1` refers to the physical indices, and `endscale=num_translayers(m)+1` to the
-indices just below the first scale invariant layer.
+`startscale = 1` refers to the physical indices, and `endscale = num_translayers(m)+1` to
+the indices just below the first scale invariant layer.
 """
-function ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
+function ascend(op, m::GenericMERA, endscale = num_translayers(m)+1, startscale = 1)
     if endscale < startscale
         throw(ArgumentError("endscale < startscale"))
     elseif endscale > startscale
@@ -447,14 +447,14 @@ function ascend(op, m::GenericMERA, endscale=num_translayers(m)+1, startscale=1)
 end
 
 """
-    descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1)
+    descend(op, m::GenericMERA, endscale = 1, startscale = num_translayers(m)+1)
 
 Descend the operator `op`, that lives on the layer `startscale`, through the MERA `m` to the
 layer `endscale`. Living "on" a layer means living on the indices right below it, so
-`endscale=1` refers to the physical indices, and `startscale=num_translayers(m)+1` to the
-indices just below the first scale invariant layer.
+`endscale = 1` refers to the physical indices, and `startscale = num_translayers(m)+1` to
+the indices just below the first scale invariant layer.
 """
-function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1)
+function descend(op, m::GenericMERA, endscale = 1, startscale = num_translayers(m)+1)
     if endscale > startscale
         throw(ArgumentError("endscale > startscale"))
     elseif endscale < startscale
@@ -468,7 +468,7 @@ function descend(op, m::GenericMERA, endscale=1, startscale=num_translayers(m)+1
 end
 
 """
-    fixedpoint_densitymatrix(m::GenericMERA, pars::NamedTuple=(;))
+    fixedpoint_densitymatrix(m::GenericMERA, pars::NamedTuple = (;))
 
 Find the fixed point density matrix of the scale invariant part of the MERA.
 
@@ -476,7 +476,7 @@ To find the fixed point, we use an iterative Krylov solver. The options for the 
 should be in `pars.scaleinvariant_krylovoptions`, they will be passed to
 `KrylovKit.eigsolve`.
 """
-function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
+function fixedpoint_densitymatrix(m::GenericMERA, pars = (;))
     f(x) = descend(x, getlayer(m, num_translayers(m)+1))
     # If we have stored the previous fixed point density matrix, and it has the right
     # dimensions, use that as the initial guess. Else, use a thermal density matrix.
@@ -486,7 +486,8 @@ function fixedpoint_densitymatrix(m::GenericMERA, pars=(;))
         x0 = old_rho
     end
     eigsolve_pars = get(pars, :scaleinvariant_krylovoptions, (;))
-    _, vecs, vals, info = schursolve(f, x0, 1, :LM, Arnoldi(; eager=true, eigsolve_pars...))
+    solver = Arnoldi(; eager = true, eigsolve_pars...)
+    _, vecs, vals, info = schursolve(f, x0, 1, :LM, solver)
     rho = vecs[1]
     # We know the result should always be Hermitian, and scaled to have trace 1.
     rho = (rho + rho')  # probably not even necessary
@@ -514,7 +515,7 @@ function thermal_densitymatrix(m::GenericMERA, depth)
 end
 
 """
-    densitymatrix(m::GenericMERA, depth, pars=(;))
+    densitymatrix(m::GenericMERA, depth, pars = (;))
 
 Return the density matrix right below the layer at `depth`.
 
@@ -525,7 +526,7 @@ This function utilises the cache, to avoid recomputation.
 
 See also: [`fixedpoint_densitymatrix`](@ref), [`densitymatrices`](@ref)
 """
-function densitymatrix(m::GenericMERA, depth, pars=(;))
+function densitymatrix(m::GenericMERA, depth, pars = (;))
     if !has_densitymatrix_stored(m.cache, depth)
         # If we don't find rho in storage, generate it.
         if depth > num_translayers(m)
@@ -541,7 +542,7 @@ function densitymatrix(m::GenericMERA, depth, pars=(;))
 end
 
 """
-    densitymatrices(m::GenericMERA, pars=(;))
+    densitymatrices(m::GenericMERA, pars = (;))
 
 Return all the distinct density matrices of the MERA, starting with the one at the physical
 level, and ending with the scale invariant one.
@@ -551,7 +552,7 @@ level, and ending with the scale invariant one.
 
 See also: [`fixedpoint_densitymatrix`](@ref), [`densitymatrix`](@ref)
 """
-function densitymatrices(m::GenericMERA, pars=(;))
+function densitymatrices(m::GenericMERA, pars = (;))
     rhos = [densitymatrix(m, depth, pars) for depth in 1:num_translayers(m)+1]
     return rhos
 end
@@ -566,7 +567,7 @@ This function utilises the cache, to avoid recomputation.
 See also: [`scale_invariant_operator_sum`](@ref)
 """
 function ascended_operator(m::GenericMERA, op, depth)
-    # Note that if depth=1, has_operator_stored always returns true, as it initializes
+    # Note that if depth = 1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
     if !has_operator_stored(m.cache, op, depth)
         op_below = ascended_operator(m, op, depth-1)
@@ -591,7 +592,7 @@ To approximate the converging series, we use an iterative Krylov solver. The opt
 solver should be in `pars.scaleinvariant_krylovoptions`, they will be passed
 to `KrylovKit.linsolve`.
 """
-function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::NamedTuple=(;)
+function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::NamedTuple = (;)
                                      ) where {N, LT, OT}
     nt = num_translayers(m)
     # fp is the dominant eigenvector of the ascending superoperator. We are not interested
@@ -657,7 +658,7 @@ function environment(m::GenericMERA{N, LT, OT}, op, depth, pars) where {N, LT, O
         rho_above = densitymatrix(m, depth+1, pars)
         l = getlayer(m, depth)
         env = environment(l, op_below, rho_above;
-                          vary_disentanglers=pars[:vary_disentanglers])
+                          vary_disentanglers = pars[:vary_disentanglers])
         set_stored_environment!(m.cache, env, op, depth)
     end
     return get_stored_environment(m.cache, op, depth)
@@ -666,7 +667,7 @@ end
 # # # Extracting CFT data
 
 """
-    scalingdimensions(m::GenericMERA, howmany=20)
+    scalingdimensions(m::GenericMERA, howmany = 20)
 
 Diagonalize the scale invariant ascending superoperator to compute the scaling dimensions of
 the underlying CFT.
@@ -677,7 +678,7 @@ scaling dimensions in this symmetry sector.
 
 `howmany` controls how many of lowest scaling dimensions are computed.
 """
-function scalingdimensions(m::GenericMERA, howmany=20)
+function scalingdimensions(m::GenericMERA, howmany = 20)
     width = causal_cone_width(m)
     V = inputspace(m, Inf)
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
@@ -707,7 +708,7 @@ end
 # # # Evaluation
 
 """
-    expect(op, m::GenericMERA, pars=(;), opscale=1, evalscale=1)
+    expect(op, m::GenericMERA, pars = (;), opscale = 1, evalscale = 1)
 
 Return the expecation value of operator `op` for the MERA `m`.
 
@@ -718,7 +719,7 @@ line passed on to `fixedpoint_densitymatrix`.
 
 See also: [`fixedpoint_densitymatrix`](@ref)
 """
-function expect(op, m::GenericMERA, pars=(;), opscale=1, evalscale=1)
+function expect(op, m::GenericMERA, pars = (;), opscale = 1, evalscale = 1)
     rho = densitymatrix(m, evalscale, pars)
     op = ascended_operator(m, op, evalscale)
     value = dot(rho, op)
@@ -753,7 +754,7 @@ const default_pars = (method = :lbfgs,
                      )
 
 """
-    minimize_expectation(m::GenericMERA, h, pars=(;);
+    minimize_expectation(m::GenericMERA, h, pars = (;);
                          finalize! = OptimKit._finalize!, kwargs...)
 
 Return a MERA optimized to minimize the expectation value of operator `h`, starting with `m`
@@ -804,7 +805,8 @@ iteration number. It should return the possibly modified `m`, `f`, and `g`. If `
 algorithm does not use gradients.
 
 """
-function minimize_expectation(m::GenericMERA, h, pars=(;); finalize! = OptimKit._finalize!)
+function minimize_expectation(m::GenericMERA, h, pars = (;);
+                              finalize! = OptimKit._finalize!)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
@@ -856,13 +858,13 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
                 env = environment(m, h, i, pars)
                 l = getlayer(m, i)
                 new_l = minimize_expectation_ev(l, env;
-                                                vary_disentanglers=pars[:vary_disentanglers])
+                                                vary_disentanglers = pars[:vary_disentanglers])
                 m = replace_layer(m, new_l, i)
             end
             # We use the latest env and the corresponding layer to compute the norm of the
             # gradient. This isn't quite the gradient at the end point, which is what we
             # would want, but close enough.
-            gradnorm_sq += gradient_normsq(l, env; metric=pars[:metric])
+            gradnorm_sq += gradient_normsq(l, env; metric = pars[:metric])
         end
 
         gradnorm = sqrt(gradnorm_sq)
@@ -930,7 +932,7 @@ function tensorwise_sum(m1::T, m2::T) where T <: GenericMERA
 end
 
 """
-    inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA; metric=:euclidean)
+    inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA; metric = :euclidean)
 
 Given two tangent MERAs `m1` and `m2`, both at base point `m`, compute their inner product.
 This means the sum of the inner products of the individual tensors.
@@ -938,9 +940,9 @@ This means the sum of the inner products of the individual tensors.
 See `TensorKitManifolds.inner` for more details.
 """
 function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
-                                  metric=:euclidean)
+                                  metric = :euclidean)
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    res = sum([inner(getlayer(m, i), getlayer(m1, i), getlayer(m2, i); metric=metric)
+    res = sum([inner(getlayer(m, i), getlayer(m1, i), getlayer(m2, i); metric = metric)
                for i in 1:n])
     return res
 end
@@ -965,7 +967,7 @@ function gradient(h, m::GenericMERA{N}, pars::NamedTuple) where {N}
     layers = ntuple(Val(nt+1)) do i
         l = getlayer(m, i)
         env = environment(m, h, i, pars)
-        gradient(l, env; metric=pars[:metric])
+        gradient(l, env; metric = pars[:metric])
     end
     g = GenericMERA(layers)
     return g
@@ -1052,12 +1054,12 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
         return f, g
     end
 
-    rtrct(args...) = retract(args...; alg=pars[:retraction])
-    trnsprt!(args...) = transport!(args...; alg=pars[:transport])
-    innr(args...) = inner(args...; metric=pars[:metric])
+    rtrct(args...) = retract(args...; alg = pars[:retraction])
+    trnsprt!(args...) = transport!(args...; alg = pars[:transport])
+    innr(args...) = inner(args...; metric = pars[:metric])
     scale(vec, beta) = tensorwise_scale(vec, beta)
     add(vec1, vec2, beta) = tensorwise_sum(vec1, scale(vec2, beta))
-    linesearch = HagerZhangLineSearch(; ϵ=pars[:ls_epsilon])
+    linesearch = HagerZhangLineSearch(; ϵ = pars[:ls_epsilon])
     if pars[:precondition]
         precondition(x, g) = precondition_tangent(x, g, pars)
     else
@@ -1085,7 +1087,7 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
             msg = "Unknown conjugate gradient flavor $(pars[:cg_flavor])"
             throw(ArgumentError(msg))
         end
-        alg = ConjugateGradient(; flavor=flavor, algkwargs...)
+        alg = ConjugateGradient(; flavor = flavor, algkwargs...)
     elseif pars[:method] == :gd || pars[:method] == :gradientdescent
         alg = GradientDescent(; algkwargs...)
     elseif pars[:method] == :lbfgs
@@ -1094,9 +1096,9 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))
     end
-    res = optimize(fg, m, alg; scale! = scale, add! = add, retract=rtrct,
-                   inner=innr, transport! = trnsprt!, isometrictransport=true,
-                   precondition=precondition, finalize! = finalize!)
+    res = optimize(fg, m, alg; scale! = scale, add! = add, retract = rtrct,
+                   inner = innr, transport! = trnsprt!, isometrictransport = true,
+                   precondition = precondition, finalize! = finalize!)
     m, expectation, normgrad, normgradhistory = res
     if pars[:verbosity] > 0
         @info("Gradient optimization done. Expectation = $(expectation).")

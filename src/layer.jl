@@ -17,15 +17,15 @@ return just `BinaryLayer`.
 baselayertype(::Type{L}) where {L<:Layer} = Base.typename(L).wrapper
 
 """
-    randomlayer(::Type{T <: Layer}, T, Vin, Vout, Vint=Vout; random_disentangler=false)
+    randomlayer(::Type{T <: Layer}, T, Vin, Vout, Vint = Vout; random_disentangler = false)
 
 Return a MERA layer with random tensors.
 
 `T` is the `Layer` type, and `Vin` and `Vout` are the input and output spaces. `Vint` is an
 internal vector space for the layer, connecting the disentanglers to the isometries. If
-`random_disentangler=true`, the disentangler is also a random unitary, if `false` (default),
-it is the identity or the product of two single-site isometries, depending on if the
-disentanler is supposed to be unitary or isometric.
+`random_disentangler = true`, the disentangler is also a random unitary, if `false`
+(default), it is the identity or the product of two single-site isometries, depending on if
+the disentanler is supposed to be unitary or isometric.
 
 Each subtype of `Layer` should have its own method for this function.
 """
@@ -137,18 +137,18 @@ Descend a local density matrix `rho` from the top of `layer` to the bottom.
 function descend end
 
 """
-    environment(layer::Layer, op, rho; vary_disentanglers=true)
+    environment(layer::Layer, op, rho; vary_disentanglers = true)
 
 Compute the environments with respect to `op` of all the tensors in the layer, and return
 them as a `Layer`. `rho` is the local density matrix at the top indices of this layer.
 
-If `vary_disentanglers=false`, only compute the environments for the isometries, and set the
-environments for the disentanglers to zero.
+If `vary_disentanglers = false`, only compute the environments for the isometries, and set
+the environments for the disentanglers to zero.
 """
 function environment end
 
 """
-    minimize_expectation_ev(layer::Layer, env::Layer; vary_disentanglers=true)
+    minimize_expectation_ev(layer::Layer, env::Layer; vary_disentanglers = true)
 
 Return a new layer that minimizes the expectation value with respect to the environment
 `env`, using an Evenbly-Vidal update.

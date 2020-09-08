@@ -12,7 +12,7 @@ order in which the constructor takes them in.
 """
 abstract type SimpleLayer <: Layer end
 
-Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer= T(t...)
+Base.convert(::Type{T}, t::Tuple) where T <: SimpleLayer = T(t...)
 Base.copy(layer::SimpleLayer) = typeof(layer)(map(deepcopy, _tuple(layer))...)
 
 @inline function Base.iterate(layer::SimpleLayer, ::Val{i} = Val(1)) where {i}
@@ -58,14 +58,14 @@ end
 # # # Manifold functions
 
 function TensorKitManifolds.inner(l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer;
-                                  metric=:euclidean)
+                                  metric = :euclidean)
     custominner(t, t1, t2) =
         inner(t, t1, t2; metric = isa(t1, Stiefel.StiefelTangent) ? metric : :euclidean)
     return sum(custominner.(_tuple(l), _tuple(l1), _tuple(l2)))
 end
 
 function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;
-                                    alg=:exp)
+                                    alg = :exp)
 
     ts_and_ttans = retract.(_tuple(l), _tuple(ltan), alpha; alg = alg)
     ts = first.(ts_and_ttans)
@@ -74,21 +74,21 @@ function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Re
 end
 
 function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer,
-                                       alpha::Real, lend::SimpleLayer; alg=:exp)
+                                       alpha::Real, lend::SimpleLayer; alg = :exp)
     ttans = transport!.(_tuple(lvec), _tuple(l), _tuple(ltan), alpha, _tuple(lend);
                             alg = alg)
     return baselayertype(l)(ttans...)
 end
 
 """
-    gradient_normsq(layer::Layer, env::Layer; metric=:euclidean)
+    gradient_normsq(layer::Layer, env::Layer; metric = :euclidean)
 
 Compute the norm of the gradient, given the enviroment layer `env` and the base point
 `layer`.
 
 See also: [`gradient`](@ref)
 """
-function gradient_normsq(layer::SimpleLayer, env::SimpleLayer; metric=:euclidean)
-    grad = gradient(layer, env; metric=metric)
-    return sum(inner(x, z, z; metric=metric) for (x, z) in zip(layer, grad))
+function gradient_normsq(layer::SimpleLayer, env::SimpleLayer; metric = :euclidean)
+    grad = gradient(layer, env; metric = metric)
+    return sum(inner(x, z, z; metric = metric) for (x, z) in zip(layer, grad))
 end

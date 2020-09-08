@@ -151,8 +151,8 @@ function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint=Vout;
-                     random_disentangler=false) where {T}
+function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
+                     random_disentangler = false) where {T}
     wl = randomisometry(T, Vout ⊗ Vint, Vin)
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
@@ -187,14 +187,14 @@ function scalingoperator_initialguess(l::ModifiedBinaryLayer, irrep)
 end
 
 function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
-                  metric=:euclidean)
+                  metric = :euclidean)
     u, wl, wr = layer
     uenv, wlenv, wrenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
     # of the Stiefel manifold point u or w.
     # The factor of two is from the partial_x + i partial_y derivative of the cost function,
     # and how it depends on both v and v^dagger.
-    ugrad = Stiefel.project!(2*uenv, u; metric=metric)
+    ugrad = Stiefel.project!(2*uenv, u; metric = metric)
     wlgrad = Grassmann.project!(2*wlenv, wl)
     wrgrad = Grassmann.project!(2*wrenv, wr)
     return ModifiedBinaryLayer(ugrad, wlgrad, wrgrad)
@@ -225,7 +225,7 @@ function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     matching_bonds = ((space(u, 3)', space(wl, 2)),
                       (space(u, 4)', space(wr, 1)))
-    allmatch = all(pair->==(pair...), matching_bonds)
+    allmatch = all(pair -> ==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
     allmatch &= all((u, wl, wr)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
@@ -241,7 +241,7 @@ function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::Modified
                       (space(wl, 3)', space(unext, 2)),
                       (space(wr, 3)', space(unext, 1)),
                       (space(wr, 3)', space(unext, 2)))
-    allmatch = all(pair->==(pair...), matching_bonds)
+    allmatch = all(pair -> ==(pair...), matching_bonds)
     return allmatch
 end
 
@@ -491,7 +491,7 @@ end
 
 # # # Optimization
 
-function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers=true)
+function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers = true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else
@@ -504,11 +504,11 @@ function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers=tru
 end
 
 function minimize_expectation_ev(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
-                                 vary_disentanglers=true)
-    u = (vary_disentanglers ?  projectisometric(env.disentangler; alg=Polar())
+                                 vary_disentanglers = true)
+    u = (vary_disentanglers ?  projectisometric(env.disentangler; alg = Polar())
          : layer.disentangler)
-    wl = projectisometric(env.isometry_left; alg=Polar())
-    wr = projectisometric(env.isometry_right; alg=Polar())
+    wl = projectisometric(env.isometry_left; alg = Polar())
+    wr = projectisometric(env.isometry_right; alg = Polar())
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
