@@ -137,7 +137,7 @@ Descend a local density matrix `rho` from the top of `layer` to the bottom.
 function descend end
 
 """
-    environment(layer::Layer, op, rho; vary_disentanglers = true)
+    environment(op, layer::Layer, rho; vary_disentanglers = true)
 
 Compute the environments with respect to `op` of all the tensors in the layer, and return
 them as a `Layer`. `rho` is the local density matrix at the top indices of this layer.

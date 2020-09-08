@@ -491,7 +491,7 @@ end
 
 # # # Optimization
 
-function environment(layer::ModifiedBinaryLayer, op, rho; vary_disentanglers = true)
+function environment(op, layer::ModifiedBinaryLayer, rho; vary_disentanglers = true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else

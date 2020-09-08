@@ -351,7 +351,7 @@ end
 
 # # # Optimization
 
-function environment(layer::TernaryLayer, op, rho; vary_disentanglers = true)
+function environment(op, layer::TernaryLayer, rho; vary_disentanglers = true)
     if vary_disentanglers
         env_u = environment_disentangler(op, layer, rho)
     else

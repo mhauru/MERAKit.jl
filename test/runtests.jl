@@ -125,7 +125,7 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     @inferred projectisometric(m)
     @inferred outputspace(m, Inf)
     @inferred inputspace(m, Inf)
-    @inferred MERA.environment(l1, randomop1, randomrho2)
+    @inferred MERA.environment(randomop1, l1, randomrho2)
 
     @inferred MERA.ascend(randomop1, m)
     @inferred ascended_operator(m, randomop1, 1)

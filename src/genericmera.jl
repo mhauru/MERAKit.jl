@@ -631,7 +631,7 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
 end
 
 """
-    environment(m::GenericMERA, op, depth, pars)
+    environment(op, m::GenericMERA, depth, pars)
 
 Return a `Layer` consisting of the environments of the various tensors of `m` at `depth`,
 with respect to the expectation value of `op`. Note the return value isn't really a proper
@@ -647,7 +647,7 @@ This function utilises the cache to avoid recomputation.
 
 See also: [`fixedpoint_densitymatrix`](@ref), [`scale_invariant_operator_sum`](@ref)
 """
-function environment(m::GenericMERA{N, LT, OT}, op, depth, pars) where {N, LT, OT}
+function environment(op, m::GenericMERA{N, LT, OT}, depth, pars) where {N, LT, OT}
     if !has_environment_stored(m.cache, op, depth)
         if depth <= num_translayers(m)
             op_below = ascended_operator(m, op, depth)
@@ -657,7 +657,7 @@ function environment(m::GenericMERA{N, LT, OT}, op, depth, pars) where {N, LT, O
         op_below = normalise_hamiltonian(op_below)
         rho_above = densitymatrix(m, depth+1, pars)
         l = getlayer(m, depth)
-        env = environment(l, op_below, rho_above;
+        env = environment(op_below, l, rho_above;
                           vary_disentanglers = pars[:vary_disentanglers])
         set_stored_environment!(m.cache, env, op, depth)
     end
@@ -855,7 +855,7 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
         for i in 1:nt+1
             local env, l
             for j in 1:pars[:ev_layer_iters]
-                env = environment(m, h, i, pars)
+                env = environment(h, m, i, pars)
                 l = getlayer(m, i)
                 new_l = minimize_expectation_ev(l, env;
                                                 vary_disentanglers = pars[:vary_disentanglers])
@@ -966,7 +966,7 @@ function gradient(h, m::GenericMERA{N}, pars::NamedTuple) where {N}
     nt = num_translayers(m)
     layers = ntuple(Val(nt+1)) do i
         l = getlayer(m, i)
-        env = environment(m, h, i, pars)
+        env = environment(h, m, i, pars)
         gradient(l, env; metric = pars[:metric])
     end
     g = GenericMERA(layers)
