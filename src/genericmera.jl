@@ -559,7 +559,7 @@ function densitymatrices(m::GenericMERA, pars = (;))
 end
 
 """
-    ascended_operator(m::GenericMERA, op, depth)
+    ascended_operator(op, m::GenericMERA, depth)
 
 Return the operator `op` ascended from the physical level to `depth`.
 
@@ -567,11 +567,11 @@ This function utilises the cache, to avoid recomputation.
 
 See also: [`scale_invariant_operator_sum`](@ref)
 """
-function ascended_operator(m::GenericMERA, op, depth)
+function ascended_operator(op, m::GenericMERA, depth)
     # Note that if depth = 1, has_operator_stored always returns true, as it initializes
     # storage for this operator.
     if !has_operator_stored(m.cache, op, depth)
-        op_below = ascended_operator(m, op, depth-1)
+        op_below = ascended_operator(op, m, depth-1)
         opasc = ascend(op_below, m, depth, depth-1)
         # Store this density matrix for future use.
         set_stored_operator!(m.cache, opasc, op, depth)
@@ -580,7 +580,7 @@ function ascended_operator(m::GenericMERA, op, depth)
 end
 
 """
-    scale_invariant_operator_sum(m::GenericMERA, op, pars)
+    scale_invariant_operator_sum(op, m::GenericMERA, pars)
 
 Return the sum of the ascended versions of `op` in the scale invariant part of the MERA.
 
@@ -593,7 +593,7 @@ To approximate the converging series, we use an iterative Krylov solver. The opt
 solver should be in `pars.scaleinvariant_krylovoptions`, they will be passed
 to `KrylovKit.linsolve`.
 """
-function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::NamedTuple = (;)
+function scale_invariant_operator_sum(op, m::GenericMERA{N, LT, OT}, pars::NamedTuple = (;)
                                      ) where {N, LT, OT}
     nt = num_translayers(m)
     # fp is the dominant eigenvector of the ascending superoperator. We are not interested
@@ -607,7 +607,7 @@ function scale_invariant_operator_sum(m::GenericMERA{N, LT, OT}, op, pars::Named
             return axpy!(-dot(rhop, xasc), fp, xasc)
         end
     end
-    op_top = ascended_operator(m, op, nt+1)
+    op_top = ascended_operator(op, m, nt+1)
     x0 = op_top
     old_opsum = m.cache.previous_operatorsum
     if old_opsum !== nothing && space(x0) == space(old_opsum)
@@ -651,9 +651,9 @@ See also: [`fixedpoint_densitymatrix`](@ref), [`scale_invariant_operator_sum`](@
 function environment(op, m::GenericMERA{N, LT, OT}, depth, pars) where {N, LT, OT}
     if !has_environment_stored(m.cache, op, depth)
         if depth <= num_translayers(m)
-            op_below = ascended_operator(m, op, depth)
+            op_below = ascended_operator(op, m, depth)
         else
-            op_below = scale_invariant_operator_sum(m, op, pars)
+            op_below = scale_invariant_operator_sum(op, m, pars)
         end
         op_below = normalise_hamiltonian(op_below)
         rho_above = densitymatrix(m, depth+1, pars)
@@ -722,7 +722,7 @@ See also: [`fixedpoint_densitymatrix`](@ref)
 """
 function expect(op, m::GenericMERA, pars = (;), opscale = 1, evalscale = 1)
     rho = densitymatrix(m, evalscale, pars)
-    op = ascended_operator(m, op, evalscale)
+    op = ascended_operator(op, m, evalscale)
     value = dot(rho, op)
     if abs(imag(value)/norm(op)) > 1e-13
         @warn("Non-real expectation value: $value")

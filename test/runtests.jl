@@ -128,11 +128,11 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     @inferred MERA.environment(randomop1, l1, randomrho2)
 
     @inferred MERA.ascend(randomop1, m)
-    @inferred ascended_operator(m, randomop1, 1)
+    @inferred ascended_operator(randomop1, m, 1)
     @inferred MERA.descend(randomrho1, m)
     @inferred MERA.thermal_densitymatrix(m, Inf)
     @inferred MERA.fixedpoint_densitymatrix(m)
-    @inferred MERA.scale_invariant_operator_sum(m, randomop1, (;))
+    @inferred MERA.scale_invariant_operator_sum(randomop1, m, (;))
     @inferred densitymatrix(m, 1)
 
     # TODO Finish this part, and add @inferred checks for more functions, optimally all
