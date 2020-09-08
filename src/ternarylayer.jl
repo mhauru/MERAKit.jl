@@ -132,8 +132,8 @@ function expand_internalspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-function randomlayer(::Type{TernaryLayer}, T, Vin, Vout, Vint = Vout;
-                     random_disentangler = false)
+function randomlayer(::Type{TernaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
+                     random_disentangler = false) where {T}
     w = randomisometry(T, Vint ⊗ Vout ⊗ Vint, Vin)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return TernaryLayer(u, w)

@@ -131,8 +131,8 @@ function expand_internalspace(layer::BinaryLayer, V_new)
     return BinaryLayer(u, w)
 end
 
-function randomlayer(::Type{BinaryLayer}, T, Vin, Vout, Vint = Vout;
-                     random_disentangler = false)
+function randomlayer(::Type{BinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
+                     random_disentangler = false) where {T}
     w = randomisometry(T, Vint ⊗ Vint, Vin)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return BinaryLayer(u, w)
