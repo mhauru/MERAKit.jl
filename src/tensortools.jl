@@ -361,7 +361,7 @@ Compute the von Neumann entropy of a density matrix `rho`.
 function densitymatrix_entropy(rho)
     eigs = eigh(rho)[1]
     eigs = real.(diag(convert(Array, eigs)))
-    if sum(abs.(eigs[eigs .<= 0.])) > 1e-13
+    if sum(abs.(eigs[eigs .<= 0.])) > 1e-7
         @warn("Significant negative eigenvalues for a density matrix: $eigs")
     end
     eigs = eigs[eigs .> 0.]
