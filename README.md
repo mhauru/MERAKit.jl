@@ -1,25 +1,49 @@
 # MERA.jl
 [![][docs-img]][docs-url] [![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
 
-MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. At the moment it only implements infinite, translation invariant MERAs. It has implementations of ternary, binary, and modified binary MERAs, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions. Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient based optimization methods](https://arxiv.org/abs/2007.03638). MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
+MERA.jl provides Julia implementations of [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms.
+At the moment it only implements infinite, translation invariant MERA.
+It has implementations of ternary, binary, and modified binary MERA, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions.
+Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient-based optimization methods](https://arxiv.org/abs/2007.03638).
+MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
 
-MERA.jl remains in active development as of August 2020.
+MERA.jl remains in active development as of September 2020.
+
+## Installation
+```
+]add https://github.com/mhauru/MERA.jl
+```
+or if you also want the demo scripts discussed below,
+```
+git clone https://github.com/mhauru/MERA.jl
+```
 
 ## Usage
 
-The folder `demo` has a script `demo.jl`, that runs energy minimization on either the Ising or the XXZ model, and computes scaling dimensions and entanglement entropies from the resulting MERA. The best way to get going is to clone this repo, navigate to its folder, open a Julia prompt and do
-```
-]activate .
-include("demo/demo.jl")
-```
+The reference documentation can be found [here][docs-url].
+However, in practice the best way to get started is to use the script `demo/demo.jl` as an example: `julia --project=. demo/demo.jl` should get you running.
+It runs energy minimization on the Ising model, using a bond dimension 8 ternary MERA, and computes scaling dimensions and entanglement entropies for the resulting MERA.
+It shows you how to initialize a random MERA, optimize it for a given Hamiltonian, and measure things from the MERA.
+It also shows you how to gradually increase the bond dimension during an optimization, something that is often very helpful in aiding convergence.
+Once you've gone through `demo.jl`, you can check out the reference docs for things like additional options for how to do energy minimization, etc.
 
-`demo.jl` writes to disk the MERAs it creates, by default in a folder called `JLMdata`. Another script, `demo/demo_refine.jl`, can be used to load these files, optimize the MERA further for better convergence, and write them back to disk. You can for instance first create a decent decent starting point for a MERA using `demo.jl`, since it builds the MERA up by slowly increasing bond dimension, and then use `demo_refine.jl` to push for proper convergence. Both of these scripts use `demo/demo_tools.jl`, which deals with creating Hamiltonians, writing to and reading from disk, and gradually increasing bond dimension during an optimization. Both `demo.jl` and `demo_refine.jl` take plenty of command line arguments, allowing things
-```
-julia --project=. demo/demo.jl --model=XXZ --meratype=binary --chi=5 --layers=4 --symmetry=none
-```
-See the source code for more details.
+If you have any questions, requests, or issues, feel free to open a GitHub issue or email [markus@mhauru.org](mailto:markus@mhauru.org).
 
-The actual library is obviously in `src`. The type system is based on an abstract type `GenericMERA{N, LT} where LT <: Layer`, and its concrete subtypes such as `TernaryMERA{N} = GenericMERA{N, TernaryLayer}` and `BinaryMERA{N} = GenericMERA{N, BinaryLayer}`. The file `src/genericmera.jl` implements functions that are independent of the exact type of MERA. `src/simplelayer.jl` implements methods for the abstract type `SimpleLayer` that all the concrete `Layer` types are subtypes of, that just assumes that each layer consists of a finite number of `TensorMap`s. `src/ternarylayer.jl`, `src/binarylayer.jl`, and `src/modifiedbinarylayer.jl` provide the details of things like ascending/descending superoperators, that depend on the specific MERA. `src/tensortools.jl` supplies some functions for TensorKit objects such as `TensorMap`s and vector spaces that the rest of the package needs.
+## Structure of the package
+
+The actual library is obviously in `src`.
+The type system is based on an abstract type `GenericMERA{N, LT} where LT <: Layer`, and its concrete subtypes such as `TernaryMERA{N} = GenericMERA{N, TernaryLayer}` and `BinaryMERA{N} = GenericMERA{N, BinaryLayer}`.
+Here's a rough summary of the contents of each file in `src`:
+* `MERA.jl`: Exports, imports, and inclusion of the other files.
+* `layer.jl`: Define the abstract type `Layer`, and empty functions for it that subtypes should implement.
+* `genericmera.jl`: The `GenericMERA` type and all functions that are common to all types of MERAs.
+* `meracache.jl`: A cache for things like ascended operators and environments, used by `GenericMERA`.
+* `simplelayer.jl`: `SimpleLayer <: Layer`, an abstract type for layers that are made out of a collection of tensors and nothing else, and methods for it. All of the current concrete layer types are subtypes of `SimpleLayer`.
+* `binarylayer.jl`, `ternarylayer.jl`, `modifiedbinarylayer.jl`: The concrete layer types, and all methods that depend on the specific type of MERA, e.g. diagrams for contraction of ascending and descending superoperators.
+* `modifiedbinaryop.jl`: The `ModifiedBinaryOp` type, that's used for representing the alternating structure of operators ascended/descended through a `ModifiedBinaryMERA`.
+* `tensortools.jl`: Utilities, mostly related to `TensorMap`s.
+
+See also `test/runtests.jl` for the test suite.
 
 [docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-url]: https://mhauru.github.io/MERA.jl/dev/
