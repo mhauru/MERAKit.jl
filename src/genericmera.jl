@@ -266,17 +266,18 @@ end
 
 # TODO Should the numbering be changed, so that the bond at `depth` would be the
 # output bond of layer `depth`, instead of input? Would maybe be more consistent.
-# TODO Replace the newdims Dict thing with just a vector space. Or allow for both?
 """
-    expand_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
+    expand_bonddim(m::GenericMERA, depth, V; check_invar = true)
 
 Expand the bond dimension of the MERA at the given depth.
 
 The indices to expand are the input indices of the layer at `depth`, i.e. `depth = 1` means
-the lowest virtual indices. The new bond dimension is given by `newdims`, which for a
-non-symmetric MERA is just a number, and for a symmetric MERA is a dictionary of `irrep =>
-block dimension`. Not all irreps for a bond need to be listed, the ones left out are left
-untouched.
+the lowest virtual indices. The new bond dimension is given by `V`, which can be one of
+three different things:
+* `V` can be the new vector space of the indices in question.
+* For a non-symmetric MERA `V` can be just a number, the bond dimension.
+* For a symmetric MERA `V` can be dictionary of `irrep => block dimension`. Not all irreps
+  for a bond need to be listed, the ones left out are left untouched.
 
 The expansion is done by padding tensors with zeros. Note that this breaks isometricity of
 the individual tensors. This is however of no consequence, since the MERA as a state remains
@@ -286,13 +287,16 @@ tensor, or `projectisometric` can be called to do so explicitly.
 If `check_invar = true` the function checks that the bond dimensions of various layers match
 after the expansion.
 """
-function expand_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
+function expand_bonddim(m::GenericMERA, depth, V; check_invar = true)
+    V_new = expand_vectorspace(inputspace(m, depth), V)
+    return expand_bonddim(m, depth, V_new; check_invar=check_invar)
+end
+
+function expand_bonddim(m::GenericMERA, depth, V::IndexSpace; check_invar = true)
     if depth > num_translayers(m)
         msg = "expand_bonddim called with too large depth. To change the scale invariant bond dimension, use depth = num_translayers(m)."
         throw(ArgumentError(msg))
     end
-    V = inputspace(m, depth)
-    V = expand_vectorspace(V, newdims)
     l = getlayer(m, depth)
     l = expand_inputspace(l, V)
     next_l = getlayer(m, depth+1)
@@ -309,13 +313,16 @@ function expand_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
 end
 
 """
-    expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
+    expand_internal_bonddim(m::GenericMERA, depth, V; check_invar = true)
 
 Expand the bond dimension of the layer-internal indices of the MERA at the given depth.
 
-The new bond dimension is given by `newdims`, which for a non-symmetric MERA is just a
-number, and for a symmetric MERA is a dictionary of {irrep => block dimension}. Not all
-irreps for a bond need to be listed, the ones left out are left untouched.
+The new bond dimension is given by `V`, which can be one of
+three different things:
+* `V` can be the new vector space of the indices in question.
+* For a non-symmetric MERA `V` can be just a number, the bond dimension.
+* For a symmetric MERA `V` can be dictionary of `irrep => block dimension`. Not all irreps
+  for a bond need to be listed, the ones left out are left untouched.
 
 The expansion is done by padding tensors with zeros. Note that this breaks isometricity of
 the individual tensors. This is however of no consequence, since the MERA as a state remains
@@ -326,9 +333,12 @@ Note that not all MERAs have an internal bond dimension, and some may have sever
 function will not make sense for all MERA types. Implementation relies on
 the function `expand_internalspace`, defined for each `Layer` type.
 """
-function expand_internal_bonddim(m::GenericMERA, depth, newdims; check_invar = true)
-    V = internalspace(m, depth)
-    V = expand_vectorspace(V, newdims)
+function expand_internal_bonddim(m::GenericMERA, depth, V; check_invar = true)
+    V_new = expand_vectorspace(internalspace(m, depth), V)
+    return expand_internal_bonddim(m, depth, V_new; check_invar=check_invar)
+end
+
+function expand_internal_bonddim(m::GenericMERA, depth, V::IndexSpace; check_invar = true)
     l = getlayer(m, depth)
     l = expand_internalspace(l, V)
     m = replace_layer(m, l, depth; check_invar = check_invar)
@@ -755,8 +765,7 @@ const default_pars = (method = :lbfgs,
                      )
 
 """
-    minimize_expectation(m::GenericMERA, h, pars = (;);
-                         finalize! = OptimKit._finalize!, kwargs...)
+    minimize_expectation(m::GenericMERA, h, pars = (;); finalize! = OptimKit._finalize!)
 
 Return a MERA optimized to minimize the expectation value of operator `h`, starting with `m`
 as the initial guess.
