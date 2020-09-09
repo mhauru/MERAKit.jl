@@ -734,7 +734,7 @@ function expect(op, m::GenericMERA, pars = (;), opscale = 1, evalscale = 1)
     rho = densitymatrix(m, evalscale, pars)
     op = ascended_operator(op, m, evalscale)
     value = dot(rho, op)
-    if abs(imag(value)/norm(op)) > 1e-13
+    if abs(imag(value)/(norm(op)*norm(rho))) > 1e-13
         @warn("Non-real expectation value: $value")
     end
     return real(value)
