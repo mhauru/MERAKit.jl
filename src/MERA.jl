@@ -20,7 +20,6 @@ export TernaryLayer
 export BinaryLayer
 export ModifiedBinaryLayer
 export ModifiedBinaryOp
-export SquareTensorMap
 export ascend
 export ascended_operator
 export scale_invariant_operator_sum
