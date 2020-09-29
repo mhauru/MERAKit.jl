@@ -65,6 +65,7 @@ function Base.similar(op::ModifiedBinaryOp, ::Type{elementT} = eltype(op)) where
 end
 
 TensorKit.space(op::ModifiedBinaryOp) = space(op.gap)
+TensorKit.space(op::ModifiedBinaryOp, n) = space(op.gap, n)
 TensorKit.domain(op::ModifiedBinaryOp) = domain(op.gap)
 TensorKit.codomain(op::ModifiedBinaryOp) = codomain(op.gap)
 
