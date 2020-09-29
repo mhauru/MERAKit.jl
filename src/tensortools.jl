@@ -45,7 +45,8 @@ function ternaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
     TensorType = tensormaptype(ST, 3, 1, ET)
     if Tan
         TU = tensormaptype(ST, 3, 1, ET)
-        TS = tensormaptype(ST, 1, 1, real(ET))
+        SET = isreal(sectortype(ST)) ? real(ET) : ET
+        TS = tensormaptype(ST, 1, 1, SET)
         TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
@@ -67,7 +68,8 @@ function binaryisometry_type(::Type{ST}, ::Type{ET}, Tan::Bool) where {ST, ET}
     TensorType = tensormaptype(ST, 2, 1, ET)
     if Tan
         TU = tensormaptype(ST, 2, 1, ET)
-        TS = tensormaptype(ST, 1, 1, real(ET))
+        SET = isreal(sectortype(ST)) ? real(ET) : ET
+        TS = tensormaptype(ST, 1, 1, SET)
         TV = tensormaptype(ST, 1, 1, ET)
         IsoType = Grassmann.GrassmannTangent{TensorType, TU, TS, TV}
     else
@@ -360,12 +362,7 @@ Compute the von Neumann entropy of a density matrix `rho`.
 """
 function densitymatrix_entropy(rho)
     eigs = eigh(rho)[1]
-    eigs = real.(diag(convert(Array, eigs)))
-    if sum(abs.(eigs[eigs .<= 0.])) > 1e-7
-        @warn("Significant negative eigenvalues for a density matrix: $eigs")
-    end
-    eigs = eigs[eigs .> 0.]
-    S = -dot(eigs, log.(eigs))
+    S = -dot(eigs, log(eigs))
     return S
 end
 
@@ -387,7 +384,7 @@ function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap,
                               delta = precondition_regconst(X))
     W, A, Z = X.W, X.A, X.Z
     E, U = eigh(rho)
-    Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))
+    Einv = reginv_E(E, delta)
     rhoinv = U * Einv * U'
     Z_prec = projectcomplement!(Z * rhoinv, W)
     A_prec = projectantihermitian!(symmetric_sylvester(E, U, 2*A, delta))
@@ -398,7 +395,7 @@ function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensor
                               delta = precondition_regconst(X))
     W, Z = X.W, X.Z
     E, U = eigh(rho)
-    Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))
+    Einv = reginv_E(E, delta)
     rhoinv = U * Einv * U'
     Z_prec = projectcomplement!(Z * rhoinv, W)
     return Grassmann.GrassmannTangent(W, Z_prec)
@@ -408,10 +405,18 @@ function precondition_tangent(X::Unitary.UnitaryTangent, rho::AbstractTensorMap,
                               delta = precondition_regconst(X))
     W, A = X.W, X.A
     E, U = eigh(rho)
-    Einv = inv(real(sqrt(E^2 + delta^2*id(domain(E)))))
-    rhoinv = U * Einv * U'
     A_prec = projectantihermitian!(symmetric_sylvester(E, U, 2*A, delta))
     return Unitary.UnitaryTangent(W, A_prec)
+end
+
+function reginv_E(E, delta)
+    E_isreal = eltype(E) <: Real && isreal(sectortype(E))
+    Ereg = sqrt(E^2 + delta^2*id(domain(E)))
+    if E_isreal
+        return inv(real(Ereg))
+    else
+        return inv(Ereg)
+    end
 end
 
 """
