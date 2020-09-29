@@ -160,7 +160,8 @@ function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint = V
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
     # any way).
-    wr = permute(wl, (2,1), (3,); copy = true)
+    # TODO For anyons, should there be a twist on the top leg too?
+    wr = braid(wl, (1, 2, 3), (2, 1), (3,); copy = true)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
 end
@@ -206,16 +207,25 @@ end
 function precondition_tangent(layer::ModifiedBinaryLayer, tan::ModifiedBinaryLayer, rho)
     u, wl, wr = layer
     utan, wltan, wrtan = tan
-    @tensor rho_wl_mid[-1; -11] := rho.mid[-1 1; -11 1]
-    @tensor rho_wl_gap[-1; -11] := rho.gap[1 -1; 1 -11]
+    # TODO This is just a silly hack to work around the fact that I haven't yet made trace!
+    # work with anyonic tensors. trace! calls permute of double fusion trees, which isn't
+    # well-defined for anyons.
+    V = space(rho, 1)
+    eye = isomorphism(Matrix{eltype(rho)}, V', V')
+    @tensor rho_wl_mid[-1; -11] := eye[1; 2] * rho.mid[-1 1; -11 2]
+    @tensor rho_wl_gap[-1; -11] := rho.gap[1 -1; 2 -11] * eye[1; 2]
+    #@tensor rho_wl_mid[-1; -11] := rho.mid[-1 1; -11 1]
+    #@tensor rho_wl_gap[-1; -11] := rho.gap[1 -1; 1 -11]
     rho_wl = (rho_wl_mid + rho_wl_gap) / 2.0
-    @tensor rho_wr_mid[-1; -11] := rho.mid[1 -1; 1 -11]
-    @tensor rho_wr_gap[-1; -11] := rho.gap[-1 1; -11 1]
+    @tensor rho_wr_mid[-1; -11] := rho.mid[1 -1; 2 -11] * eye[1; 2]
+    @tensor rho_wr_gap[-1; -11] := eye[1; 2] * rho.gap[-1 1; -11 2]
+    #@tensor rho_wr_mid[-1; -11] := rho.mid[1 -1; 1 -11]
+    #@tensor rho_wr_gap[-1; -11] := rho.gap[-1 1; -11 1]
     rho_wr = (rho_wr_mid + rho_wr_gap) / 2.0
     @tensor(rho_u[-1 -2; -11 -12] :=
-            wl'[12; 1 -11] * wr'[22; -12 2] *
+            wl[1 -1; 11] * wr[-2 2; 21] *
             rho.mid[11 21; 12 22] *
-            wl[1 -1; 11] * wr[-2 2; 21])
+            wl'[12; 1 -11] * wr'[22; -12 2])
     utan_prec = precondition_tangent(utan, rho_u)
     wltan_prec = precondition_tangent(wltan, rho_wl)
     wrtan_prec = precondition_tangent(wrtan, rho_wr)
@@ -257,11 +267,11 @@ function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_op[-100 -200; -300 -400] :=
-            wl[7 8; -300] * wr[10 1; -400] *
-            u[6 5; 8 10] *
-            op_gap[3 4; 7 6] *
+            wl'[-100; 3 2] * wr'[-200; 9 1] *
             u'[2 9; 4 5] *
-            wl'[-100; 3 2] * wr'[-200; 9 1]
+            op_gap[3 4; 7 6] *
+            u[6 5; 8 10] *
+            wl[7 8; -300] * wr[10 1; -400]
            )
     return scaled_op
 end
@@ -273,11 +283,11 @@ function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_op[-100 -200; -300 -400] :=
-            wl[1 10; -300] * wr[8 7; -400] *
-            u[5 6; 10 8] *
-            op_gap[4 3; 6 7] *
+            wl'[-100; 1 9] * wr'[-200; 2 3] *
             u'[9 2; 5 4] *
-            wl'[-100; 1 9] * wr'[-200; 2 3]
+            op_gap[4 3; 6 7] *
+            u[5 6; 10 8] *
+            wl[1 10; -300] * wr[8 7; -400]
            )
     return scaled_op
 end
@@ -289,11 +299,11 @@ function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 4X^6 + 2X^5
     @tensor(
             scaled_op[-100 -200; -300 -400] :=
-            wl[12 23; -300] * wr[21 11; -400] *
-            u[3 4; 23 21] *
-            op_mid[1 2; 3 4] *
+            wl'[-100; 12 24] * wr'[-200; 22 11] *
             u'[24 22; 1 2] *
-            wl'[-100; 12 24] * wr'[-200; 22 11]
+            op_mid[1 2; 3 4] *
+            u[3 4; 23 21] *
+            wl[12 23; -300] * wr[21 11; -400]
            )
     return scaled_op
 end
@@ -305,9 +315,9 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^6 + 2X^5
     @tensor(
             scaled_op[-100 -200; -300 -400] :=
-            wr[12 23; -300] * wl[21 11; -400] *
+            wr'[-100; 12 24] * wl'[-200; 22 11] *
             op_mid[24 22; 23 21] *
-            wr'[-100; 12 24] * wl'[-200; 22 11]
+            wr[12 23; -300] * wl[21 11; -400]
            )
     return scaled_op
 end
@@ -334,11 +344,11 @@ function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            wl[7 8; -300] * wr[10 1; -400] *
-            u[6 5; 8 10] *
-            op_gap[3 4; 7 6 -1000] *
+            wl'[-100; 3 2] * wr'[-200; 9 1] *
             u'[2 9; 4 5] *
-            wl'[-100; 3 2] * wr'[-200; 9 1]
+            op_gap[3 4; 7 6 -1000] *
+            u[6 5; 8 10] *
+            wl[7 8; -300] * wr[10 1; -400]
            )
     return scaled_op
 end
@@ -350,11 +360,11 @@ function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            wl[1 10; -300] * wr[8 7; -400] *
-            u[5 6; 10 8] *
-            op_gap[4 3; 6 7 -1000] *
+            wl'[-100; 1 9] * wr'[-200; 2 3] *
             u'[9 2; 5 4] *
-            wl'[-100; 1 9] * wr'[-200; 2 3]
+            op_gap[4 3; 6 7 -1000] *
+            u[5 6; 10 8] *
+            wl[1 10; -300] * wr[8 7; -400]
            )
     return scaled_op
 end
@@ -366,11 +376,11 @@ function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 4X^6 + 2X^5
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            wl[12 23; -300] * wr[21 11; -400] *
-            u[3 4; 23 21] *
-            op_mid[1 2; 3 4 -1000] *
+            wl'[-100; 12 24] * wr'[-200; 22 11] *
             u'[24 22; 1 2] *
-            wl'[-100; 12 24] * wr'[-200; 22 11]
+            op_mid[1 2; 3 4 -1000] *
+            u[3 4; 23 21] *
+            wl[12 23; -300] * wr[21 11; -400]
            )
     return scaled_op
 end
@@ -382,9 +392,9 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     # Cost: 2X^6 + 2X^5
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            wr[12 23; -300] * wl[21 11; -400] *
+            wr'[-100; 12 24] * wl'[-200; 22 11] *
             op_mid[24 22; 23 21 -1000] *
-            wr'[-100; 12 24] * wl'[-200; 22 11]
+            wr[12 23; -300] * wl[21 11; -400]
            )
     return scaled_op
 end
@@ -423,11 +433,11 @@ function descend_left(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[5 6; -400 7] *
-            wl'[4; -300 5] * wr'[2; 6 1] *
-            rho_mid[9 3; 4 2] *
+            u[-200 7; 10 8] *
             wl[-100 10; 9] * wr[8 1; 3] *
-            u[-200 7; 10 8]
+            rho_mid[9 3; 4 2] *
+            wl'[4; -300 5] * wr'[2; 6 1] *
+            u'[5 6; -400 7]
            )
     return scaled_rho
 end
@@ -438,11 +448,11 @@ function descend_right(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[6 5; 7 -300] *
-            wl'[2; 1 6] * wr'[4; 5 -400] *
-            rho_mid[3 9; 2 4] *
+            u[7 -100; 8 10] *
             wl[1 8; 3] * wr[10 -200; 9] *
-            u[7 -100; 8 10]
+            rho_mid[3 9; 2 4] *
+            wl'[2; 1 6] * wr'[4; 5 -400] *
+            u'[6 5; 7 -300]
            )
     return scaled_rho
 end
@@ -453,11 +463,11 @@ function descend_mid(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 4X^6 + 2X^5
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[9 10; -300 -400] *
-            wl'[5; 4 9] * wr'[2; 10 1] *
-            rho_mid[6 3; 5 2] *
+            u[-100 -200; 7 8] *
             wl[4 7; 6] * wr[8 1; 3] *
-            u[-100 -200; 7 8]
+            rho_mid[6 3; 5 2] *
+            wl'[5; 4 9] * wr'[2; 10 1] *
+            u'[9 10; -300 -400]
            )
     return scaled_rho
 end
@@ -468,9 +478,9 @@ function descend_between(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^6 + 2X^5
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            wr'[5; 4 -300] * wl'[2; -400 1] *
+            wr[4 -100; 6] * wl[-200 1; 3] *
             rho_gap[6 3; 5 2] *
-            wr[4 -100; 6] * wl[-200 1; 3]
+            wr'[5; 4 -300] * wl'[2; -400 1]
            )
     return scaled_rho
 end
@@ -523,36 +533,34 @@ function environment_disentangler(h::ModifiedBinaryOp, layer::ModifiedBinaryLaye
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envl[-100 -200; -300 -400] :=
-            rho_mid[10 3; 4 2] *
-            wl[9 -300; 10] * wr[-400 1; 3] *
-            h_gap[7 8; 9 -100] *
-            u'[5 6; 8 -200] *
-            wl'[4; 7 5] * wr'[2; 6 1]
+            rho_mid[4 2; 10 3] *
+            wl'[10; 9 -300] * wr'[3; -400 1] *
+            h_gap[9 -100; 7 8] *
+            u[8 -200; 5 6] *
+            wl[7 5; 4] * wr[6 1; 2]
            )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envr[-100 -200; -300 -400] :=
-            rho_mid[3 10; 2 4] *
-            wl[1 -300; 3] * wr[-400 9; 10] *
-            h_gap[8 7; -200 9] *
-            u'[6 5; -100 8] *
-            wl'[2; 1 6] * wr'[4; 5 7]
+            rho_mid[2 4; 3 10] *
+            wl'[3; 1 -300] * wr'[10; -400 9] *
+            h_gap[-200 9; 8 7] *
+            u[-100 8; 6 5] *
+            wl[1 6; 2] * wr[5 7; 4]
            )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
             envm[-100 -200; -300 -400] :=
-            rho_mid[5 3; 6 4] *
-            wl[1 -300; 5] * wr[-400 2; 3] *
-            h_mid[9 10; -100 -200] *
-            u'[7 8; 9 10] *
-            wl'[6; 1 7] * wr'[4; 8 2]
+            rho_mid[6 4; 5 3] *
+            wl'[5; 1 -300] * wr'[3; -400 2] *
+            h_mid[-100 -200; 9 10] *
+            u[9 10; 7 8] *
+            wl[1 7; 6] * wr[8 2; 4]
            )
 
     env = (envl + envr + envm) / 4.0
-    # Complex conjugate.
-    env = permute(env', (3,4), (1,2))
     return env
 end
 
@@ -573,48 +581,46 @@ function environment_isometry_left(h::ModifiedBinaryOp, layer, rho::ModifiedBina
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envl[-100 -200; -300] :=
-            rho_mid[-300 2; 4 3] *
-            wr[11 1; 2] *
-            u[9 10; -200 11] *
-            h_gap[7 8; -100 9] *
-            u'[5 6; 8 10] *
-            wl'[4; 7 5] * wr'[3; 6 1]
+            rho_mid[4 3; -300 2] *
+            wr'[2; 11 1] *
+            u'[-200 11; 9 10] *
+            h_gap[-100 9; 7 8] *
+            u[8 10; 5 6] *
+            wl[7 5; 4] * wr[6 1; 3]
            )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envr[-100 -200; -300] :=
-            rho_mid[-300 9; 10 8] *
-            wr[7 6; 9] *
-            u[5 4; -200 7] *
-            h_gap[3 2; 4 6] *
-            u'[11 1; 5 3] *
-            wl'[10; -100 11] * wr'[8; 1 2]
+            rho_mid[10 8; -300 9] *
+            wr'[9; 7 6] *
+            u'[-200 7; 5 4] *
+            h_gap[4 6; 3 2] *
+            u[5 3; 11 1] *
+            wl[-100 11; 10] * wr[1 2; 8]
            )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
             envm[-100 -200; -300] :=
-            rho_mid[-300 8; 10 9] *
-            wr[6 5; 8] *
-            u[1 2; -200 6] *
-            h_mid[3 4; 1 2] *
-            u'[11 7; 3 4] *
-            wl'[10; -100 11] * wr'[9; 7 5]
+            rho_mid[10 9; -300 8] *
+            wr'[8; 6 5] *
+            u'[-200 6; 1 2] *
+            h_mid[1 2; 3 4] *
+            u[3 4; 11 7] *
+            wl[-100 11; 10] * wr[7 5; 9]
            )
 
     # Cost: 2X^6 + 2X^5
     @tensor(
             envb[-100 -200; -300] :=
-            rho_gap[4 -300; 5 7] *
-            wr[1 2; 4] *
-            h_mid[3 6; 2 -100] *
-            wr'[5; 1 3] * wl'[7; 6 -200]
+            rho_gap[5 7; 4 -300] *
+            wr'[4; 1 2] *
+            h_mid[2 -100; 3 6] *
+            wr[1 3; 5] * wl[6 -200; 7]
            )
 
     env = (envl + envr + envm + envb) / 4.0
-    # Complex conjugate.
-    env = permute(env', (2,3), (1,))
     return env
 end
 
@@ -637,48 +643,46 @@ function environment_isometry_right(h::ModifiedBinaryOp, layer, rho::ModifiedBin
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envl[-100 -200; -300] :=
-            rho_mid[9 -300; 8 10] *
-            wl[6 7; 9] *
-            u[4 5; 7 -100] *
-            h_gap[2 3; 6 4] *
-            u'[1 11; 3 5] *
-            wl'[8; 2 1] * wr'[10; 11 -200]
+            rho_mid[8 10; 9 -300] *
+            wl'[9; 6 7] *
+            u'[7 -100; 4 5] *
+            h_gap[6 4; 2 3] *
+            u[3 5; 1 11] *
+            wl[2 1; 8] * wr[11 -200; 10]
            )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
             envr[-100 -200; -300] :=
-            rho_mid[2 -300; 3 4] *
-            wl[1 11; 2] *
-            u[10 9; 11 -100] *
-            h_gap[8 7; 9 -200] *
-            u'[6 5; 10 8] *
-            wl'[3; 1 6] * wr'[4; 5 7]
+            rho_mid[3 4; 2 -300] *
+            wl'[2; 1 11] *
+            u'[11 -100; 10 9] *
+            h_gap[9 -200; 8 7] *
+            u[10 8; 6 5] *
+            wl[1 6; 3] * wr[5 7; 4]
            )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
             envm[-100 -200; -300] :=
-            rho_mid[8 -300; 9 10] *
-            wl[5 6; 8] *
-            u[2 1; 6 -100] *
-            h_mid[4 3; 2 1] *
-            u'[7 11; 4 3] *
-            wl'[9; 5 7] * wr'[10; 11 -200]
+            rho_mid[9 10; 8 -300] *
+            wl'[8; 5 6] *
+            u'[6 -100; 2 1] *
+            h_mid[2 1; 4 3] *
+            u[4 3; 7 11] *
+            wl[5 7; 9] * wr[11 -200; 10]
            )
 
     # Cost: 2X^6 + 2X^5
     @tensor(
             envb[-100 -200; -300] :=
-            rho_gap[-300 4; 7 5] *
-            wl[2 1; 4] *
-            h_mid[6 3; -200 2] *
-            wr'[7; -100 6] * wl'[5; 3 1]
+            rho_gap[7 5; -300 4] *
+            wl'[4; 2 1] *
+            h_mid[-200 2; 6 3] *
+            wr[-100 6; 7] * wl[3 1; 5]
            )
 
     env = (envl + envr + envm + envb) / 4.0
-    # Complex conjugate.
-    env = permute(env', (2,3), (1,))
     return env
 end
 

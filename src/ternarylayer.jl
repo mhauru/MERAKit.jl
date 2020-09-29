@@ -180,13 +180,20 @@ end
 function precondition_tangent(layer::TernaryLayer, tan::TernaryLayer, rho)
     u, w = layer
     utan, wtan = tan
-    @tensor rho_wl[-1; -11] := rho[-1 1; -11 1]
-    @tensor rho_wr[-1; -11] := rho[1 -1; 1 -11]
+    # TODO This is just a silly hack to work around the fact that I haven't yet made trace!
+    # work with anyonic tensors. trace! calls permute of double fusion trees, which isn't
+    # well-defined for anyons.
+    V = space(rho, 1)
+    eye = isomorphism(Matrix{eltype(rho)}, V', V')
+    @tensor rho_wl[-1; -11] := eye[1; 2] * rho[-1 1; -11 2]
+    @tensor rho_wr[-1; -11] := rho[1 -1; 2 -11] * eye[1; 2]
+    #@tensor rho_wl[-1; -11] := rho[-1 1; -11 1]
+    #@tensor rho_wr[-1; -11] := rho[1 -1; 1 -11]
     rho_w = (rho_wl + rho_wr) / 2.0
     @tensor(rho_u[-1 -2; -11 -12] :=
-            w'[12; 1 2 -11] * w'[22; -12 3 4] *
+            w[1 2 -1; 11] * w[-2 3 4; 21] *
             rho[11 21; 12 22] *
-            w[1 2 -1; 11] * w[-2 3 4; 21])
+            w'[12; 1 2 -11] * w'[22; -12 3 4])
     utan_prec = precondition_tangent(utan, rho_u)
     wtan_prec = precondition_tangent(wtan, rho_w)
     return TernaryLayer(utan_prec, wtan_prec)
@@ -228,7 +235,7 @@ ascending_superop_onesite(m::TernaryMERA) = ascending_superop_onesite(getlayer(m
 
 function ascending_superop_onesite(layer::TernaryLayer)
     w = layer.isometry
-    @tensor(superop[-1 -2; -11 -12] := w[1 -2 2; -12] * w'[-11; 1 -1 2])
+    @tensor superop[-1 -2; -11 -12] := w'[-11; 1 -1 2] * w[1 -2 2; -12]
     return superop
 end
 
@@ -240,11 +247,11 @@ function ascend_left(op::ChargedTernaryOperator, layer::TernaryLayer)
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            w[51 52 53; -300] * w[54 11 12; -400] *
-            u[41 42; 53 54] *
-            op[31 32; 52 41 -1000] *
+            w'[-100; 51 31 21] * w'[-200; 55 11 12] *
             u'[21 55; 32 42] *
-            w'[-100; 51 31 21] * w'[-200; 55 11 12]
+            op[31 32; 52 41 -1000] *
+            u[41 42; 53 54] *
+            w[51 52 53; -300] * w[54 11 12; -400]
            )
     return scaled_op
 end
@@ -254,11 +261,11 @@ function ascend_right(op::ChargedTernaryOperator, layer::TernaryLayer)
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            w[11 12 65; -300] * w[63 61 62; -400] *
-            u[51 52; 65 63] *
-            op[31 41; 52 61 -1000] *
+            w'[-100; 11 12 64] * w'[-200; 21 41 62] *
             u'[64 21; 51 31] *
-            w'[-100; 11 12 64] * w'[-200; 21 41 62]
+            op[31 41; 52 61 -1000] *
+            u[51 52; 65 63] *
+            w[11 12 65; -300] * w[63 61 62; -400]
            )
     return scaled_op
 end
@@ -268,16 +275,17 @@ function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     # Cost: 6X^6
     @tensor(
             scaled_op[-100 -200; -300 -400 -1000] :=
-            w[31 32 41; -300] * w[51 21 22; -400] *
-            u[1 2; 41 51] *
-            op[11 12; 1 2 -1000] *
+            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
             u'[42 52; 11 12] *
-            w'[-100; 31 32 42] * w'[-200; 52 21 22]
+            op[11 12; 1 2 -1000] *
+            u[1 2; 41 51] *
+            w[31 32 41; -300] * w[51 21 22; -400]
            )
     return scaled_op
 end
 
-function ascend(op::ChargedTernaryOperator, layer::TernaryLayer) where {S1}
+function ascend(op::Union{TernaryOperator, ChargedTernaryOperator},
+                layer::TernaryLayer) where {S1}
     u, w = layer
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
@@ -295,22 +303,63 @@ ascend_right(op::TernaryOperator, layer::TernaryLayer) =
 ascend_mid(op::TernaryOperator, layer::TernaryLayer) =
     remove_dummy_index(ascend_mid(append_dummy_index(op), layer))
 
-ascend(op::TernaryOperator, layer::TernaryLayer) =
-    remove_dummy_index(ascend(append_dummy_index(op), layer))
-
 ascend(op::SquareTensorMap{1}, layer::TernaryLayer) =
     ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
+
+# TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
+function ascend_left(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w'[-100; 51 31 21] * w'[-200; 55 11 12] *
+            u'[21 55; 32 42] *
+            op[31 32; 52 41] *
+            u[41 42; 53 54] *
+            w[51 52 53; -300] * w[54 11 12; -400]
+           )
+    return scaled_op
+end
+
+function ascend_right(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w'[-100; 11 12 64] * w'[-200; 21 41 62] *
+            u'[64 21; 51 31] *
+            op[31 41; 52 61] *
+            u[51 52; 65 63] *
+            w[11 12 65; -300] * w[63 61 62; -400]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 6X^6
+    @tensor(
+            scaled_op[-100 -200; -300 -400] :=
+            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
+            u'[42 52; 11 12] *
+            op[11 12; 1 2] *
+            u[1 2; 41 51] *
+            w[31 32 41; -300] * w[51 21 22; -400]
+           )
+    return scaled_op
+end
+
 
 function descend_left(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[61 62; -400 63] *
-            w'[51; 52 -300 61] * w'[21; 62 11 12] *
-            rho[42 22; 51 21] *
+            u[-200 63; 41 31] *
             w[52 -100 41; 42] * w[31 11 12; 22] *
-            u[-200 63; 41 31]
+            rho[42 22; 51 21] *
+            w'[51; 52 -300 61] * w'[21; 62 11 12] *
+            u'[61 62; -400 63]
            )
     return scaled_rho
 end
@@ -320,11 +369,11 @@ function descend_right(rho::TernaryOperator, layer::TernaryLayer)
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[62 61; 63 -300] *
-            w'[21; 11 12 62] * w'[51; 61 -400 52] *
-            rho[22 42; 21 51] *
+            u[63 -100; 41 31] *
             w[11 12 41; 22] * w[31 -200 52; 42] *
-            u[63 -100; 41 31]
+            rho[22 42; 21 51] *
+            w'[21; 11 12 62] * w'[51; 61 -400 52] *
+            u'[62 61; 63 -300]
            )
     return scaled_rho
 end
@@ -334,11 +383,11 @@ function descend_mid(rho::TernaryOperator, layer::TernaryLayer)
     # Cost: 6X^6
     @tensor(
             scaled_rho[-100 -200; -300 -400] :=
-            u'[61 62; -300 -400] *
-            w'[21; 11 12 61] * w'[41; 62 31 32] *
-            rho[22 42; 21 41] *
+            u[-100 -200; 51 52] *
             w[11 12 51; 22] * w[52 31 32; 42] *
-            u[-100 -200; 51 52]
+            rho[22 42; 21 41] *
+            w'[21; 11 12 61] * w'[41; 62 31 32] *
+            u'[61 62; -300 -400]
            )
     return scaled_rho
 end
@@ -378,36 +427,34 @@ function environment_disentangler(h::TernaryOperator, layer, rho)
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env1[-1 -2; -3 -4] :=
-            rho[63 22; 31 21] *
-            w[61 62 -3; 63] * w[-4 11 12; 22] *
-            h[51 52; 62 -1] *
-            u'[41 42; 52 -2] *
-            w'[31; 61 51 41] * w'[21; 42 11 12]
+            rho[31 21; 63 22] *
+            w'[63; 61 62 -3] * w'[22; -4 11 12] *
+            h[62 -1; 51 52] *
+            u[52 -2; 41 42] *
+            w[61 51 41; 31] * w[42 11 12; 21]
            )
 
     # Cost: 6X^6
     @tensor(
             env2[-1 -2; -3 -4] :=
-            rho[42 52; 41 51] *
-            w[21 22 -3; 42] * w[-4 31 32; 52] *
-            h[11 12; -1 -2] *
-            u'[61 62; 11 12] *
-            w'[41; 21 22 61] * w'[51; 62 31 32]
+            rho[41 51; 42 52] *
+            w'[42; 21 22 -3] * w'[52; -4 31 32] *
+            h[-1 -2; 11 12] *
+            u[11 12; 61 62] *
+            w[21 22 61; 41] * w[62 31 32; 51]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env3[-1 -2; -3 -4] :=
-            rho[22 63; 21 31] *
-            w[12 11 -3; 22] * w[-4 62 61; 63] *
-            h[52 51; -2 62] *
-            u'[42 41; -1 52] *
-            w'[21; 12 11 42] * w'[31; 41 51 61]
+            rho[21 31; 22 63] *
+            w'[22; 12 11 -3] * w'[63; -4 62 61] *
+            h[-2 62; 52 51] *
+            u[-1 52; 42 41] *
+            w[12 11 42; 21] * w[41 51 61; 31]
            )
 
     env = (env1 + env2 + env3)/3
-    # Complex conjugate.
-    env = permute(env', (3,4), (1,2))
     return env
 end
 
@@ -416,71 +463,69 @@ function environment_isometry(h::TernaryOperator, layer, rho)
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env1[-1 -2 -3; -4] :=
-            rho[82 -4; 81 84] *
-            w[62 61 63; 82] *
-            u[51 52; 63 -1] *
-            h[41 42; 61 51] *
-            u'[31 83; 42 52] *
-            w'[81; 62 41 31] * w'[84; 83 -2 -3]
+            rho[81 84; 82 -4] *
+            w'[82; 62 61 63] *
+            u'[63 -1; 51 52] *
+            h[61 51; 41 42] *
+            u[42 52; 31 83] *
+            w[62 41 31; 81] * w[83 -2 -3; 84]
            )
 
     # Cost: 6X^6
     @tensor(
             env2[-1 -2 -3; -4] :=
-            rho[42 -4; 41 62] *
-            w[11 12 51; 42] *
-            u[21 22; 51 -1] *
-            h[31 32; 21 22] *
-            u'[52 61; 31 32] *
-            w'[41; 11 12 52] * w'[62; 61 -2 -3]
+            rho[41 62; 42 -4] *
+            w'[42; 11 12 51] *
+            u'[51 -1; 21 22] *
+            h[21 22; 31 32] *
+            u[31 32; 52 61] *
+            w[11 12 52; 41] * w[61 -2 -3; 62]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env3[-1 -2 -3; -4] :=
-            rho[32 -4; 31 33] *
-            w[21 11 73; 32] *
-            u[72 71; 73 -1] *
-            h[62 61; 71 -2] *
-            u'[51 41; 72 62] *
-            w'[31; 21 11 51] * w'[33; 41 61 -3]
+            rho[31 33; 32 -4] *
+            w'[32; 21 11 73] *
+            u'[73 -1; 72 71] *
+            h[71 -2; 62 61] *
+            u[72 62; 51 41] *
+            w[21 11 51; 31] * w[41 61 -3; 33]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env4[-1 -2 -3; -4] :=
-            rho[-4 32; 33 31] *
-            w[73 11 21; 32] *
-            u[71 72; -3 73] *
-            h[61 62; -2 71] *
-            u'[41 51; 62 72] *
-            w'[33; -1 61 41] * w'[31; 51 11 21]
+            rho[33 31; -4 32] *
+            w'[32; 73 11 21] *
+            u'[-3 73; 71 72] *
+            h[-2 71; 61 62] *
+            u[62 72; 41 51] *
+            w[-1 61 41; 33] * w[51 11 21; 31]
            )
 
     # Cost: 6X^6
     @tensor(
             env5[-1 -2 -3; -4] :=
-            rho[-4 42; 62 41] *
-            w[51 12 11; 42] *
-            u[22 21; -3 51] *
-            h[32 31; 22 21] *
-            u'[61 52; 32 31] *
-            w'[62; -1 -2 61] * w'[41; 52 12 11]
+            rho[62 41; -4 42] *
+            w'[42; 51 12 11] *
+            u'[-3 51; 22 21] *
+            h[22 21; 32 31] *
+            u[32 31; 61 52] *
+            w[-1 -2 61; 62] * w[52 12 11; 41]
            )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
             env6[-1 -2 -3; -4] :=
-            rho[-4 82; 84 81] *
-            w[63 61 62; 82] *
-            u[52 51; -3 63] *
-            h[42 41; 51 61] *
-            u'[83 31; 52 42] *
-            w'[84; -1 -2 83] * w'[81; 31 41 62]
+            rho[84 81; -4 82] *
+            w'[82; 63 61 62] *
+            u'[-3 63; 52 51] *
+            h[51 61; 42 41] *
+            u[52 42; 83 31] *
+            w[-1 -2 83; 84] * w[31 41 62; 81]
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/3
-    # Complex conjugate.
-    env = permute(env', (2,3,4), (1,))
     return env
 end

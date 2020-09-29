@@ -179,17 +179,27 @@ end
 function precondition_tangent(layer::BinaryLayer, tan::BinaryLayer, rho)
     u, w = layer
     utan, wtan = tan
-    @tensor rho_wl[-1; -11] := rho[-1 1 2; -11 1 2]
-    @tensor rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
-    @tensor rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
+    # TODO This is just a silly hack to work around the fact that I haven't yet made trace!
+    # work with anyonic tensors. trace! calls permute of double fusion trees, which isn't
+    # well-defined for anyons.
+    V = space(rho, 1)
+    eye = isomorphism(Matrix{eltype(rho)}, V', V')
+    @tensor rho_wl[-1; -11] := eye[2; 12] * eye[1; 11] * rho[-1 2 1; -11 12 11]
+    @tensor rho_wm[-1; -11] := eye[2; 12] * rho[1 -1 2; 11 -11 12] * eye[1; 11]
+    @tensor rho_wr[-1; -11] := rho[1 2 -1; 11 12 -11] * eye[1; 11] * eye[2; 12]
+    #@tensor rho_wl[-1; -11] := rho[-1 1 2; -11 1 2]
+    #@tensor rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
+    #@tensor rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
     rho_w = (rho_wl + rho_wm + rho_wr) / 3.0
-    @tensor rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
-    @tensor rho_twosite_r[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
+    @tensor rho_twosite_l[-1 -2; -11 -12] := eye[1; 2] * rho[-1 -2 1; -11 -12 2]
+    @tensor rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 2 -11 -12] * eye[1; 2]
+    #@tensor rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
+    #@tensor rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 1 -11 -12]
     rho_twosite = (rho_twosite_l + rho_twosite_r) / 2.0
     @tensor(rho_u[-1 -2; -11 -12] :=
-            w'[12; 1 -11] * w'[22; -12 2] *
+            w[1 -1; 11] * w[-2 2; 21] *
             rho_twosite[11 21; 12 22] *
-            w[1 -1; 11] * w[-2 2; 21])
+            w'[12; 1 -11] * w'[22; -12 2])
     utan_prec = precondition_tangent(utan, rho_u)
     wtan_prec = precondition_tangent(wtan, rho_w)
     return BinaryLayer(utan_prec, wtan_prec)
@@ -227,11 +237,11 @@ function ascend_left(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
-            w[5 6; -400] * w[9 8; -500] * w[16 15; -600] *
-            u[1 2; 6 9] * u[10 12; 8 16] *
-            op[3 4 14; 1 2 10 -1000] *
+            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
             u'[7 13; 3 4] * u'[11 17; 14 12] *
-            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15]
+            op[3 4 14; 1 2 10 -1000] *
+            u[1 2; 6 9] * u[10 12; 8 16] *
+            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
            )
     return scaled_op
 end
@@ -240,16 +250,43 @@ function ascend_right(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
-            w[15 16; -400] * w[8 9; -500] * w[6 5; -600] *
-            u[12 10; 16 8] * u[1 2; 9 6] *
-            op[14 3 4; 10 1 2 -1000] *
+            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
             u'[17 11; 12 14] * u'[13 7; 3 4] *
-            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5]
+            op[14 3 4; 10 1 2 -1000] *
+            u[12 10; 16 8] * u[1 2; 9 6] *
+            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
            )
     return scaled_op
 end
 
-function ascend(op::ChargedBinaryOperator, layer::BinaryLayer)
+# TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
+function ascend_left(op::BinaryOperator, layer::BinaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    @tensor(
+            scaled_op[-100 -200 -300; -400 -500 -600] :=
+            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
+            u'[7 13; 3 4] * u'[11 17; 14 12] *
+            op[3 4 14; 1 2 10] *
+            u[1 2; 6 9] * u[10 12; 8 16] *
+            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
+           )
+    return scaled_op
+end
+
+function ascend_right(op::BinaryOperator, layer::BinaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    @tensor(
+            scaled_op[-100 -200 -300; -400 -500 -600] :=
+            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
+            u'[17 11; 12 14] * u'[13 7; 3 4] *
+            op[14 3 4; 10 1 2] *
+            u[12 10; 16 8] * u[1 2; 9 6] *
+            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
+           )
+    return scaled_op
+end
+
+function ascend(op::Union{BinaryOperator, ChargedBinaryOperator}, layer::BinaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     scaled_op = (l+r)/2
@@ -263,9 +300,6 @@ ascend_left(op::BinaryOperator, layer::BinaryLayer) =
 ascend_right(op::BinaryOperator, layer::BinaryLayer) =
     remove_dummy_index(ascend_right(append_dummy_index(op), layer))
 
-ascend(op::BinaryOperator, layer::BinaryLayer) =
-    remove_dummy_index(ascend(append_dummy_index(op), layer))
-
 ascend(op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer) =
     ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
 
@@ -273,11 +307,11 @@ function descend_left(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_rho[-100 -200 -300; -400 -500 -600] :=
-            u'[16 17; -400 -500] * u'[2 10; -600 11] *
-            w'[12; 1 16] * w'[9; 17 2] * w'[5; 10 4] *
-            rho[13 7 6; 12 9 5] *
+            u[-100 -200; 14 15] * u[-300 11; 3 8] *
             w[1 14; 13] * w[15 3; 7] * w[8 4; 6] *
-            u[-100 -200; 14 15] * u[-300 11; 3 8]
+            rho[13 7 6; 12 9 5] *
+            w'[12; 1 16] * w'[9; 17 2] * w'[5; 10 4] *
+            u'[16 17; -400 -500] * u'[2 10; -600 11]
            )
     return scaled_rho
 end
@@ -286,11 +320,11 @@ function descend_right(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_rho[-100 -200 -300; -400 -500 -600] :=
-            u'[10 2; 11 -400] * u'[17 16; -500 -600] *
-            w'[5; 4 10] * w'[9; 2 17] * w'[12; 16 1] *
-            rho[6 7 13; 5 9 12] *
+            u[11 -100; 8 3] * u[-200 -300; 15 14] *
             w[4 8; 6] * w[3 15; 7] * w[14 1; 13] *
-            u[11 -100; 8 3] * u[-200 -300; 15 14]
+            rho[6 7 13; 5 9 12] *
+            w'[5; 4 10] * w'[9; 2 17] * w'[12; 16 1] *
+            u'[10 2; 11 -400] * u'[17 16; -500 -600]
            )
     return scaled_rho
 end
@@ -327,47 +361,45 @@ function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
     u, w = layer
     @tensor(
             env1[-1 -2; -3 -4] :=
-            rho[15 14 9; 17 18 10] *
-            w[5 6; 15] * w[16 -3; 14] * w[-4 8; 9] *
-            u[1 2; 6 16] *
-            h[3 4 13; 1 2 -1] *
-            u'[7 12; 3 4] * u'[11 19; 13 -2] *
-            w'[17; 5 7] * w'[18; 12 11] * w'[10; 19 8]
+            rho[17 18 10; 15 14 9] *
+            w'[15; 5 6] * w'[14; 16 -3] * w'[9; -4 8] *
+            u'[6 16; 1 2] *
+            h[1 2 -1; 3 4 13] *
+            u[3 4; 7 12] * u[13 -2; 11 19] *
+            w[5 7; 17] * w[12 11; 18] * w[19 8; 10]
            )
 
     @tensor(
             env2[-1 -2; -3 -4] :=
-            rho[3 10 5; 4 15 6] *
-            w[1 11; 3] * w[9 -3; 10] * w[-4 2; 5] *
-            u[12 19; 11 9] *
-            h[18 7 8; 19 -1 -2] *
-            u'[13 14; 12 18] * u'[16 17; 7 8] *
-            w'[4; 1 13] * w'[15; 14 16] * w'[6; 17 2]
+            rho[4 15 6; 3 10 5] *
+            w'[3; 1 11] * w'[10; 9 -3] * w'[5; -4 2] *
+            u'[11 9; 12 19] *
+            h[19 -1 -2; 18 7 8] *
+            u[12 18; 13 14] * u[7 8; 16 17] *
+            w[1 13; 4] * w[14 16; 15] * w[17 2; 6]
            )
 
     @tensor(
             env3[-1 -2; -3 -4] :=
-            rho[5 10 3; 6 15 4] *
-            w[2 -3; 5] * w[-4 9; 10] * w[11 1; 3] *
-            u[19 12; 9 11] *
-            h[8 7 18; -1 -2 19] *
-            u'[17 16; 8 7] * u'[14 13; 18 12] *
-            w'[6; 2 17] * w'[15; 16 14] * w'[4; 13 1]
+            rho[6 15 4; 5 10 3] *
+            w'[5; 2 -3] * w'[10; -4 9] * w'[3; 11 1] *
+            u'[9 11; 19 12] *
+            h[-1 -2 19; 8 7 18] *
+            u[8 7; 17 16] * u[18 12; 14 13] *
+            w[2 17; 6] * w[16 14; 15] * w[13 1; 4]
            )
 
     @tensor(
             env4[-1 -2; -3 -4] :=
-            rho[9 14 15; 10 18 17] *
-            w[8 -3; 9] * w[-4 16; 14] * w[6 5; 15] *
-            u[2 1; 16 6] *
-            h[13 4 3; -2 2 1] *
-            u'[19 11; -1 13] * u'[12 7; 4 3] *
-            w'[10; 8 19] * w'[18; 11 12] * w'[17; 7 5]
+            rho[10 18 17; 9 14 15] *
+            w'[9; 8 -3] * w'[14; -4 16] * w'[15; 6 5] *
+            u'[16 6; 2 1] *
+            h[-2 2 1; 13 4 3] *
+            u[-1 13; 19 11] * u[4 3; 12 7] *
+            w[8 19; 10] * w[11 12; 18] * w[7 5; 17]
            )
 
     env = (env1 + env2 + env3 + env4)/2
-    # Complex conjugate.
-    env = permute(env', (3,4), (1,2))
     return env
 end
 
@@ -381,67 +413,65 @@ function environment_isometry(h::BinaryOperator, layer, rho)
     u, w = layer
     @tensor(
             env1[-1 -2; -3] :=
-            rho[18 17 -3; 16 15 19] *
-            w[5 6; 18] * w[9 8; 17] *
-            u[2 1; 6 9] * u[10 11; 8 -1] *
-            h[4 3 12; 2 1 10] *
-            u'[7 14; 4 3] * u'[13 20; 12 11] *
-            w'[16; 5 7] * w'[15; 14 13] * w'[19; 20 -2]
+            rho[16 15 19; 18 17 -3] *
+            w'[18; 5 6] * w'[17; 9 8] *
+            u'[6 9; 2 1] * u'[8 -1; 10 11] *
+            h[2 1 10; 4 3 12] *
+            u[4 3; 7 14] * u[12 11; 13 20] *
+            w[5 7; 16] * w[14 13; 15] * w[20 -2; 19]
            )
 
     @tensor(
             env2[-1 -2; -3] :=
-            rho[16 15 -3; 18 17 19] *
-            w[12 13; 16] * w[5 6; 15] *
-            u[9 7; 13 5] * u[2 1; 6 -1] *
-            h[8 4 3; 7 2 1] *
-            u'[14 11; 9 8] * u'[10 20; 4 3] *
-            w'[18; 12 14] * w'[17; 11 10] * w'[19; 20 -2]
+            rho[18 17 19; 16 15 -3] *
+            w'[16; 12 13] * w'[15; 5 6] *
+            u'[13 5; 9 7] * u'[6 -1; 2 1] *
+            h[7 2 1; 8 4 3] *
+            u[9 8; 14 11] * u[4 3; 10 20] *
+            w[12 14; 18] * w[11 10; 17] * w[20 -2; 19]
            )
 
     @tensor(
             env3[-1 -2; -3] :=
-            rho[18 -3 14; 19 20 15] *
-            w[5 6; 18] * w[17 13; 14] *
-            u[2 1; 6 -1] * u[12 11; -2 17] *
-            h[4 3 9; 2 1 12] *
-            u'[7 10; 4 3] * u'[8 16; 9 11] *
-            w'[19; 5 7] * w'[20; 10 8] * w'[15; 16 13]
+            rho[19 20 15; 18 -3 14] *
+            w'[18; 5 6] * w'[14; 17 13] *
+            u'[6 -1; 2 1] * u'[-2 17; 12 11] *
+            h[2 1 12; 4 3 9] *
+            u[4 3; 7 10] * u[9 11; 8 16] *
+            w[5 7; 19] * w[10 8; 20] * w[16 13; 15]
            )
 
     @tensor(
             env4[-1 -2; -3] :=
-            rho[14 -3 18; 15 20 19] *
-            w[13 17; 14] * w[6 5; 18] *
-            u[11 12; 17 -1] * u[1 2; -2 6] *
-            h[9 3 4; 12 1 2] *
-            u'[16 8; 11 9] * u'[10 7; 3 4] *
-            w'[15; 13 16] * w'[20; 8 10] * w'[19; 7 5]
+            rho[15 20 19; 14 -3 18] *
+            w'[14; 13 17] * w'[18; 6 5] *
+            u'[17 -1; 11 12] * u'[-2 6; 1 2] *
+            h[12 1 2; 9 3 4] *
+            u[11 9; 16 8] * u[3 4; 10 7] *
+            w[13 16; 15] * w[8 10; 20] * w[7 5; 19]
            )
 
     @tensor(
             env5[-1 -2; -3] :=
-            rho[-3 15 16; 19 17 18] *
-            w[6 5; 15] * w[13 12; 16] *
-            u[1 2; -2 6] * u[7 9; 5 13] *
-            h[3 4 8; 1 2 7] *
-            u'[20 10; 3 4] * u'[11 14; 8 9] *
-            w'[19; -1 20] * w'[17; 10 11] * w'[18; 14 12]
+            rho[19 17 18; -3 15 16] *
+            w'[15; 6 5] * w'[16; 13 12] *
+            u'[-2 6; 1 2] * u'[5 13; 7 9] *
+            h[1 2 7; 3 4 8] *
+            u[3 4; 20 10] * u[8 9; 11 14] *
+            w[-1 20; 19] * w[10 11; 17] * w[14 12; 18]
            )
 
     @tensor(
             env6[-1 -2; -3] :=
-            rho[-3 17 18; 19 15 16] *
-            w[8 9; 17] * w[6 5; 18] *
-            u[11 10; -2 8] * u[1 2; 9 6] *
-            h[12 3 4; 10 1 2] *
-            u'[20 13; 11 12] * u'[14 7; 3 4] *
-            w'[19; -1 20] * w'[15; 13 14] * w'[16; 7 5]
+            rho[19 15 16; -3 17 18] *
+            w'[17; 8 9] * w'[18; 6 5] *
+            u'[-2 8; 11 10] * u'[9 6; 1 2] *
+            h[10 1 2; 12 3 4] *
+            u[11 12; 20 13] * u[3 4; 14 7] *
+            w[-1 20; 19] * w[13 14; 15] * w[7 5; 16]
            )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/2
-    # Complex conjugate.
-    env = permute(env', (2,3), (1,))
     return env
 end
 
