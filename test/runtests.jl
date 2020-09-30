@@ -14,6 +14,17 @@ function particle_number_operator(::Type{GradedSpace[FibonacciAnyon]})
     return z
 end
 
+function particle_number_operator(::Type{GradedSpace[IsingAnyon]})
+    V = GradedSpace[IsingAnyon](IsingAnyon(:I) => 1,
+                                IsingAnyon(:σ) => 1,
+                                IsingAnyon(:ψ) => 1)
+    z = TensorMap(zeros, Float64, V ← V)
+    z.data[IsingAnyon(:I)] .= 0.0
+    z.data[IsingAnyon(:σ)] .= 1.0
+    z.data[IsingAnyon(:ψ)] .= 0.0
+    return z
+end
+
 function particle_number_operator(::Type{Z2Space})
     V = Z2Space(ℤ₂(0) => 1, ℤ₂(1) => 1)
     z = TensorMap(zeros, Float64, V ← V)
@@ -35,6 +46,17 @@ function random_space(::Type{GradedSpace[FibonacciAnyon]}, dlow=2, dhigh=6)
     d0 = rand(1:dtotal-1)
     d1 = dtotal - d0
     V = GradedSpace[FibonacciAnyon](FibonacciAnyon(:I) => d0, FibonacciAnyon(:τ) => d1)
+    return V
+end
+
+function random_space(::Type{GradedSpace[IsingAnyon]}, dlow=3, dhigh=6)
+    dtotal = rand(dlow:dhigh)
+    d0 = rand(1:dtotal-2)
+    d1 = rand(1:(dtotal-d0-1))
+    d2 = dtotal - d0 - d1
+    V = GradedSpace[IsingAnyon](IsingAnyon(:I) => d0,
+                                IsingAnyon(:σ) => d1,
+                                IsingAnyon(:ψ) => d2)
     return V
 end
 
@@ -520,7 +542,7 @@ function test_optimization(::Type{M}, ::Type{S}, method, precondition=false) whe
     expectation = expect(ham, m)
     @test abs(expectation + 1.0) < eps
     # TODO We used to check here that these entropies are small, but this doesn't hold for
-    # FibonacciAnyons anymore. Figure out what's a good check.
+    # anyons. Figure out what's a good check.
     entropies = densitymatrix_entropies(m)
 end
 
@@ -613,7 +635,7 @@ end
 
 Random.seed!(1)  # For reproducing the same tests again and again.
 meratypes = (ModifiedBinaryMERA, BinaryMERA, TernaryMERA)
-spacetypes = (ComplexSpace, Z2Space, GradedSpace[FibonacciAnyon])
+spacetypes = (ComplexSpace, Z2Space, GradedSpace[FibonacciAnyon], GradedSpace[IsingAnyon])
 
 # Run the tests on different MERAs and vector spaces.
 # Basics
@@ -645,7 +667,9 @@ end
 end
 @testset "Removing symmetry" begin
     # This doesn't make sense for anyons.
-    test_with_all_types(test_remove_symmetry, meratypes, (ComplexSpace, Z2Space))
+    nonanonic_spacetypes = (ST for ST in spacetypes
+                            if BraidingStyle(sectortype(ST)) != Anyonic())
+    test_with_all_types(test_remove_symmetry, meratypes, nonanonic_spacetypes)
 end
 @testset "Reset storage" begin
     test_with_all_types(test_reset_storage, meratypes, spacetypes)

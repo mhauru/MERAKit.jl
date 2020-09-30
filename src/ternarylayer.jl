@@ -242,6 +242,23 @@ const TernaryOperator{S} = AbstractTensorMap{S, 2, 2}
 const ChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 3}
 const DoubleChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 4}
 
+function ascend(op::Union{TernaryOperator,
+                          ChargedTernaryOperator,
+                          DoubleChargedTernaryOperator},
+                layer::TernaryLayer) where {S1}
+    u, w = layer
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    scaled_op = (l+r+m)/3
+    return scaled_op
+end
+
+ascend(op::SquareTensorMap{1}, layer::TernaryLayer) =
+    ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
+
+# TODO Think about how to best remove the code duplication of having the separate methods
+# for ordinary, charged, and double charged operators.
 function ascend_left(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
@@ -284,32 +301,8 @@ function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     return scaled_op
 end
 
-function ascend(op::Union{TernaryOperator,
-                          ChargedTernaryOperator,
-                          DoubleChargedTernaryOperator},
-                layer::TernaryLayer) where {S1}
-    u, w = layer
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    m = ascend_mid(op, layer)
-    scaled_op = (l+r+m)/3
-    return scaled_op
-end
-
-ascend_left(op::TernaryOperator, layer::TernaryLayer) =
-    remove_dummy_index(ascend_left(append_dummy_index(op), layer))
-
-ascend_right(op::TernaryOperator, layer::TernaryLayer) =
-    remove_dummy_index(ascend_right(append_dummy_index(op), layer))
-
-ascend_mid(op::TernaryOperator, layer::TernaryLayer) =
-    remove_dummy_index(ascend_mid(append_dummy_index(op), layer))
-
-ascend(op::SquareTensorMap{1}, layer::TernaryLayer) =
-    ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
-
 # TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
-function ascend_left(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_left(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -323,7 +316,7 @@ function ascend_left(op::TernaryOperator, layer::TernaryLayer{GradedSpace[Fibona
     return scaled_op
 end
 
-function ascend_right(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_right(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -337,7 +330,7 @@ function ascend_right(op::TernaryOperator, layer::TernaryLayer{GradedSpace[Fibon
     return scaled_op
 end
 
-function ascend_mid(op::TernaryOperator, layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_mid(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
@@ -351,8 +344,7 @@ function ascend_mid(op::TernaryOperator, layer::TernaryLayer{GradedSpace[Fibonac
     return scaled_op
 end
 
-function ascend_left(op::DoubleChargedTernaryOperator,
-                     layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_left(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -373,8 +365,7 @@ function ascend_left(op::DoubleChargedTernaryOperator,
     return scaled_op
 end
 
-function ascend_right(op::DoubleChargedTernaryOperator,
-                      layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_right(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
@@ -395,8 +386,7 @@ function ascend_right(op::DoubleChargedTernaryOperator,
     return scaled_op
 end
 
-function ascend_mid(op::DoubleChargedTernaryOperator,
-                    layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_mid(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(

@@ -235,6 +235,18 @@ end
 const BinaryOperator{S} = AbstractTensorMap{S,3,3}
 const ChargedBinaryOperator{S} = AbstractTensorMap{S,3,4}
 
+function ascend(op::Union{BinaryOperator, ChargedBinaryOperator}, layer::BinaryLayer)
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    scaled_op = (l+r)/2
+    return scaled_op
+end
+
+ascend(op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer) =
+    ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
+
+# TODO Think about how to best remove the code duplication of having the separate methods
+# for ordinary, charged, and double charged operators.
 function ascend_left(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
@@ -262,7 +274,7 @@ function ascend_right(op::ChargedBinaryOperator, layer::BinaryLayer)
 end
 
 # TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
-function ascend_left(op::BinaryOperator, layer::BinaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_left(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600] :=
@@ -275,7 +287,7 @@ function ascend_left(op::BinaryOperator, layer::BinaryLayer{GradedSpace[Fibonacc
     return scaled_op
 end
 
-function ascend_right(op::BinaryOperator, layer::BinaryLayer{GradedSpace[FibonacciAnyon]})
+function ascend_right(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
             scaled_op[-100 -200 -300; -400 -500 -600] :=
@@ -287,23 +299,6 @@ function ascend_right(op::BinaryOperator, layer::BinaryLayer{GradedSpace[Fibonac
            )
     return scaled_op
 end
-
-function ascend(op::Union{BinaryOperator, ChargedBinaryOperator}, layer::BinaryLayer)
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    scaled_op = (l+r)/2
-    return scaled_op
-end
-
-# Turn any BinaryOperator into a ChargedBinaryOperator with trivial charge, and then back.
-ascend_left(op::BinaryOperator, layer::BinaryLayer) =
-    remove_dummy_index(ascend_left(append_dummy_index(op), layer))
-
-ascend_right(op::BinaryOperator, layer::BinaryLayer) =
-    remove_dummy_index(ascend_right(append_dummy_index(op), layer))
-
-ascend(op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer) =
-    ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
 
 function descend_left(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer

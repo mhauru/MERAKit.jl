@@ -262,6 +262,36 @@ end
 
 # # # Ascending and descending superoperators
 
+
+"""
+Ascend a two-site `op` from the bottom of the given layer to the top.
+"""
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+               ) where {S1, T <: Union{SquareTensorMap{2},
+                                       AbstractTensorMap{S1,2,3}}}
+    l = ascend_left(op, layer)
+    r = ascend_right(op, layer)
+    m = ascend_mid(op, layer)
+    b = ascend_between(op, layer)
+    scaled_op_mid = (l+r+m) / 2
+    scaled_op_gap = b / 2
+    scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
+    return scaled_op
+end
+
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+               ) where {T <: SquareTensorMap{1}}
+    op = expand_support(op, causal_cone_width(ModifiedBinaryLayer))
+    return ascend(op, layer)
+end
+
+function ascend(op::AbstractTensorMap, layer::ModifiedBinaryLayer)
+    op = ModifiedBinaryOp(op)
+    return ascend(op, layer)
+end
+
+# TODO Think about how to best remove the code duplication of having the separate methods
+# for ordinary, charged, and double charged operators.
 function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
                     ) where T <: SquareTensorMap{2}
     u, wl, wr = layer
@@ -321,21 +351,6 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
             op_mid[24 22; 23 21] *
             wr[12 23; -300] * wl[21 11; -400]
            )
-    return scaled_op
-end
-
-"""
-Ascend a two-site `op` from the bottom of the given layer to the top.
-"""
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-               ) where T <: SquareTensorMap{2}
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    m = ascend_mid(op, layer)
-    b = ascend_between(op, layer)
-    scaled_op_mid = (l+r+m) / 2.0
-    scaled_op_gap = b / 2.0
-    scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
     return scaled_op
 end
 
@@ -399,34 +414,6 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
             wr[12 23; -300] * wl[21 11; -400]
            )
     return scaled_op
-end
-
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-               ) where {S1, T <: AbstractTensorMap{S1,2,3}}
-    u, wl, wr = layer
-    op_mid, op_gap = op
-    l = ascend_left(op, layer)
-    r = ascend_right(op, layer)
-    m = ascend_mid(op, layer)
-    b = ascend_between(op, layer)
-    scaled_op_mid = (l+r+m) / 2.0
-    scaled_op_gap = b / 2.0
-    scaled_op = ModifiedBinaryOp(scaled_op_mid, scaled_op_gap)
-    return scaled_op
-end
-
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-               ) where {T <: SquareTensorMap{1}}
-    op = expand_support(op, causal_cone_width(ModifiedBinaryLayer))
-    return ascend(op, layer)
-end
-
-function ascend(op::T, layer::ModifiedBinaryLayer
-               ) where {S1, T <: Union{SquareTensorMap{1},
-                                       SquareTensorMap{2},
-                                       AbstractTensorMap{S1,2,3}}}
-    op = ModifiedBinaryOp(op)
-    return ascend(op, layer)
 end
 
 function descend_left(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
