@@ -104,6 +104,8 @@ function operatortype(::Type{TernaryLayer{ST, ET, false}}) where {ST, ET}
 end
 operatortype(::Type{TernaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
+TensorKit.spacetype(::Type{TernaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ST
+
 scalefactor(::Type{<:TernaryLayer}) = 3
 
 causal_cone_width(::Type{<:TernaryLayer}) = 2

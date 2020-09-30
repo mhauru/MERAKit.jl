@@ -104,6 +104,8 @@ function operatortype(::Type{BinaryLayer{ST, ET, false}}) where {ST, ET}
 end
 operatortype(::Type{BinaryLayer{ST, ET, true}}) where {ST, ET} = Nothing
 
+TensorKit.spacetype(::Type{BinaryLayer{ST, ET, Tan}}) where {ST, ET, Tan} = ST
+
 scalefactor(::Type{<:BinaryLayer}) = 2
 
 causal_cone_width(::Type{<:BinaryLayer}) = 3
