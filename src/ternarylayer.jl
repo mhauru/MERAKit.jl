@@ -150,17 +150,14 @@ function ascending_fixedpoint(layer::TernaryLayer)
     return id(storagetype(operatortype(layer)), Vtotal)
 end
 
-function scalingoperator_initialguess(l::TernaryLayer, irrep)
+function scalingoperator_initialguess(l::TernaryLayer, irreps...)
     width = causal_cone_width(l)
     V = inputspace(l)
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     outspace = interlayer_space
-    local inspace
-    if irrep !== Trivial()
-        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-        inspace = interlayer_space ⊗ spacetype(V)(irrep => 1)
-    else
-        inspace = interlayer_space
+    inspace = interlayer_space
+    for irrep in irreps
+        inspace = inspace ⊗ spacetype(V)(irrep => 1)
     end
     typ = eltype(l)
     t = TensorMap(randn, typ, outspace ← inspace)
@@ -241,8 +238,9 @@ function ascending_superop_onesite(layer::TernaryLayer)
     return superop
 end
 
-const TernaryOperator{S} = AbstractTensorMap{S,2,2}
-const ChargedTernaryOperator{S} = AbstractTensorMap{S,2,3}
+const TernaryOperator{S} = AbstractTensorMap{S, 2, 2}
+const ChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 3}
+const DoubleChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 4}
 
 function ascend_left(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
@@ -286,7 +284,9 @@ function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     return scaled_op
 end
 
-function ascend(op::Union{TernaryOperator, ChargedTernaryOperator},
+function ascend(op::Union{TernaryOperator,
+                          ChargedTernaryOperator,
+                          DoubleChargedTernaryOperator},
                 layer::TernaryLayer) where {S1}
     u, w = layer
     l = ascend_left(op, layer)
@@ -351,6 +351,70 @@ function ascend_mid(op::TernaryOperator, layer::TernaryLayer{GradedSpace[Fibonac
     return scaled_op
 end
 
+function ascend_left(op::DoubleChargedTernaryOperator,
+                     layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            temp1[-1 -2 -3 -4; -11 -12 -13 -14] :=
+            w'[-3; -2 31 21] *
+            u'[21 -4; 32 -14] *
+            op[31 32; -1 -11 -12 -13]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 15, 1, 100, 16), (1, 2, 3, 7, 6, 4), (5, 8))
+    @tensor(
+            temp3[-100 -1000 -2000 -200; -300 -400] :=
+            w'[-200; 55 11 12] *
+            temp2[52 51 -100 -1000 -2000 55; 41 42] *
+            u[41 42; 53 54] *
+            w[51 52 53; -300] * w[54 11 12; -400]
+           )
+    scaled_op = braid(temp3, (11, 100, 1, 12, 13, 14), (1, 4), (5, 6, 3, 2))
+    return scaled_op
+end
+
+function ascend_right(op::DoubleChargedTernaryOperator,
+                      layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 2X^8 + 2X^7 + 2X^6
+    @tensor(
+            temp1[-1 -2 -3 -4 -5 -6; -11 -12] :=
+            w'[-2; 21 41 -3] *
+            u'[-1 21; -11 31] *
+            op[31 41; -12 -6 -5 -4]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 100, 1, 14, 15, 16), (1, 2, 4, 5, 3, 6), (7, 8))
+    @tensor(
+            temp3[-100 -200 -1000 -2000; -300 -400] :=
+            w'[-100; 11 12 64] *
+            temp2[64 -200 -1000 -2000 62 61; 51 52] *
+            u[51 52; 65 63] *
+            w[11 12 65; -300] * w[63 61 62; -400]
+           )
+    scaled_op = braid(temp3, (11, 12, 100, 1, 13, 14), (1, 2), (5, 6, 4, 3))
+    return scaled_op
+end
+
+function ascend_mid(op::DoubleChargedTernaryOperator,
+                    layer::TernaryLayer{GradedSpace[FibonacciAnyon]})
+    u, w = layer
+    # Cost: 6X^6
+    @tensor(
+            temp1[-1 -2; -3 -4 -5 -6] :=
+            u'[-1 -2; 11 12] *
+            op[11 12; 1 2 -5 -6] *
+            u[1 2; -3 -4]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 1, 100), (1, 6, 5, 2), (3, 4))
+    @tensor(
+            temp3[-100 -1000 -2000 -200; -300 -400] :=
+            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
+            temp2[42 -1000 -2000 52; 41 51] *
+            w[31 32 41; -300] * w[51 21 22; -400]
+           )
+    scaled_op = braid(temp3, (11, 100, 1, 12, 13, 14), (1, 4), (5, 6, 3, 2))
+    return scaled_op
+end
 
 function descend_left(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer

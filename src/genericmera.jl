@@ -690,6 +690,9 @@ scaling dimensions in this symmetry sector.
 `howmany` controls how many of lowest scaling dimensions are computed.
 """
 function scalingdimensions(m::GenericMERA, howmany = 20)
+    if BraidingStyle(sectortype(spacetype(layertype(m)))) == Anyonic()
+        return scalingdimensions_anyons(m, howmany)
+    end
     width = causal_cone_width(m)
     V = inputspace(m, Inf)
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
@@ -706,12 +709,44 @@ function scalingdimensions(m::GenericMERA, howmany = 20)
         x0 = scalingoperator_initialguess(l, irrep)
         # Don't even try to get more than half of the eigenvalues. Its too expensive, and
         # they are garbage anyway.
-        howmanysector = min(howmany, div(blockdim(interlayer_space, irrep), 2, RoundUp))
+        max_howmanysector = Int(div(blockdim(interlayer_space, irrep), 2, RoundUp))
+        howmanysector = min(howmany, max_howmanysector)
         S, U, info = eigsolve(f, x0, howmanysector, :LM)
         # sfact is the ratio by which the number of sites changes at each coarse-graining.
         sfact = scalefactor(typeof(m))
         scaldims = sort(-log.(sfact, abs.(real(S))))
         scaldim_dict[irrep] = scaldims
+    end
+    return scaldim_dict
+end
+
+function scalingdimensions_anyons(m::GenericMERA, howmany = 20)
+    # TODO Make this do sectors other than the identity.
+    width = causal_cone_width(m)
+    V = inputspace(m, Inf)
+    interlayer_space = ⊗(ntuple(n->V, Val(width))...)
+    # Define a function that takes an operator and ascends it once through the scale
+    # invariant layer.
+    nt = num_translayers(m)
+    # Closures are more type stable if they only depend on arguments of the function.
+    f(x) = ascend(x, getlayer(m, nt+1))
+    # Find out which symmetry sectors we should do the diagonalization in.
+    scaldim_dict = Dict()
+    l = getlayer(m, nt+1)
+    sectors = blocksectors(interlayer_space)
+    # Diagonalize in each irrep sector pair.
+    for irrep1 in sectors, irrep2 in sectors
+        x0 = scalingoperator_initialguess(l, irrep1, irrep2)
+        # Don't even try to get more than half of the eigenvalues. Its too expensive, and
+        # they are garbage anyway.
+        # TODO What's the right way to compute this with two anyonic charges?
+        max_howmanysector = Int(div(blockdim(interlayer_space, irrep1), 2, RoundUp))
+        howmanysector = min(howmany, max_howmanysector)
+        S, U, info = eigsolve(f, x0, howmanysector, :LM)
+        # sfact is the ratio by which the number of sites changes at each coarse-graining.
+        sfact = scalefactor(typeof(m))
+        scaldims = sort(-log.(sfact, abs.(real(S))))
+        scaldim_dict[(irrep1, irrep2)] = scaldims
     end
     return scaldim_dict
 end
