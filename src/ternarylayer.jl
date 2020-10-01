@@ -11,7 +11,7 @@ isometry, often called `w`.
 
 The type parameters are `ST` for space type, e.g. `ComplexSpace` or `SU2Space`; `ET` for
 element type, e.g. `Complex{Float64}`; and `Tan` for whether this layer is a tangent layer
-or not.  If `Tan = false`, the layer is question is an actual MERA layer. If `Tan = true` it
+or not.  If `Tan = false`, the layer in question is an actual MERA layer. If `Tan = true` it
 consists, instead of the actual tensors, of Stiefel/Grassmann tangent vectors of these
 tensors.
 

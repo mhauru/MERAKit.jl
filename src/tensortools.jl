@@ -164,7 +164,7 @@ remove_symmetry(V::ElementarySpace{ℂ}) = ComplexSpace(dim(V), isdual(V))
     remove_symmetry(t::AbstractTensorMap)
 
 Strip an `AbstractTensorMap` of its internal symmetries, and return the corresponding
-`TensorMap` that operators on `ComplexSpace` or `CartesianSpace`.
+`TensorMap` that operates on `ComplexSpace` or `CartesianSpace`.
 """
 function remove_symmetry(t::TensorMap)
     dom = domain(t)

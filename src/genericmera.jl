@@ -19,9 +19,9 @@ On conventions and terminology:
   output space.
 
 The type parameters are
-`N`:  The number of distinct layers (N-1 transition layers and one scale invariant one).
-`LT`: Layer type.
-`OT`: Operator type. The type of ascended and descended operators for this MERA. Determined
+* `N`:  The number of distinct layers (N-1 transition layers and one scale invariant one).
+* `LT`: Layer type.
+* `OT`: Operator type. The type of ascended and descended operators for this MERA. Determined
       from `LT`. Typically a `TensorMap` with input and output indices matching the causal
       cone width.
 
@@ -105,9 +105,8 @@ baselayertype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = baselayertype(
     operatortype(m::GenericMERA)
     operatortype(::Type{<: GenericMERA})
 
-Return the type of operator associate with this MERA or MERA type. That means the type of
-operator that fits in the causal cone, and is naturally emerges as one ascends local
-operators.
+Return the type of operator associated with this MERA or MERA type. This means the type of
+operator that fits in the causal cone, and naturally emerges as one ascends local operators.
 """
 operatortype(::Type{GenericMERA{N, LT, OT} where N}) where {LT, OT} = OT
 operatortype(::Type{GenericMERA{N, LT, OT}}) where {N, LT, OT} = OT
@@ -154,8 +153,8 @@ end
 """
     replace_layer(m::GenericMERA, layer, depth; check_invar = true)
 
-Replace `depth` layer of `m` with `layer`. If check_invar = true, check that the indices
-match afterwards.
+Replace the layer at `depth` in `m` with `layer`. If `check_invar = true`, check that the
+indices match afterwards.
 """
 function replace_layer(m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar = true
                       ) where {N, LT}
@@ -362,7 +361,7 @@ remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
 # Note that pseudoserialization discards the cache, forcing recomputation.
 
 """
-pseudoserialize(x)
+    pseudoserialize(x)
 
 Return a tuple of objects that can be used to reconstruct `x`, and that are all of Julia
 base types.
@@ -379,7 +378,7 @@ function pseudoserialize(m::GenericMERA)
 end
 
 """
-depseudoserialize(::Type{T}, args) where T <: GenericMERA
+    depseudoserialize(::Type{T}, args) where T <: GenericMERA
 
 Reconstruct an object given the output of `pseudoserialize`:
 `x -> depseudoserialize(pseudoserialize(x)...)` should be an effective noop.
@@ -684,7 +683,7 @@ Diagonalize the scale invariant ascending superoperator to compute the scaling d
 the underlying CFT.
 
 The return value is a dictionary, the keys of which are symmetry sectors for a possible
-internal symmetry of the MERA (Trivial() if there is no internal symmetry), and values are
+internal symmetry of the MERA (`Trivial()` if there is no internal symmetry), and values are
 scaling dimensions in this symmetry sector.
 
 `howmany` controls how many of lowest scaling dimensions are computed.
@@ -760,8 +759,8 @@ Return the expecation value of operator `op` for the MERA `m`.
 
 The layer on which `op` lives is set by `opscale`, which by default is the physical one.
 `evalscale` can be used to set whether the operator is ascended through the network or the
-density matrix is descended. `pars` can hold additional options that are further down the
-line passed on to `fixedpoint_densitymatrix`.
+density matrix is descended (the default). `pars` can hold additional options that are
+further down the line passed on to `fixedpoint_densitymatrix`.
 
 See also: [`fixedpoint_densitymatrix`](@ref)
 """
@@ -816,15 +815,15 @@ as the initial guess.
   product. `true` by default. See https://arxiv.org/abs/2007.03638 for more details.
 * `verbosity`: How much output to log. 2 by default.
 * `isometries_only_iters`: An integer for how many iterations should at first be done
-  optimising only the isometries, and leaving the disentangler be. 0 by default.
+  optimising only the isometries, and leaving the disentanglers be. 0 by default.
 * `scaleinvariant_krylovoptions`: A `NamedTuple` of keyword arguments passed to
   `KrylovKit.linsolve` and `KrylovKit.eigsolve`, when solving for the fixed-point density
   matrix and the scale invariant operator sum. The default is
   `(tol = 1e-13, verbosity = 0, maxiter = 20)`.
 * `retraction`: Which retraction method to use. Options are `:exp` for geodesics
   (default), and `:cayley` for Cayley transforms. Only affects gradient methods.
-* transport: Which vector transport method to use. Currently each retraction` method only
-  comes with a single compatible transport, so one should always use `transport` to be the
+* `transport`: Which vector transport method to use. Currently each `retraction` method only
+  comes with a single compatible transport, so one should always set `transport` to be the
   same as `retraction`. This may change. Only affects gradient methods.
 * `metric`: Which metric to use for Stiefel manifold. Options are `:euclidean`
   (default) and `:canonical`. Only affects gradient methods.
@@ -832,8 +831,9 @@ as the initial guess.
   affects gradient methods.
 * `lbfgs_m`: The rank of the approximation of the inverse Hessian in L-BFGS. 8 by default.
   Only affects the `:lbfgs` method.
-* `cg_flavor`: The "flavor" of conjguate gradient to use. `:HagerZhang` by default. Only
-  affects the `:cg:` method.
+* `cg_flavor`: The "flavor" of conjguate gradient to use. The options are `:HagerZhang` (the
+  default), `:HestenesStiefel`, `:PolakRibierePolyak`, `:DaiYuan`, `:FletcherReeves`. Only
+  affects the `:cg` method.
 * `ev_layer_iters`: How many times a single layer is optimised before moving to the next
   layer in the Evenbly-Vidal algorithm. `1` by default. Only affects the `:ev` method.
 * `vary_disentanglers`: If `false`, the optimisation is run only for the
@@ -842,12 +842,12 @@ If any of these are specified in `pars`, the specified values override the defau
 
 `finalize!` is a function that will be called at every iteration. It can be used to for
 instance log the development of some quantity during the optimisation, or modify the MERA in
-some custom (although undefined behavior may follow depending on how the state is changed).
-Its signature is `finalize!(m, f, g, counter)` where `m` is the current MERA, `f` is its
-expectation value for `h`, `g` is the gradient MERA at `m`, and `counter` is the current
-iteration number. It should return the possibly modified `m`, `f`, and `g`. If `method =
-:ev`, then it should also be able to handle the case `g = nothing`, since the Evenbly-Vidal
-algorithm does not use gradients.
+some custom way (although undefined behavior may follow depending on how the state is
+changed).  Its signature is `finalize!(m, f, g, counter)` where `m` is the current MERA, `f`
+is its expectation value for `h`, `g` is the gradient MERA at `m`, and `counter` is the
+current iteration number. It should return the possibly modified `m`, `f`, and `g`. If
+`method = :ev`, then it should also be able to handle the case `g = nothing`, since the
+Evenbly-Vidal algorithm does not use gradients.
 
 """
 function minimize_expectation(m::GenericMERA, h, pars = (;);
@@ -982,7 +982,7 @@ end
 Given two tangent MERAs `m1` and `m2`, both at base point `m`, compute their inner product.
 This means the sum of the inner products of the individual tensors.
 
-See `TensorKitManifolds.inner` for more details.
+See the documentation for `TensorKitManifolds` for more details.
 """
 function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
                                   metric = :euclidean)
@@ -1004,7 +1004,7 @@ being `false` means that we should only compute gradients for the isometries, an
 gradients for the disentanglers to zero.
 
 The return value is a "tangent MERA": An object of a similar type as `m`, but instead of
-regular layers with tensors that have isometricity constraints, instead each layer holds the
+regular layers with tensors that have isometricity constraints, each layer holds the
 corresponding gradients for each tensor.
 """
 function gradient(h, m::GenericMERA{N}, pars::NamedTuple) where {N}
@@ -1050,7 +1050,7 @@ respective Stiefel/Grassmann tangent.
 The additional keyword argument are passed on to the respective `TensorKitManifolds`
 function.
 
-See `TensorKitManifolds.retract` for more details.
+See the documentation for `TensorKitManifolds` for more details.
 
 See also: [`transport!`](@ref)
 """
@@ -1066,7 +1066,7 @@ end
     transport!(mvec::GenericMERA, m::GenericMERA, mtan::GenericMERA, alpha::Real,
                mend::GenericMERA; kwargs...)
 
-Given a "tangent MERAs" `mtan` and `mvec`, at base point `m`, transport `mvec` in the
+Given "tangent MERAs" `mtan` and `mvec`, at base point `m`, transport `mvec` in the
 direction of `mtan` by distance `alpha`. This is done tensor-by-tensor, i.e. each tensor is
 transported along its respective Stiefel/Grassmann tangent.
 
@@ -1074,7 +1074,7 @@ transported along its respective Stiefel/Grassmann tangent.
 direction of `mtan`. The additional keyword argument are passed on to the respective
 `TensorKitManifolds` function.
 
-See `TensorKitManifolds.transport!` for more details.
+See the documentation for `TensorKitManifolds` for more details.
 
 See also: [`retract`](@ref)
 """

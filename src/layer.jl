@@ -19,13 +19,13 @@ baselayertype(::Type{L}) where {L<:Layer} = Base.typename(L).wrapper
 """
     randomlayer(::Type{T <: Layer}, T, Vin, Vout, Vint = Vout; random_disentangler = false)
 
-Return a MERA layer with random tensors.
+Return a MERA layer with Haar random tensors.
 
 `T` is the `Layer` type, and `Vin` and `Vout` are the input and output spaces. `Vint` is an
 internal vector space for the layer, connecting the disentanglers to the isometries. If
 `random_disentangler = true`, the disentangler is also a random unitary, if `false`
 (default), it is the identity or the product of two single-site isometries, depending on if
-the disentanler is supposed to be unitary or isometric.
+the disentangler is supposed to be unitary or isometric.
 
 Each subtype of `Layer` should have its own method for this function.
 """
@@ -35,7 +35,7 @@ function randomlayer end
     outputspace(layer::Layer)
 
 Return the vector space of the downwards-pointing (towards the physical level) indices of
-`layer.
+`layer`.
 
 See also: [`inputspace`](@ref), [`internalspace`](@ref)
 """
@@ -45,7 +45,7 @@ function outputspace end
     inputspace(layer::Layer)
 
 Return the vector space of the upwards-pointing (towards the scale invariance) indices of
-`layer.
+`layer`.
 
 See also: [`outputspace`](@ref), [`internalspace`](@ref)
 """
@@ -54,7 +54,7 @@ function inputspace end
 """
     internalspace(layer::Layer)
 
-Return the internal vector space of `layer.
+Return the internal vector space of `layer`. This need not be defined for all layer types.
 
 See also: [`outputspace`](@ref),  [`inputspace`](@ref)
 """
