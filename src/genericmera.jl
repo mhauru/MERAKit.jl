@@ -732,14 +732,18 @@ function scalingdimensions_anyons(m::GenericMERA, howmany = 20)
     # Find out which symmetry sectors we should do the diagonalization in.
     scaldim_dict = Dict()
     l = getlayer(m, nt+1)
-    sectors = blocksectors(interlayer_space)
+    sectors = values(sectortype(interlayer_space))
     # Diagonalize in each irrep sector pair.
     for irrep1 in sectors, irrep2 in sectors
+        if isempty(intersect(collect(irrep1 ⊗ irrep2), blocksectors(interlayer_space)))
+            continue
+        end
         x0 = scalingoperator_initialguess(l, irrep1, irrep2)
         # Don't even try to get more than half of the eigenvalues. Its too expensive, and
         # they are garbage anyway.
         # TODO What's the right way to compute this with two anyonic charges?
-        max_howmanysector = Int(div(blockdim(interlayer_space, irrep1), 2, RoundUp))
+        #max_howmanysector = Int(div(blockdim(interlayer_space, irrep1), 2, RoundUp))
+        max_howmanysector = howmany
         howmanysector = min(howmany, max_howmanysector)
         S, U, info = eigsolve(f, x0, howmanysector, :LM)
         # sfact is the ratio by which the number of sites changes at each coarse-graining.
