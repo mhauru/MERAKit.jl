@@ -149,17 +149,14 @@ function ascending_fixedpoint(layer::BinaryLayer)
     return id(storagetype(operatortype(layer)), Vtotal)
 end
 
-function scalingoperator_initialguess(l::BinaryLayer, irrep)
+function scalingoperator_initialguess(l::BinaryLayer, irreps...)
     width = causal_cone_width(l)
     V = inputspace(l)
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     outspace = interlayer_space
-    local inspace
-    if irrep !== Trivial()
-        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-        inspace = interlayer_space ⊗ spacetype(V)(irrep => 1)
-    else
-        inspace = interlayer_space
+    inspace = interlayer_space
+    for irrep in irreps
+        inspace = inspace ⊗ spacetype(V)(irrep => 1)
     end
     typ = eltype(l)
     t = TensorMap(randn, typ, outspace ← inspace)
@@ -234,8 +231,12 @@ end
 # # # Ascending and descending superoperators
 const BinaryOperator{S} = AbstractTensorMap{S,3,3}
 const ChargedBinaryOperator{S} = AbstractTensorMap{S,3,4}
+const DoubleChargedBinaryOperator{S} = AbstractTensorMap{S,3,5}
 
-function ascend(op::Union{BinaryOperator, ChargedBinaryOperator}, layer::BinaryLayer)
+function ascend(op::Union{BinaryOperator,
+                          ChargedBinaryOperator,
+                          DoubleChargedBinaryOperator},
+                layer::BinaryLayer)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     scaled_op = (l+r)/2
@@ -297,6 +298,46 @@ function ascend_right(op::BinaryOperator, layer::BinaryLayer)
             u[12 10; 16 8] * u[1 2; 9 6] *
             w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
            )
+    return scaled_op
+end
+
+function ascend_left(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
+    u, w = layer
+    @tensor(
+            temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
+            op[-1 -2 -8; 1 2 -5 -6 -7] *
+            u[1 2; -3 -4]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 6, 7, 4, 5, 8))
+    @tensor(
+            temp3[-100 -200 -300; -400 -1000 -2000 -500 -600] :=
+            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
+            u'[7 13; 3 4] * u'[11 17; 14 12] *
+            temp2[3 4; 6 -1000 -2000 9 10 14] *
+            u[10 12; 8 16] *
+            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
+           )
+    scaled_op = braid(temp3, (11, 12, 13, 14, 1, 100, 15, 16), (1, 2, 3), (4, 7, 8, 5, 6))
+    return scaled_op
+end
+
+function ascend_right(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
+    u, w = layer
+    @tensor(
+            temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
+            op[-3 -1 -2; -4 1 2 -7 -8] *
+            u[1 2; -5 -6]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 4, 5, 7, 8, 6))
+    @tensor(
+            temp3[-100 -200 -300; -400 -500 -1000 -2000 -600] :=
+            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
+            u'[17 11; 12 14] * u'[13 7; 3 4] *
+            temp2[3 4; 14 10 9 -1000 -2000 6] *
+            u[12 10; 16 8] *
+            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
+           )
+    scaled_op = braid(temp3, (11, 12, 13, 14, 15, 1, 100, 16), (1, 2, 3), (4, 5, 8, 6, 7))
     return scaled_op
 end
 
