@@ -175,17 +175,14 @@ function ascending_fixedpoint(layer::ModifiedBinaryLayer)
     return ModifiedBinaryOp(sqrt(8.0/5.0) * eye, sqrt(2.0/5.0) * eye)
 end
 
-function scalingoperator_initialguess(l::ModifiedBinaryLayer, irrep)
+function scalingoperator_initialguess(l::ModifiedBinaryLayer, irreps...)
     width = causal_cone_width(l)
     V = inputspace(l)
     interlayer_space = ⊗(ntuple(n->V, Val(width))...)
     outspace = interlayer_space
-    local inspace
-    if irrep !== Trivial()
-        # If this is a non-trivial irrep sector, expand the input space with a dummy leg.
-        inspace = interlayer_space ⊗ spacetype(V)(irrep => 1)
-    else
-        inspace = interlayer_space
+    inspace = interlayer_space
+    for irrep in irreps
+        inspace = inspace ⊗ spacetype(V)(irrep => 1)
     end
     typ = eltype(l)
     t = TensorMap(randn, typ, outspace ← inspace)
@@ -262,13 +259,13 @@ end
 
 # # # Ascending and descending superoperators
 
-
 """
 Ascend a two-site `op` from the bottom of the given layer to the top.
 """
 function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
                ) where {S1, T <: Union{SquareTensorMap{2},
-                                       AbstractTensorMap{S1,2,3}}}
+                                       AbstractTensorMap{S1,2,3},
+                                       AbstractTensorMap{S1,2,4}}}
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     m = ascend_mid(op, layer)
@@ -413,6 +410,84 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
             op_mid[24 22; 23 21 -1000] *
             wr[12 23; -300] * wl[21 11; -400]
            )
+    return scaled_op
+end
+
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                    ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    @tensor(
+            temp1[-1 -2 -3; -11 -12 -13 -14] :=
+            wl'[-2; 3 2] *
+            u'[2 -3; 4 -14] *
+            op_gap[3 4; -1 -11 -12 -13]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 1, 100, 15), (1, 2, 5, 6, 3), (4, 7))
+    @tensor(
+            temp3[-100 -1000 -2000 -200; -300 -400] :=
+            wr'[-200; 9 1] *
+            temp2[7 -100 -1000 -2000 9; 6 5] *
+            u[6 5; 8 10] *
+            wl[7 8; -300] * wr[10 1; -400]
+           )
+    scaled_op = braid(temp3, (11, 1, 100, 12, 13, 14), (1, 4), (5, 6, 2, 3))
+    return scaled_op
+end
+
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                     ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^7 + 3X^6 + 1X^5
+    # This happens to not need any braiding.
+    @tensor(
+            scaled_op[-100 -200; -300 -400 -1000 -2000] :=
+            wl'[-100; 1 9] * wr'[-200; 2 3] *
+            u'[9 2; 5 4] *
+            op_gap[4 3; 6 7 -1000 -2000] *
+            u[5 6; 10 8] *
+            wl[1 10; -300] * wr[8 7; -400]
+           )
+    return scaled_op
+end
+
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                   ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 4X^6 + 2X^5
+    @tensor(
+            temp1[-1 -2; -3 -4 -5 -6] :=
+            u'[-1 -2; 1 2] *
+            op_mid[1 2; 3 4 -5 -6] *
+            u[3 4; -3 -4]
+           )
+    temp2 = braid(temp1, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
+    @tensor(
+            temp3[-100 -200; -300 -1000 -2000 -400] :=
+            wl'[-100; 12 24] * wr'[-200; 22 11] *
+            temp2[24 22; 23 -1000 -2000 21] *
+            wl[12 23; -300] * wr[21 11; -400]
+           )
+    scaled_op = braid(temp3, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
+    return scaled_op
+end
+
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
+                       ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+    u, wl, wr = layer
+    op_mid, op_gap = op
+    # Cost: 2X^6 + 2X^5
+    temp1 = braid(op_mid, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
+    @tensor(
+            temp2[-100 -200; -300 -1000 -2000 -400] :=
+            wr'[-100; 12 24] * wl'[-200; 22 11] *
+            temp1[24 22; 23 -1000 -2000 21] *
+            wr[12 23; -300] * wl[21 11; -400]
+           )
+    scaled_op = braid(temp2, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
     return scaled_op
 end
 
