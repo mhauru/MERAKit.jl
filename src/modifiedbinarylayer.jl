@@ -53,8 +53,9 @@ struct ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer
     isometry_left::Any
     isometry_right::Any
 
-    function ModifiedBinaryLayer{ST, ET, Tan}(disentangler, isometry_left, isometry_right
-                                             ) where {ST, ET, Tan}
+    function ModifiedBinaryLayer{ST, ET, Tan}(
+        disentangler, isometry_left, isometry_right
+    ) where {ST, ET, Tan}
         DisType = disentangler_type(ST, ET, Tan)
         IsoType = binaryisometry_type(ST, ET, Tan)
         disconv = convert(DisType, disentangler)::DisType
@@ -64,30 +65,31 @@ struct ModifiedBinaryLayer{ST, ET, Tan} <: SimpleLayer
     end
 end
 
-function ModifiedBinaryLayer(disentangler::DisType, isometry_left::IsoType,
-                             isometry_right::IsoType
-                            ) where {ST,
-                                     DisType <: AbstractTensorMap{ST, 2, 2},
-                                     IsoType <: AbstractTensorMap{ST, 2, 1}}
+function ModifiedBinaryLayer(
+    disentangler::DisType, isometry_left::IsoType, isometry_right::IsoType
+) where {ST, DisType <: AbstractTensorMap{ST, 2, 2}, IsoType <: AbstractTensorMap{ST, 2, 1}}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return ModifiedBinaryLayer{ST, ET, false}(disentangler, isometry_left, isometry_right)
 end
 
-function ModifiedBinaryLayer(disentangler::DisTanType, isometry_left::IsoTanType,
-                             isometry_right::IsoTanType
-                            ) where {ST,
-                                     DisType <: AbstractTensorMap{ST, 2, 2},
-                                     IsoType <: AbstractTensorMap{ST, 2, 1},
-                                     DisTanType <: Stiefel.StiefelTangent{DisType},
-                                     IsoTanType <: Grassmann.GrassmannTangent{IsoType}}
+function ModifiedBinaryLayer(
+    disentangler::DisTanType, isometry_left::IsoTanType, isometry_right::IsoTanType
+) where {
+    ST,
+    DisType <: AbstractTensorMap{ST, 2, 2},
+    IsoType <: AbstractTensorMap{ST, 2, 1},
+    DisTanType <: Stiefel.StiefelTangent{DisType},
+    IsoTanType <: Grassmann.GrassmannTangent{IsoType}
+}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return ModifiedBinaryLayer{ST, ET, true}(disentangler, isometry_left, isometry_right)
 end
 
-function Base.getproperty(l::ModifiedBinaryLayer{ST, ET, Tan}, sym::Symbol
-                         ) where {ST, ET, Tan}
+function Base.getproperty(
+    l::ModifiedBinaryLayer{ST, ET, Tan}, sym::Symbol
+) where {ST, ET, Tan}
     if sym === :disentangler
         T = disentangler_type(ST, ET, Tan)
     elseif sym === :isometry_left || sym === :isometry_right
@@ -112,8 +114,9 @@ layertype(::Type{ModifiedBinaryMERA}) = ModifiedBinaryLayer
 
 # Implement the iteration and indexing interfaces. Allows things like `u, wl, wr = layer`.
 # See simplelayer.jl for details.
-_tuple(layer::ModifiedBinaryLayer) =
-    (layer.disentangler, layer.isometry_left, layer.isometry_right)
+function _tuple(layer::ModifiedBinaryLayer)
+    return (layer.disentangler, layer.isometry_left, layer.isometry_right)
+end
 
 function operatortype(::Type{ModifiedBinaryLayer{ST, ET, false}}) where {ST, ET}
     return ModifiedBinaryOp{tensormaptype(ST, 2, 2, ET)}
@@ -156,8 +159,10 @@ function expand_internalspace(layer::ModifiedBinaryLayer, V_new)
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-function randomlayer(::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
-                     random_disentangler = false) where {T}
+function randomlayer(
+    ::Type{ModifiedBinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
+    random_disentangler = false
+) where {T}
     wl = randomisometry(T, Vout ⊗ Vint, Vin)
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
@@ -189,8 +194,9 @@ function scalingoperator_initialguess(l::ModifiedBinaryLayer, irreps...)
     return ModifiedBinaryOp(t)
 end
 
-function gradient(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
-                  metric = :euclidean)
+function gradient(
+    layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer; metric = :euclidean
+)
     u, wl, wr = layer
     uenv, wlenv, wrenv = env
     # The environment is the partial derivative. We need to turn that into a tangent vector
@@ -221,10 +227,12 @@ function precondition_tangent(layer::ModifiedBinaryLayer, tan::ModifiedBinaryLay
     #@tensor rho_wr_mid[-1; -11] := rho.mid[1 -1; 1 -11]
     #@tensor rho_wr_gap[-1; -11] := rho.gap[-1 1; -11 1]
     rho_wr = (rho_wr_mid + rho_wr_gap) / 2.0
-    @tensor(rho_u[-1 -2; -11 -12] :=
-            wl[1 -1; 11] * wr[-2 2; 21] *
-            rho.mid[11 21; 12 22] *
-            wl'[12; 1 -11] * wr'[22; -12 2])
+    @tensor(
+        rho_u[-1 -2; -11 -12] :=
+        wl[1 -1; 11] * wr[-2 2; 21] *
+        rho.mid[11 21; 12 22] *
+        wl'[12; 1 -11] * wr'[22; -12 2]
+    )
     utan_prec = precondition_tangent(utan, rho_u)
     wltan_prec = precondition_tangent(wltan, rho_wl)
     wrtan_prec = precondition_tangent(wrtan, rho_wr)
@@ -235,8 +243,10 @@ end
 
 function space_invar_intralayer(layer::ModifiedBinaryLayer)
     u, wl, wr = layer
-    matching_bonds = ((space(u, 3)', space(wl, 2)),
-                      (space(u, 4)', space(wr, 1)))
+    matching_bonds = (
+        (space(u, 3)', space(wl, 2)),
+        (space(u, 4)', space(wr, 1)),
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
     allmatch &= all((u, wl, wr)) do v
@@ -249,10 +259,12 @@ end
 function space_invar_interlayer(layer::ModifiedBinaryLayer, next_layer::ModifiedBinaryLayer)
     u, wl, wr = layer
     unext, wlnext, wrnext = next_layer
-    matching_bonds = ((space(wl, 3)', space(unext, 1)),
-                      (space(wl, 3)', space(unext, 2)),
-                      (space(wr, 3)', space(unext, 1)),
-                      (space(wr, 3)', space(unext, 2)))
+    matching_bonds = (
+        (space(wl, 3)', space(unext, 1)),
+        (space(wl, 3)', space(unext, 2)),
+        (space(wr, 3)', space(unext, 1)),
+        (space(wr, 3)', space(unext, 2)),
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     return allmatch
 end
@@ -262,10 +274,12 @@ end
 """
 Ascend a two-site `op` from the bottom of the given layer to the top.
 """
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-               ) where {S1, T <: Union{SquareTensorMap{2},
-                                       AbstractTensorMap{S1,2,3},
-                                       AbstractTensorMap{S1,2,4}}}
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1,
+    T <: Union{SquareTensorMap{2},
+    AbstractTensorMap{S1, 2, 3},
+    AbstractTensorMap{S1, 2, 4}}
+}
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     m = ascend_mid(op, layer)
@@ -276,8 +290,9 @@ function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
     return scaled_op
 end
 
-function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-               ) where {T <: SquareTensorMap{1}}
+function ascend(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    T <: SquareTensorMap{1}
+}
     op = expand_support(op, causal_cone_width(ModifiedBinaryLayer))
     return ascend(op, layer)
 end
@@ -289,204 +304,216 @@ end
 
 # TODO Think about how to best remove the code duplication of having the separate methods
 # for ordinary, charged, and double charged operators.
-function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                    ) where T <: SquareTensorMap{2}
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    T <: SquareTensorMap{2}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            wl'[-100; 3 2] * wr'[-200; 9 1] *
-            u'[2 9; 4 5] *
-            op_gap[3 4; 7 6] *
-            u[6 5; 8 10] *
-            wl[7 8; -300] * wr[10 1; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        wl'[-100; 3 2] * wr'[-200; 9 1] *
+        u'[2 9; 4 5] *
+        op_gap[3 4; 7 6] *
+        u[6 5; 8 10] *
+        wl[7 8; -300] * wr[10 1; -400]
+    )
     return scaled_op
 end
 
-function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                     ) where T <: SquareTensorMap{2}
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    T <: SquareTensorMap{2}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            wl'[-100; 1 9] * wr'[-200; 2 3] *
-            u'[9 2; 5 4] *
-            op_gap[4 3; 6 7] *
-            u[5 6; 10 8] *
-            wl[1 10; -300] * wr[8 7; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        wl'[-100; 1 9] * wr'[-200; 2 3] *
+        u'[9 2; 5 4] *
+        op_gap[4 3; 6 7] *
+        u[5 6; 10 8] *
+        wl[1 10; -300] * wr[8 7; -400]
+    )
     return scaled_op
 end
 
-function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                   ) where T <: SquareTensorMap{2}
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    T <: SquareTensorMap{2}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 4X^6 + 2X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            wl'[-100; 12 24] * wr'[-200; 22 11] *
-            u'[24 22; 1 2] *
-            op_mid[1 2; 3 4] *
-            u[3 4; 23 21] *
-            wl[12 23; -300] * wr[21 11; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        wl'[-100; 12 24] * wr'[-200; 22 11] *
+        u'[24 22; 1 2] *
+        op_mid[1 2; 3 4] *
+        u[3 4; 23 21] *
+        wl[12 23; -300] * wr[21 11; -400]
+    )
     return scaled_op
 end
 
-function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                       ) where T <: SquareTensorMap{2}
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    T <: SquareTensorMap{2}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^6 + 2X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            wr'[-100; 12 24] * wl'[-200; 22 11] *
-            op_mid[24 22; 23 21] *
-            wr[12 23; -300] * wl[21 11; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        op_mid[24 22; 23 21] *
+        wr[12 23; -300] * wl[21 11; -400]
+    )
     return scaled_op
 end
 
-function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                    ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 3}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            wl'[-100; 3 2] * wr'[-200; 9 1] *
-            u'[2 9; 4 5] *
-            op_gap[3 4; 7 6 -1000] *
-            u[6 5; 8 10] *
-            wl[7 8; -300] * wr[10 1; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        wl'[-100; 3 2] * wr'[-200; 9 1] *
+        u'[2 9; 4 5] *
+        op_gap[3 4; 7 6 -1000] *
+        u[6 5; 8 10] *
+        wl[7 8; -300] * wr[10 1; -400]
+    )
     return scaled_op
 end
 
-function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                     ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 3}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            wl'[-100; 1 9] * wr'[-200; 2 3] *
-            u'[9 2; 5 4] *
-            op_gap[4 3; 6 7 -1000] *
-            u[5 6; 10 8] *
-            wl[1 10; -300] * wr[8 7; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        wl'[-100; 1 9] * wr'[-200; 2 3] *
+        u'[9 2; 5 4] *
+        op_gap[4 3; 6 7 -1000] *
+        u[5 6; 10 8] *
+        wl[1 10; -300] * wr[8 7; -400]
+    )
     return scaled_op
 end
 
-function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                   ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 3}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 4X^6 + 2X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            wl'[-100; 12 24] * wr'[-200; 22 11] *
-            u'[24 22; 1 2] *
-            op_mid[1 2; 3 4 -1000] *
-            u[3 4; 23 21] *
-            wl[12 23; -300] * wr[21 11; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        wl'[-100; 12 24] * wr'[-200; 22 11] *
+        u'[24 22; 1 2] *
+        op_mid[1 2; 3 4 -1000] *
+        u[3 4; 23 21] *
+        wl[12 23; -300] * wr[21 11; -400]
+    )
     return scaled_op
 end
 
-function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                       ) where {S1, T <: AbstractTensorMap{S1,2,3}}
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 3}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^6 + 2X^5
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            wr'[-100; 12 24] * wl'[-200; 22 11] *
-            op_mid[24 22; 23 21 -1000] *
-            wr[12 23; -300] * wl[21 11; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        op_mid[24 22; 23 21 -1000] *
+        wr[12 23; -300] * wl[21 11; -400]
+    )
     return scaled_op
 end
 
-function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                    ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 4}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            temp1[-1 -2 -3; -11 -12 -13 -14] :=
-            wl'[-2; 3 2] *
-            u'[2 -3; 4 -14] *
-            op_gap[3 4; -1 -11 -12 -13]
-           )
+        temp1[-1 -2 -3; -11 -12 -13 -14] :=
+        wl'[-2; 3 2] *
+        u'[2 -3; 4 -14] *
+        op_gap[3 4; -1 -11 -12 -13]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 1, 100, 15), (1, 2, 5, 6, 3), (4, 7))
     @tensor(
-            temp3[-100 -1000 -2000 -200; -300 -400] :=
-            wr'[-200; 9 1] *
-            temp2[7 -100 -1000 -2000 9; 6 5] *
-            u[6 5; 8 10] *
-            wl[7 8; -300] * wr[10 1; -400]
-           )
+        temp3[-100 -1000 -2000 -200; -300 -400] :=
+        wr'[-200; 9 1] *
+        temp2[7 -100 -1000 -2000 9; 6 5] *
+        u[6 5; 8 10] *
+        wl[7 8; -300] * wr[10 1; -400]
+    )
     scaled_op = braid(temp3, (11, 1, 100, 12, 13, 14), (1, 4), (5, 6, 2, 3))
     return scaled_op
 end
 
-function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                     ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 4}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^7 + 3X^6 + 1X^5
     # This happens to not need any braiding.
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000 -2000] :=
-            wl'[-100; 1 9] * wr'[-200; 2 3] *
-            u'[9 2; 5 4] *
-            op_gap[4 3; 6 7 -1000 -2000] *
-            u[5 6; 10 8] *
-            wl[1 10; -300] * wr[8 7; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000 -2000] :=
+        wl'[-100; 1 9] * wr'[-200; 2 3] *
+        u'[9 2; 5 4] *
+        op_gap[4 3; 6 7 -1000 -2000] *
+        u[5 6; 10 8] *
+        wl[1 10; -300] * wr[8 7; -400]
+    )
     return scaled_op
 end
 
-function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                   ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 4}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 4X^6 + 2X^5
     @tensor(
-            temp1[-1 -2; -3 -4 -5 -6] :=
-            u'[-1 -2; 1 2] *
-            op_mid[1 2; 3 4 -5 -6] *
-            u[3 4; -3 -4]
-           )
+        temp1[-1 -2; -3 -4 -5 -6] :=
+        u'[-1 -2; 1 2] *
+        op_mid[1 2; 3 4 -5 -6] *
+        u[3 4; -3 -4]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
     @tensor(
-            temp3[-100 -200; -300 -1000 -2000 -400] :=
-            wl'[-100; 12 24] * wr'[-200; 22 11] *
-            temp2[24 22; 23 -1000 -2000 21] *
-            wl[12 23; -300] * wr[21 11; -400]
-           )
+        temp3[-100 -200; -300 -1000 -2000 -400] :=
+        wl'[-100; 12 24] * wr'[-200; 22 11] *
+        temp2[24 22; 23 -1000 -2000 21] *
+        wl[12 23; -300] * wr[21 11; -400]
+    )
     scaled_op = braid(temp3, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
     return scaled_op
 end
 
-function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer
-                       ) where {S1, T <: AbstractTensorMap{S1,2,4}}
+function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
+    S1, T <: AbstractTensorMap{S1, 2, 4}
+}
     u, wl, wr = layer
     op_mid, op_gap = op
     # Cost: 2X^6 + 2X^5
     temp1 = braid(op_mid, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
     @tensor(
-            temp2[-100 -200; -300 -1000 -2000 -400] :=
-            wr'[-100; 12 24] * wl'[-200; 22 11] *
-            temp1[24 22; 23 -1000 -2000 21] *
-            wr[12 23; -300] * wl[21 11; -400]
-           )
+        temp2[-100 -200; -300 -1000 -2000 -400] :=
+        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        temp1[24 22; 23 -1000 -2000 21] *
+        wr[12 23; -300] * wl[21 11; -400]
+    )
     scaled_op = braid(temp2, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
     return scaled_op
 end
@@ -496,13 +523,13 @@ function descend_left(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     rho_mid, rho_gap = rho
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[-200 7; 10 8] *
-            wl[-100 10; 9] * wr[8 1; 3] *
-            rho_mid[9 3; 4 2] *
-            wl'[4; -300 5] * wr'[2; 6 1] *
-            u'[5 6; -400 7]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[-200 7; 10 8] *
+        wl[-100 10; 9] * wr[8 1; 3] *
+        rho_mid[9 3; 4 2] *
+        wl'[4; -300 5] * wr'[2; 6 1] *
+        u'[5 6; -400 7]
+    )
     return scaled_rho
 end
 
@@ -511,13 +538,13 @@ function descend_right(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     rho_mid, rho_gap = rho
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[7 -100; 8 10] *
-            wl[1 8; 3] * wr[10 -200; 9] *
-            rho_mid[3 9; 2 4] *
-            wl'[2; 1 6] * wr'[4; 5 -400] *
-            u'[6 5; 7 -300]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[7 -100; 8 10] *
+        wl[1 8; 3] * wr[10 -200; 9] *
+        rho_mid[3 9; 2 4] *
+        wl'[2; 1 6] * wr'[4; 5 -400] *
+        u'[6 5; 7 -300]
+    )
     return scaled_rho
 end
 
@@ -526,13 +553,13 @@ function descend_mid(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     rho_mid, rho_gap = rho
     # Cost: 4X^6 + 2X^5
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[-100 -200; 7 8] *
-            wl[4 7; 6] * wr[8 1; 3] *
-            rho_mid[6 3; 5 2] *
-            wl'[5; 4 9] * wr'[2; 10 1] *
-            u'[9 10; -300 -400]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[-100 -200; 7 8] *
+        wl[4 7; 6] * wr[8 1; 3] *
+        rho_mid[6 3; 5 2] *
+        wl'[5; 4 9] * wr'[2; 10 1] *
+        u'[9 10; -300 -400]
+    )
     return scaled_rho
 end
 
@@ -541,11 +568,11 @@ function descend_between(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     rho_mid, rho_gap = rho
     # Cost: 2X^6 + 2X^5
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            wr[4 -100; 6] * wl[-200 1; 3] *
-            rho_gap[6 3; 5 2] *
-            wr'[5; 4 -300] * wl'[2; -400 1]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        wr[4 -100; 6] * wl[-200 1; 3] *
+        rho_gap[6 3; 5 2] *
+        wr'[5; 4 -300] * wl'[2; -400 1]
+    )
     return scaled_rho
 end
 
@@ -580,49 +607,54 @@ function environment(op, layer::ModifiedBinaryLayer, rho; vary_disentanglers = t
     return ModifiedBinaryLayer(env_u, env_wl, env_wr)
 end
 
-function minimize_expectation_ev(layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer;
-                                 vary_disentanglers = true)
-    u = (vary_disentanglers ?  projectisometric(env.disentangler; alg = Polar())
-         : layer.disentangler)
+function minimize_expectation_ev(
+    layer::ModifiedBinaryLayer, env::ModifiedBinaryLayer; vary_disentanglers = true
+)
+    u = if vary_disentanglers
+        projectisometric(env.disentangler; alg = Polar())
+    else
+        layer.disentangler
+    end
     wl = projectisometric(env.isometry_left; alg = Polar())
     wr = projectisometric(env.isometry_right; alg = Polar())
     return ModifiedBinaryLayer(u, wl, wr)
 end
 
-function environment_disentangler(h::ModifiedBinaryOp, layer::ModifiedBinaryLayer,
-                                  rho::ModifiedBinaryOp)
+function environment_disentangler(
+    h::ModifiedBinaryOp, layer::ModifiedBinaryLayer, rho::ModifiedBinaryOp
+)
     u, wl, wr = layer
     h_mid, h_gap = h
     rho_mid, rho_gap = rho
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envl[-100 -200; -300 -400] :=
-            rho_mid[4 2; 10 3] *
-            wl'[10; 9 -300] * wr'[3; -400 1] *
-            h_gap[9 -100; 7 8] *
-            u[8 -200; 5 6] *
-            wl[7 5; 4] * wr[6 1; 2]
-           )
+        envl[-100 -200; -300 -400] :=
+        rho_mid[4 2; 10 3] *
+        wl'[10; 9 -300] * wr'[3; -400 1] *
+        h_gap[9 -100; 7 8] *
+        u[8 -200; 5 6] *
+        wl[7 5; 4] * wr[6 1; 2]
+    )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envr[-100 -200; -300 -400] :=
-            rho_mid[2 4; 3 10] *
-            wl'[3; 1 -300] * wr'[10; -400 9] *
-            h_gap[-200 9; 8 7] *
-            u[-100 8; 6 5] *
-            wl[1 6; 2] * wr[5 7; 4]
-           )
+        envr[-100 -200; -300 -400] :=
+        rho_mid[2 4; 3 10] *
+        wl'[3; 1 -300] * wr'[10; -400 9] *
+        h_gap[-200 9; 8 7] *
+        u[-100 8; 6 5] *
+        wl[1 6; 2] * wr[5 7; 4]
+    )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
-            envm[-100 -200; -300 -400] :=
-            rho_mid[6 4; 5 3] *
-            wl'[5; 1 -300] * wr'[3; -400 2] *
-            h_mid[-100 -200; 9 10] *
-            u[9 10; 7 8] *
-            wl[1 7; 6] * wr[8 2; 4]
-           )
+        envm[-100 -200; -300 -400] :=
+        rho_mid[6 4; 5 3] *
+        wl'[5; 1 -300] * wr'[3; -400 2] *
+        h_mid[-100 -200; 9 10] *
+        u[9 10; 7 8] *
+        wl[1 7; 6] * wr[8 2; 4]
+    )
 
     env = (envl + envr + envm) / 4.0
     return env
@@ -644,58 +676,60 @@ function environment_isometry_left(h::ModifiedBinaryOp, layer, rho::ModifiedBina
     rho_mid, rho_gap = rho
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envl[-100 -200; -300] :=
-            rho_mid[4 3; -300 2] *
-            wr'[2; 11 1] *
-            u'[-200 11; 9 10] *
-            h_gap[-100 9; 7 8] *
-            u[8 10; 5 6] *
-            wl[7 5; 4] * wr[6 1; 3]
-           )
+        envl[-100 -200; -300] :=
+        rho_mid[4 3; -300 2] *
+        wr'[2; 11 1] *
+        u'[-200 11; 9 10] *
+        h_gap[-100 9; 7 8] *
+        u[8 10; 5 6] *
+        wl[7 5; 4] * wr[6 1; 3]
+    )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envr[-100 -200; -300] :=
-            rho_mid[10 8; -300 9] *
-            wr'[9; 7 6] *
-            u'[-200 7; 5 4] *
-            h_gap[4 6; 3 2] *
-            u[5 3; 11 1] *
-            wl[-100 11; 10] * wr[1 2; 8]
-           )
+        envr[-100 -200; -300] :=
+        rho_mid[10 8; -300 9] *
+        wr'[9; 7 6] *
+        u'[-200 7; 5 4] *
+        h_gap[4 6; 3 2] *
+        u[5 3; 11 1] *
+        wl[-100 11; 10] * wr[1 2; 8]
+    )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
-            envm[-100 -200; -300] :=
-            rho_mid[10 9; -300 8] *
-            wr'[8; 6 5] *
-            u'[-200 6; 1 2] *
-            h_mid[1 2; 3 4] *
-            u[3 4; 11 7] *
-            wl[-100 11; 10] * wr[7 5; 9]
-           )
+        envm[-100 -200; -300] :=
+        rho_mid[10 9; -300 8] *
+        wr'[8; 6 5] *
+        u'[-200 6; 1 2] *
+        h_mid[1 2; 3 4] *
+        u[3 4; 11 7] *
+        wl[-100 11; 10] * wr[7 5; 9]
+    )
 
     # Cost: 2X^6 + 2X^5
     @tensor(
-            envb[-100 -200; -300] :=
-            rho_gap[5 7; 4 -300] *
-            wr'[4; 1 2] *
-            h_mid[2 -100; 3 6] *
-            wr[1 3; 5] * wl[6 -200; 7]
-           )
+        envb[-100 -200; -300] :=
+        rho_gap[5 7; 4 -300] *
+        wr'[4; 1 2] *
+        h_mid[2 -100; 3 6] *
+        wr[1 3; 5] * wl[6 -200; 7]
+    )
 
     env = (envl + envr + envm + envb) / 4.0
     return env
 end
 
-function environment_isometry_left(h::SquareTensorMap{2}, layer::ModifiedBinaryLayer,
-                              rho::ModifiedBinaryOp)
+function environment_isometry_left(
+    h::SquareTensorMap{2}, layer::ModifiedBinaryLayer, rho::ModifiedBinaryOp
+)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_left(h, layer, rho)
 end
 
-function environment_isometry_left(h::SquareTensorMap{1}, layer::ModifiedBinaryLayer,
-                              rho::ModifiedBinaryOp)
+function environment_isometry_left(
+    h::SquareTensorMap{1}, layer::ModifiedBinaryLayer, rho::ModifiedBinaryOp
+)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_left(h, layer, rho)
 end
@@ -706,58 +740,60 @@ function environment_isometry_right(h::ModifiedBinaryOp, layer, rho::ModifiedBin
     rho_mid, rho_gap = rho
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envl[-100 -200; -300] :=
-            rho_mid[8 10; 9 -300] *
-            wl'[9; 6 7] *
-            u'[7 -100; 4 5] *
-            h_gap[6 4; 2 3] *
-            u[3 5; 1 11] *
-            wl[2 1; 8] * wr[11 -200; 10]
-           )
+        envl[-100 -200; -300] :=
+        rho_mid[8 10; 9 -300] *
+        wl'[9; 6 7] *
+        u'[7 -100; 4 5] *
+        h_gap[6 4; 2 3] *
+        u[3 5; 1 11] *
+        wl[2 1; 8] * wr[11 -200; 10]
+    )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
-            envr[-100 -200; -300] :=
-            rho_mid[3 4; 2 -300] *
-            wl'[2; 1 11] *
-            u'[11 -100; 10 9] *
-            h_gap[9 -200; 8 7] *
-            u[10 8; 6 5] *
-            wl[1 6; 3] * wr[5 7; 4]
-           )
+        envr[-100 -200; -300] :=
+        rho_mid[3 4; 2 -300] *
+        wl'[2; 1 11] *
+        u'[11 -100; 10 9] *
+        h_gap[9 -200; 8 7] *
+        u[10 8; 6 5] *
+        wl[1 6; 3] * wr[5 7; 4]
+    )
 
     # Cost: 4X^6 + 2X^5
     @tensor(
-            envm[-100 -200; -300] :=
-            rho_mid[9 10; 8 -300] *
-            wl'[8; 5 6] *
-            u'[6 -100; 2 1] *
-            h_mid[2 1; 4 3] *
-            u[4 3; 7 11] *
-            wl[5 7; 9] * wr[11 -200; 10]
-           )
+        envm[-100 -200; -300] :=
+        rho_mid[9 10; 8 -300] *
+        wl'[8; 5 6] *
+        u'[6 -100; 2 1] *
+        h_mid[2 1; 4 3] *
+        u[4 3; 7 11] *
+        wl[5 7; 9] * wr[11 -200; 10]
+    )
 
     # Cost: 2X^6 + 2X^5
     @tensor(
-            envb[-100 -200; -300] :=
-            rho_gap[7 5; -300 4] *
-            wl'[4; 2 1] *
-            h_mid[-200 2; 6 3] *
-            wr[-100 6; 7] * wl[3 1; 5]
-           )
+        envb[-100 -200; -300] :=
+        rho_gap[7 5; -300 4] *
+        wl'[4; 2 1] *
+        h_mid[-200 2; 6 3] *
+        wr[-100 6; 7] * wl[3 1; 5]
+    )
 
     env = (envl + envr + envm + envb) / 4.0
     return env
 end
 
-function environment_isometry_right(h::SquareTensorMap{2}, layer::ModifiedBinaryLayer,
-                              rho::ModifiedBinaryOp)
+function environment_isometry_right(
+    h::SquareTensorMap{2}, layer::ModifiedBinaryLayer, rho::ModifiedBinaryOp
+)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_right(h, layer, rho)
 end
 
-function environment_isometry_right(h::SquareTensorMap{1}, layer::ModifiedBinaryLayer,
-                              rho::ModifiedBinaryOp)
+function environment_isometry_right(
+    h::SquareTensorMap{1}, layer::ModifiedBinaryLayer, rho::ModifiedBinaryOp
+)
     h = ModifiedBinaryOp(expand_support(h, causal_cone_width(ModifiedBinaryLayer)))
     return environment_isometry_right(h, layer, rho)
 end

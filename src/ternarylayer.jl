@@ -53,22 +53,23 @@ struct TernaryLayer{ST, ET, Tan} <: SimpleLayer
     end
 end
 
-function TernaryLayer(disentangler::DisType, isometry::IsoType
-                     ) where {ST,
-                              DisType <: AbstractTensorMap{ST, 2, 2},
-                              IsoType <: AbstractTensorMap{ST, 3, 1}}
+function TernaryLayer(disentangler::DisType, isometry::IsoType) where {
+    ST,
+    DisType <: AbstractTensorMap{ST, 2, 2},
+    IsoType <: AbstractTensorMap{ST, 3, 1}
+}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return TernaryLayer{ST, ET, false}(disentangler, isometry)
 end
 
-function TernaryLayer(disentangler::DisTanType, isometry::IsoTanType
-                     ) where {ST,
-                              DisType <: AbstractTensorMap{ST, 2, 2},
-                              IsoType <: AbstractTensorMap{ST, 3, 1},
-                              DisTanType <: Stiefel.StiefelTangent{DisType},
-                              IsoTanType <: Grassmann.GrassmannTangent{IsoType},
-                             }
+function TernaryLayer(disentangler::DisTanType, isometry::IsoTanType) where {
+    ST,
+    DisType <: AbstractTensorMap{ST, 2, 2},
+    IsoType <: AbstractTensorMap{ST, 3, 1},
+    DisTanType <: Stiefel.StiefelTangent{DisType},
+    IsoTanType <: Grassmann.GrassmannTangent{IsoType},
+}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return TernaryLayer{ST, ET, true}(disentangler, isometry)
@@ -137,8 +138,9 @@ function expand_internalspace(layer::TernaryLayer, V_new)
     return TernaryLayer(u, w)
 end
 
-function randomlayer(::Type{TernaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
-                     random_disentangler = false) where {T}
+function randomlayer(
+    ::Type{TernaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout; random_disentangler = false
+) where {T}
     w = randomisometry(T, Vint ⊗ Vout ⊗ Vint, Vin)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return TernaryLayer(u, w)
@@ -189,10 +191,12 @@ function precondition_tangent(layer::TernaryLayer, tan::TernaryLayer, rho)
     #@tensor rho_wl[-1; -11] := rho[-1 1; -11 1]
     #@tensor rho_wr[-1; -11] := rho[1 -1; 1 -11]
     rho_w = (rho_wl + rho_wr) / 2.0
-    @tensor(rho_u[-1 -2; -11 -12] :=
-            w[1 2 -1; 11] * w[-2 3 4; 21] *
-            rho[11 21; 12 22] *
-            w'[12; 1 2 -11] * w'[22; -12 3 4])
+    @tensor(
+        rho_u[-1 -2; -11 -12] :=
+        w[1 2 -1; 11] * w[-2 3 4; 21] *
+        rho[11 21; 12 22] *
+        w'[12; 1 2 -11] * w'[22; -12 3 4]
+    )
     utan_prec = precondition_tangent(utan, rho_u)
     wtan_prec = precondition_tangent(wtan, rho_w)
     return TernaryLayer(utan_prec, wtan_prec)
@@ -202,11 +206,13 @@ end
 
 function space_invar_intralayer(layer::TernaryLayer)
     u, w = layer
-    matching_bonds = ((space(u, 3)', space(w, 3)),
-                      (space(u, 4)', space(w, 1)))
+    matching_bonds = (
+        (space(u, 3)', space(w, 3)),
+        (space(u, 4)', space(w, 1)),
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
-    allmatch &= all((u,w)) do v
+    allmatch &= all((u, w)) do v
         codom, dom = fuse(codomain(v)), fuse(domain(v))
         infimum(dom, codom) == dom
     end
@@ -216,9 +222,11 @@ end
 function space_invar_interlayer(layer::TernaryLayer, next_layer::TernaryLayer)
     u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
-    matching_bonds = ((space(w, 4)', space(unext, 1)),
-                      (space(w, 4)', space(unext, 2)),
-                      (space(w, 4)', space(wnext, 2)))
+    matching_bonds = (
+        (space(w, 4)', space(unext, 1)),
+        (space(w, 4)', space(unext, 2)),
+        (space(w, 4)', space(wnext, 2)),
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     return allmatch
 end
@@ -242,10 +250,10 @@ const TernaryOperator{S} = AbstractTensorMap{S, 2, 2}
 const ChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 3}
 const DoubleChargedTernaryOperator{S} = AbstractTensorMap{S, 2, 4}
 
-function ascend(op::Union{TernaryOperator,
-                          ChargedTernaryOperator,
-                          DoubleChargedTernaryOperator},
-                layer::TernaryLayer) where {S1}
+function ascend(
+    op::Union{TernaryOperator, ChargedTernaryOperator, DoubleChargedTernaryOperator},
+    layer::TernaryLayer
+) where {S1}
     u, w = layer
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
@@ -254,8 +262,9 @@ function ascend(op::Union{TernaryOperator,
     return scaled_op
 end
 
-ascend(op::SquareTensorMap{1}, layer::TernaryLayer) =
-    ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
+function ascend(op::SquareTensorMap{1}, layer::TernaryLayer)
+    return ascend(expand_support(op, causal_cone_width(TernaryLayer)), layer)
+end
 
 # TODO Think about how to best remove the code duplication of having the separate methods
 # for ordinary, charged, and double charged operators.
@@ -263,13 +272,13 @@ function ascend_left(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            w'[-100; 51 31 21] * w'[-200; 55 11 12] *
-            u'[21 55; 32 42] *
-            op[31 32; 52 41 -1000] *
-            u[41 42; 53 54] *
-            w[51 52 53; -300] * w[54 11 12; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        w'[-100; 51 31 21] * w'[-200; 55 11 12] *
+        u'[21 55; 32 42] *
+        op[31 32; 52 41 -1000] *
+        u[41 42; 53 54] *
+        w[51 52 53; -300] * w[54 11 12; -400]
+    )
     return scaled_op
 end
 
@@ -277,13 +286,13 @@ function ascend_right(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            w'[-100; 11 12 64] * w'[-200; 21 41 62] *
-            u'[64 21; 51 31] *
-            op[31 41; 52 61 -1000] *
-            u[51 52; 65 63] *
-            w[11 12 65; -300] * w[63 61 62; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        w'[-100; 11 12 64] * w'[-200; 21 41 62] *
+        u'[64 21; 51 31] *
+        op[31 41; 52 61 -1000] *
+        u[51 52; 65 63] *
+        w[11 12 65; -300] * w[63 61 62; -400]
+    )
     return scaled_op
 end
 
@@ -291,13 +300,13 @@ function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400 -1000] :=
-            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
-            u'[42 52; 11 12] *
-            op[11 12; 1 2 -1000] *
-            u[1 2; 41 51] *
-            w[31 32 41; -300] * w[51 21 22; -400]
-           )
+        scaled_op[-100 -200; -300 -400 -1000] :=
+        w'[-100; 31 32 42] * w'[-200; 52 21 22] *
+        u'[42 52; 11 12] *
+        op[11 12; 1 2 -1000] *
+        u[1 2; 41 51] *
+        w[31 32 41; -300] * w[51 21 22; -400]
+    )
     return scaled_op
 end
 
@@ -306,13 +315,13 @@ function ascend_left(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w'[-100; 51 31 21] * w'[-200; 55 11 12] *
-            u'[21 55; 32 42] *
-            op[31 32; 52 41] *
-            u[41 42; 53 54] *
-            w[51 52 53; -300] * w[54 11 12; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        w'[-100; 51 31 21] * w'[-200; 55 11 12] *
+        u'[21 55; 32 42] *
+        op[31 32; 52 41] *
+        u[41 42; 53 54] *
+        w[51 52 53; -300] * w[54 11 12; -400]
+    )
     return scaled_op
 end
 
@@ -320,13 +329,13 @@ function ascend_right(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w'[-100; 11 12 64] * w'[-200; 21 41 62] *
-            u'[64 21; 51 31] *
-            op[31 41; 52 61] *
-            u[51 52; 65 63] *
-            w[11 12 65; -300] * w[63 61 62; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        w'[-100; 11 12 64] * w'[-200; 21 41 62] *
+        u'[64 21; 51 31] *
+        op[31 41; 52 61] *
+        u[51 52; 65 63] *
+        w[11 12 65; -300] * w[63 61 62; -400]
+    )
     return scaled_op
 end
 
@@ -334,13 +343,13 @@ function ascend_mid(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
-            scaled_op[-100 -200; -300 -400] :=
-            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
-            u'[42 52; 11 12] *
-            op[11 12; 1 2] *
-            u[1 2; 41 51] *
-            w[31 32 41; -300] * w[51 21 22; -400]
-           )
+        scaled_op[-100 -200; -300 -400] :=
+        w'[-100; 31 32 42] * w'[-200; 52 21 22] *
+        u'[42 52; 11 12] *
+        op[11 12; 1 2] *
+        u[1 2; 41 51] *
+        w[31 32 41; -300] * w[51 21 22; -400]
+    )
     return scaled_op
 end
 
@@ -348,19 +357,19 @@ function ascend_left(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            temp1[-1 -2 -3 -4; -11 -12 -13 -14] :=
-            w'[-3; -2 31 21] *
-            u'[21 -4; 32 -14] *
-            op[31 32; -1 -11 -12 -13]
-           )
+        temp1[-1 -2 -3 -4; -11 -12 -13 -14] :=
+        w'[-3; -2 31 21] *
+        u'[21 -4; 32 -14] *
+        op[31 32; -1 -11 -12 -13]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 15, 1, 100, 16), (1, 2, 3, 7, 6, 4), (5, 8))
     @tensor(
-            temp3[-100 -1000 -2000 -200; -300 -400] :=
-            w'[-200; 55 11 12] *
-            temp2[52 51 -100 -1000 -2000 55; 41 42] *
-            u[41 42; 53 54] *
-            w[51 52 53; -300] * w[54 11 12; -400]
-           )
+        temp3[-100 -1000 -2000 -200; -300 -400] :=
+        w'[-200; 55 11 12] *
+        temp2[52 51 -100 -1000 -2000 55; 41 42] *
+        u[41 42; 53 54] *
+        w[51 52 53; -300] * w[54 11 12; -400]
+    )
     scaled_op = braid(temp3, (11, 100, 1, 12, 13, 14), (1, 4), (5, 6, 3, 2))
     return scaled_op
 end
@@ -369,19 +378,19 @@ function ascend_right(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            temp1[-1 -2 -3 -4 -5 -6; -11 -12] :=
-            w'[-2; 21 41 -3] *
-            u'[-1 21; -11 31] *
-            op[31 41; -12 -6 -5 -4]
-           )
+        temp1[-1 -2 -3 -4 -5 -6; -11 -12] :=
+        w'[-2; 21 41 -3] *
+        u'[-1 21; -11 31] *
+        op[31 41; -12 -6 -5 -4]
+    )
     temp2 = braid(temp1, (11, 12, 13, 100, 1, 14, 15, 16), (1, 2, 4, 5, 3, 6), (7, 8))
     @tensor(
-            temp3[-100 -200 -1000 -2000; -300 -400] :=
-            w'[-100; 11 12 64] *
-            temp2[64 -200 -1000 -2000 62 61; 51 52] *
-            u[51 52; 65 63] *
-            w[11 12 65; -300] * w[63 61 62; -400]
-           )
+        temp3[-100 -200 -1000 -2000; -300 -400] :=
+        w'[-100; 11 12 64] *
+        temp2[64 -200 -1000 -2000 62 61; 51 52] *
+        u[51 52; 65 63] *
+        w[11 12 65; -300] * w[63 61 62; -400]
+    )
     scaled_op = braid(temp3, (11, 12, 100, 1, 13, 14), (1, 2), (5, 6, 4, 3))
     return scaled_op
 end
@@ -390,18 +399,18 @@ function ascend_mid(op::DoubleChargedTernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
-            temp1[-1 -2; -3 -4 -5 -6] :=
-            u'[-1 -2; 11 12] *
-            op[11 12; 1 2 -5 -6] *
-            u[1 2; -3 -4]
-           )
+        temp1[-1 -2; -3 -4 -5 -6] :=
+        u'[-1 -2; 11 12] *
+        op[11 12; 1 2 -5 -6] *
+        u[1 2; -3 -4]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 1, 100), (1, 6, 5, 2), (3, 4))
     @tensor(
-            temp3[-100 -1000 -2000 -200; -300 -400] :=
-            w'[-100; 31 32 42] * w'[-200; 52 21 22] *
-            temp2[42 -1000 -2000 52; 41 51] *
-            w[31 32 41; -300] * w[51 21 22; -400]
-           )
+        temp3[-100 -1000 -2000 -200; -300 -400] :=
+        w'[-100; 31 32 42] * w'[-200; 52 21 22] *
+        temp2[42 -1000 -2000 52; 41 51] *
+        w[31 32 41; -300] * w[51 21 22; -400]
+    )
     scaled_op = braid(temp3, (11, 100, 1, 12, 13, 14), (1, 4), (5, 6, 3, 2))
     return scaled_op
 end
@@ -410,13 +419,13 @@ function descend_left(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[-200 63; 41 31] *
-            w[52 -100 41; 42] * w[31 11 12; 22] *
-            rho[42 22; 51 21] *
-            w'[51; 52 -300 61] * w'[21; 62 11 12] *
-            u'[61 62; -400 63]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[-200 63; 41 31] *
+        w[52 -100 41; 42] * w[31 11 12; 22] *
+        rho[42 22; 51 21] *
+        w'[51; 52 -300 61] * w'[21; 62 11 12] *
+        u'[61 62; -400 63]
+    )
     return scaled_rho
 end
 
@@ -424,13 +433,13 @@ function descend_right(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[63 -100; 41 31] *
-            w[11 12 41; 22] * w[31 -200 52; 42] *
-            rho[22 42; 21 51] *
-            w'[21; 11 12 62] * w'[51; 61 -400 52] *
-            u'[62 61; 63 -300]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[63 -100; 41 31] *
+        w[11 12 41; 22] * w[31 -200 52; 42] *
+        rho[22 42; 21 51] *
+        w'[21; 11 12 62] * w'[51; 61 -400 52] *
+        u'[62 61; 63 -300]
+    )
     return scaled_rho
 end
 
@@ -438,13 +447,13 @@ function descend_mid(rho::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 6X^6
     @tensor(
-            scaled_rho[-100 -200; -300 -400] :=
-            u[-100 -200; 51 52] *
-            w[11 12 51; 22] * w[52 31 32; 42] *
-            rho[22 42; 21 41] *
-            w'[21; 11 12 61] * w'[41; 62 31 32] *
-            u'[61 62; -300 -400]
-           )
+        scaled_rho[-100 -200; -300 -400] :=
+        u[-100 -200; 51 52] *
+        w[11 12 51; 22] * w[52 31 32; 42] *
+        rho[22 42; 21 41] *
+        w'[21; 11 12 61] * w'[41; 62 31 32] *
+        u'[61 62; -300 -400]
+    )
     return scaled_rho
 end
 
@@ -470,10 +479,14 @@ function environment(op, layer::TernaryLayer, rho; vary_disentanglers = true)
     return TernaryLayer(env_u, env_w)
 end
 
-function minimize_expectation_ev(layer::TernaryLayer, env::TernaryLayer;
-                                 vary_disentanglers = true)
-    u = (vary_disentanglers ? projectisometric(env.disentangler; alg = Polar())
-         : layer.disentangler)
+function minimize_expectation_ev(
+    layer::TernaryLayer, env::TernaryLayer; vary_disentanglers = true
+)
+    u = if vary_disentanglers
+        projectisometric(env.disentangler; alg = Polar())
+    else
+        layer.disentangler
+    end
     w = projectisometric(env.isometry; alg = Polar())
     return TernaryLayer(u, w)
 end
@@ -482,33 +495,33 @@ function environment_disentangler(h::TernaryOperator, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env1[-1 -2; -3 -4] :=
-            rho[31 21; 63 22] *
-            w'[63; 61 62 -3] * w'[22; -4 11 12] *
-            h[62 -1; 51 52] *
-            u[52 -2; 41 42] *
-            w[61 51 41; 31] * w[42 11 12; 21]
-           )
+        env1[-1 -2; -3 -4] :=
+        rho[31 21; 63 22] *
+        w'[63; 61 62 -3] * w'[22; -4 11 12] *
+        h[62 -1; 51 52] *
+        u[52 -2; 41 42] *
+        w[61 51 41; 31] * w[42 11 12; 21]
+    )
 
     # Cost: 6X^6
     @tensor(
-            env2[-1 -2; -3 -4] :=
-            rho[41 51; 42 52] *
-            w'[42; 21 22 -3] * w'[52; -4 31 32] *
-            h[-1 -2; 11 12] *
-            u[11 12; 61 62] *
-            w[21 22 61; 41] * w[62 31 32; 51]
-           )
+        env2[-1 -2; -3 -4] :=
+        rho[41 51; 42 52] *
+        w'[42; 21 22 -3] * w'[52; -4 31 32] *
+        h[-1 -2; 11 12] *
+        u[11 12; 61 62] *
+        w[21 22 61; 41] * w[62 31 32; 51]
+    )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env3[-1 -2; -3 -4] :=
-            rho[21 31; 22 63] *
-            w'[22; 12 11 -3] * w'[63; -4 62 61] *
-            h[-2 62; 52 51] *
-            u[-1 52; 42 41] *
-            w[12 11 42; 21] * w[41 51 61; 31]
-           )
+        env3[-1 -2; -3 -4] :=
+        rho[21 31; 22 63] *
+        w'[22; 12 11 -3] * w'[63; -4 62 61] *
+        h[-2 62; 52 51] *
+        u[-1 52; 42 41] *
+        w[12 11 42; 21] * w[41 51 61; 31]
+    )
 
     env = (env1 + env2 + env3)/3
     return env
@@ -518,69 +531,69 @@ function environment_isometry(h::TernaryOperator, layer, rho)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env1[-1 -2 -3; -4] :=
-            rho[81 84; 82 -4] *
-            w'[82; 62 61 63] *
-            u'[63 -1; 51 52] *
-            h[61 51; 41 42] *
-            u[42 52; 31 83] *
-            w[62 41 31; 81] * w[83 -2 -3; 84]
-           )
+        env1[-1 -2 -3; -4] :=
+        rho[81 84; 82 -4] *
+        w'[82; 62 61 63] *
+        u'[63 -1; 51 52] *
+        h[61 51; 41 42] *
+        u[42 52; 31 83] *
+        w[62 41 31; 81] * w[83 -2 -3; 84]
+    )
 
     # Cost: 6X^6
     @tensor(
-            env2[-1 -2 -3; -4] :=
-            rho[41 62; 42 -4] *
-            w'[42; 11 12 51] *
-            u'[51 -1; 21 22] *
-            h[21 22; 31 32] *
-            u[31 32; 52 61] *
-            w[11 12 52; 41] * w[61 -2 -3; 62]
-           )
+        env2[-1 -2 -3; -4] :=
+        rho[41 62; 42 -4] *
+        w'[42; 11 12 51] *
+        u'[51 -1; 21 22] *
+        h[21 22; 31 32] *
+        u[31 32; 52 61] *
+        w[11 12 52; 41] * w[61 -2 -3; 62]
+    )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env3[-1 -2 -3; -4] :=
-            rho[31 33; 32 -4] *
-            w'[32; 21 11 73] *
-            u'[73 -1; 72 71] *
-            h[71 -2; 62 61] *
-            u[72 62; 51 41] *
-            w[21 11 51; 31] * w[41 61 -3; 33]
-           )
+        env3[-1 -2 -3; -4] :=
+        rho[31 33; 32 -4] *
+        w'[32; 21 11 73] *
+        u'[73 -1; 72 71] *
+        h[71 -2; 62 61] *
+        u[72 62; 51 41] *
+        w[21 11 51; 31] * w[41 61 -3; 33]
+    )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env4[-1 -2 -3; -4] :=
-            rho[33 31; -4 32] *
-            w'[32; 73 11 21] *
-            u'[-3 73; 71 72] *
-            h[-2 71; 61 62] *
-            u[62 72; 41 51] *
-            w[-1 61 41; 33] * w[51 11 21; 31]
-           )
+        env4[-1 -2 -3; -4] :=
+        rho[33 31; -4 32] *
+        w'[32; 73 11 21] *
+        u'[-3 73; 71 72] *
+        h[-2 71; 61 62] *
+        u[62 72; 41 51] *
+        w[-1 61 41; 33] * w[51 11 21; 31]
+    )
 
     # Cost: 6X^6
     @tensor(
-            env5[-1 -2 -3; -4] :=
-            rho[62 41; -4 42] *
-            w'[42; 51 12 11] *
-            u'[-3 51; 22 21] *
-            h[22 21; 32 31] *
-            u[32 31; 61 52] *
-            w[-1 -2 61; 62] * w[52 12 11; 41]
-           )
+        env5[-1 -2 -3; -4] :=
+        rho[62 41; -4 42] *
+        w'[42; 51 12 11] *
+        u'[-3 51; 22 21] *
+        h[22 21; 32 31] *
+        u[32 31; 61 52] *
+        w[-1 -2 61; 62] * w[52 12 11; 41]
+    )
 
     # Cost: 2X^8 + 2X^7 + 2X^6
     @tensor(
-            env6[-1 -2 -3; -4] :=
-            rho[84 81; -4 82] *
-            w'[82; 63 61 62] *
-            u'[-3 63; 52 51] *
-            h[51 61; 42 41] *
-            u[52 42; 83 31] *
-            w[-1 -2 83; 84] * w[31 41 62; 81]
-           )
+        env6[-1 -2 -3; -4] :=
+        rho[84 81; -4 82] *
+        w'[82; 63 61 62] *
+        u'[-3 63; 52 51] *
+        h[51 61; 42 41] *
+        u[52 42; 83 31] *
+        w[-1 -2 83; 84] * w[31 41 62; 81]
+    )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/3
     return env

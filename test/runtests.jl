@@ -15,9 +15,11 @@ function particle_number_operator(::Type{GradedSpace[FibonacciAnyon]})
 end
 
 function particle_number_operator(::Type{GradedSpace[IsingAnyon]})
-    V = GradedSpace[IsingAnyon](IsingAnyon(:I) => 1,
-                                IsingAnyon(:σ) => 1,
-                                IsingAnyon(:ψ) => 1)
+    V = GradedSpace[IsingAnyon](
+        IsingAnyon(:I) => 1,
+        IsingAnyon(:σ) => 1,
+        IsingAnyon(:ψ) => 1
+    )
     z = TensorMap(zeros, Float64, V ← V)
     z.data[IsingAnyon(:I)] .= 0.0
     z.data[IsingAnyon(:σ)] .= 1.0
@@ -54,9 +56,11 @@ function random_space(::Type{GradedSpace[IsingAnyon]}, dlow=3, dhigh=6)
     d0 = rand(1:dtotal-2)
     d1 = rand(1:(dtotal-d0-1))
     d2 = dtotal - d0 - d1
-    V = GradedSpace[IsingAnyon](IsingAnyon(:I) => d0,
-                                IsingAnyon(:σ) => d1,
-                                IsingAnyon(:ψ) => d2)
+    V = GradedSpace[IsingAnyon](
+        IsingAnyon(:I) => d0,
+        IsingAnyon(:σ) => d1,
+        IsingAnyon(:ψ) => d2
+    )
     return V
 end
 
@@ -132,17 +136,17 @@ function test_modifiedbinaryop(::Type{S}) where {S}
     # Unary operations
     a = 0.1
     unaryops = [
-                copy,
-                adjoint,
-                one,
-                (x) -> MERA.expand_support(x, 2),
-                (x) -> a * x,
-                (x) -> x * a,
-                (x) -> x / a,
-                (x) -> fill!(x, a),
-                (x) -> rmul!(x, a),
-                (x) -> lmul!(a, x),
-               ]
+        copy,
+        adjoint,
+        one,
+        (x) -> MERA.expand_support(x, 2),
+        (x) -> a * x,
+        (x) -> x * a,
+        (x) -> x / a,
+        (x) -> fill!(x, a),
+        (x) -> rmul!(x, a),
+        (x) -> lmul!(a, x),
+    ]
     if isreal(sectortype(S))
         # These don't make sense complex sector types.
         push!(unaryops, imag)
@@ -161,15 +165,15 @@ function test_modifiedbinaryop(::Type{S}) where {S}
     a = 0.1
     b = 2.7
     binaryops = (
-              *,
-              +,
-              -,
-              /,
-              (x, y) -> axpby!(a, x, b, y),
-              (x, y) -> axpy!(a, x, y),
-              (x, y) -> mul!(x, a, y),
-              (x, y) -> mul!(x, y, b),
-             )
+        *,
+        +,
+        -,
+        /,
+        (x, y) -> axpby!(a, x, b, y),
+        (x, y) -> axpy!(a, x, y),
+        (x, y) -> mul!(x, a, y),
+        (x, y) -> mul!(x, y, b),
+    )
     for f in binaryops
         t1 = TensorMap(randn, ComplexF64, V, V)
         t2 = TensorMap(randn, ComplexF64, V, V)
@@ -228,24 +232,29 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     Vend = spaces[end]
     randomop1 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop1 = randomop1 + randomop1'
-    randomop1 = convert(MERA.operatortype(m),
-                        MERA.expand_support(randomop1, causal_cone_width(M)))
+    randomop1 = convert(
+        MERA.operatortype(m), MERA.expand_support(randomop1, causal_cone_width(M))
+    )
     randomop2 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop2 = randomop2 + randomop2'
-    randomop2 = convert(MERA.operatortype(m),
-                        MERA.expand_support(randomop2, causal_cone_width(M)))
+    randomop2 = convert(
+        MERA.operatortype(m), MERA.expand_support(randomop2, causal_cone_width(M))
+    )
     randomrho1 = TensorMap(randn, ComplexF64, Vend ← Vend)
     randomrho1 = randomrho1 + randomrho1'
-    randomrho1 = convert(MERA.operatortype(m),
-                         MERA.expand_support(randomrho1, causal_cone_width(M)))
+    randomrho1 = convert(
+        MERA.operatortype(m), MERA.expand_support(randomrho1, causal_cone_width(M))
+    )
     randomrho2 = TensorMap(randn, ComplexF64, V2 ← V2)
     randomrho2 = randomrho2 + randomrho2'
-    randomrho2 = convert(MERA.operatortype(m),
-                         MERA.expand_support(randomrho2, causal_cone_width(M)))
+    randomrho2 = convert(
+        MERA.operatortype(m), MERA.expand_support(randomrho2, causal_cone_width(M))
+    )
 
     nt = @inferred num_translayers(m)
-    l1 = @inferred randomlayer(L, ComplexF64, V2, V1, intspaces[1];
-                               random_disentangler=false)
+    l1 = @inferred randomlayer(
+        L, ComplexF64, V2, V1, intspaces[1]; random_disentangler=false
+    )
 
     @inferred replace_layer(m, l1, 1)
     @inferred release_transitionlayer(m)
@@ -395,9 +404,10 @@ function test_expand_bonddim(::Type{M}, ::Type{S}) where {M, S}
     for i in 1:(num_layers)
         V = internalspace(m, i)
         Vout = outputspace(m, i)
-        newdims = Dict(s => dim(V, s) < dim(Vout, s) ? dim(V, s) + 1 : dim(V, s)
-                       for s in sectors(V)
-                      )
+        newdims = Dict(
+            s => dim(V, s) < dim(Vout, s) ? dim(V, s) + 1 : dim(V, s)
+            for s in sectors(V)
+        )
         m = expand_internal_bonddim(m, i, newdims)
     end
     new_expectation = expect(randomop, m)
@@ -510,25 +520,26 @@ end
 Test optimization on a Hamiltonian that is just the particle number operator We know what it
 should converge to, and it should converge fast.
 """
-function test_optimization(::Type{M}, ::Type{S}, method, precondition=false) where {M, S}
+function test_optimization(::Type{M}, ::Type{S}, method, precondition = false) where {M, S}
     layers = 3
     # eps is the threshold for how close we need to be to the actual ground state energy
     # to pass the test.
     eps = 1e-2
     dlow = 2
     dhigh = 3
-    pars = (method = method,
-            gradient_delta = 1e-6,
-            maxiter = 500,
-            isometries_only_iters = 30,
-            precondition = precondition,
+    pars = (
+        method = method,
+        gradient_delta = 1e-6,
+        maxiter = 500,
+        isometries_only_iters = 30,
+        precondition = precondition,
+        verbosity = 0,
+        scaleinvariant_krylovoptions = (
+            tol = 1e-8,
             verbosity = 0,
-            scaleinvariant_krylovoptions = (
-                                            tol = 1e-8,
-                                            verbosity = 0,
-                                            maxiter = 20,
-                                           ),
-           )
+            maxiter = 20,
+        ),
+    )
 
     op = particle_number_operator(S)
     width = causal_cone_width(M)
@@ -667,8 +678,9 @@ end
 end
 @testset "Removing symmetry" begin
     # This doesn't make sense for anyons.
-    nonanonic_spacetypes = (ST for ST in spacetypes
-                            if BraidingStyle(sectortype(ST)) != Anyonic())
+    nonanonic_spacetypes = (
+        ST for ST in spacetypes if BraidingStyle(sectortype(ST)) != Anyonic()
+    )
     test_with_all_types(test_remove_symmetry, meratypes, nonanonic_spacetypes)
 end
 @testset "Reset storage" begin
@@ -684,20 +696,24 @@ end
 
 # Manifold operations
 @testset "Gradient and retraction, Cayley transform, canonical metric" begin
-    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
-                        :cayley, :canonical)
+    test_with_all_types(
+        test_gradient_and_retraction, meratypes, spacetypes, :cayley, :canonical
+    )
 end
 @testset "Gradient and retraction, Cayley transform, Euclidean metric" begin
-    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
-                        :cayley, :euclidean)
+    test_with_all_types(
+        test_gradient_and_retraction, meratypes, spacetypes, :cayley, :euclidean
+    )
 end
 @testset "Gradient and retraction, exponential, canonical metric" begin
-    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
-                        :exp, :canonical)
+    test_with_all_types(
+        test_gradient_and_retraction, meratypes, spacetypes, :exp, :canonical
+    )
 end
 @testset "Gradient and retraction, exponential, Euclidean metric" begin
-    test_with_all_types(test_gradient_and_retraction, meratypes, spacetypes,
-                        :exp, :euclidean)
+    test_with_all_types(
+        test_gradient_and_retraction, meratypes, spacetypes, :exp, :euclidean
+    )
 end
 @testset "Transport, cayley transform, canonical metric" begin
     test_with_all_types(test_transport, meratypes, spacetypes, :cayley, :canonical)
@@ -717,10 +733,12 @@ end
     test_with_all_types((M, S) -> test_optimization(M, S, :ev), meratypes, spacetypes)
 end
 @testset "Optimization LBFGS" begin
-    test_with_all_types((M, S) -> test_optimization(M, S, :lbfgs, false),
-                        meratypes, spacetypes)
+    test_with_all_types(
+        (M, S) -> test_optimization(M, S, :lbfgs, false), meratypes, spacetypes
+    )
 end
 @testset "Optimization LBFGS with preconditioning" begin
-    test_with_all_types((M, S) -> test_optimization(M, S, :lbfgs, true),
-                        meratypes, spacetypes)
+    test_with_all_types(
+        (M, S) -> test_optimization(M, S, :lbfgs, true), meratypes, spacetypes
+    )
 end

@@ -23,6 +23,7 @@ Base.copy(layer::SimpleLayer) = typeof(layer)(map(deepcopy, _tuple(layer))...)
         return t[i], Val(i+1)
     end
 end
+
 Base.length(layer::SimpleLayer) = length(_tuple(layer))
 
 function remove_symmetry(layer::SimpleLayer)
@@ -57,26 +58,33 @@ end
 
 # # # Manifold functions
 
-function TensorKitManifolds.inner(l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer;
-                                  metric = :euclidean)
-    custominner(t, t1, t2) =
-        inner(t, t1, t2; metric = isa(t1, Stiefel.StiefelTangent) ? metric : :euclidean)
+function TensorKitManifolds.inner(
+    l::SimpleLayer, l1::SimpleLayer, l2::SimpleLayer; metric = :euclidean
+)
+    function custominner(t, t1, t2)
+        mtc = isa(t1, Stiefel.StiefelTangent) ? metric : :euclidean
+        return inner(t, t1, t2; metric = mtc)
+    end
     return sum(custominner.(_tuple(l), _tuple(l1), _tuple(l2)))
 end
 
-function TensorKitManifolds.retract(l::SimpleLayer, ltan::SimpleLayer, alpha::Real;
-                                    alg = :exp)
-
+function TensorKitManifolds.retract(
+    l::SimpleLayer, ltan::SimpleLayer, alpha::Real; alg = :exp
+)
     ts_and_ttans = retract.(_tuple(l), _tuple(ltan), alpha; alg = alg)
     ts = first.(ts_and_ttans)
     ttans = last.(ts_and_ttans)
     return baselayertype(l)(ts...), baselayertype(l)(ttans...)
 end
 
-function TensorKitManifolds.transport!(lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer,
-                                       alpha::Real, lend::SimpleLayer; alg = :exp)
-    ttans = transport!.(_tuple(lvec), _tuple(l), _tuple(ltan), alpha, _tuple(lend);
-                            alg = alg)
+function TensorKitManifolds.transport!(
+    lvec::SimpleLayer, l::SimpleLayer, ltan::SimpleLayer, alpha::Real, lend::SimpleLayer;
+    alg = :exp
+)
+    ttans = transport!.(
+        _tuple(lvec), _tuple(l), _tuple(ltan), alpha, _tuple(lend);
+        alg = alg
+    )
     return baselayertype(l)(ttans...)
 end
 

@@ -53,22 +53,23 @@ struct BinaryLayer{ST, ET, Tan} <: SimpleLayer
     end
 end
 
-function BinaryLayer(disentangler::DisType, isometry::IsoType
-                     ) where {ST,
-                              DisType <: AbstractTensorMap{ST, 2, 2},
-                              IsoType <: AbstractTensorMap{ST, 2, 1}}
+function BinaryLayer(disentangler::DisType, isometry::IsoType) where {
+    ST,
+    DisType <: AbstractTensorMap{ST, 2, 2},
+    IsoType <: AbstractTensorMap{ST, 2, 1}
+}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return BinaryLayer{ST, ET, false}(disentangler, isometry)
 end
 
-function BinaryLayer(disentangler::DisTanType, isometry::IsoTanType
-                     ) where {ST,
-                              DisType <: AbstractTensorMap{ST, 2, 2},
-                              IsoType <: AbstractTensorMap{ST, 2, 1},
-                              DisTanType <: Stiefel.StiefelTangent{DisType},
-                              IsoTanType <: Grassmann.GrassmannTangent{IsoType},
-                             }
+function BinaryLayer(disentangler::DisTanType, isometry::IsoTanType) where {
+    ST,
+    DisType <: AbstractTensorMap{ST, 2, 2},
+    IsoType <: AbstractTensorMap{ST, 2, 1},
+    DisTanType <: Stiefel.StiefelTangent{DisType},
+    IsoTanType <: Grassmann.GrassmannTangent{IsoType},
+}
     ET = eltype(DisType)
     @assert eltype(IsoType) === ET
     return BinaryLayer{ST, ET, true}(disentangler, isometry)
@@ -136,8 +137,9 @@ function expand_internalspace(layer::BinaryLayer, V_new)
     return BinaryLayer(u, w)
 end
 
-function randomlayer(::Type{BinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout;
-                     random_disentangler = false) where {T}
+function randomlayer(
+    ::Type{BinaryLayer}, ::Type{T}, Vin, Vout, Vint = Vout; random_disentangler = false
+) where {T}
     w = randomisometry(T, Vint ⊗ Vint, Vin)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return BinaryLayer(u, w)
@@ -195,10 +197,12 @@ function precondition_tangent(layer::BinaryLayer, tan::BinaryLayer, rho)
     #@tensor rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
     #@tensor rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 1 -11 -12]
     rho_twosite = (rho_twosite_l + rho_twosite_r) / 2.0
-    @tensor(rho_u[-1 -2; -11 -12] :=
-            w[1 -1; 11] * w[-2 2; 21] *
-            rho_twosite[11 21; 12 22] *
-            w'[12; 1 -11] * w'[22; -12 2])
+    @tensor(
+        rho_u[-1 -2; -11 -12] :=
+        w[1 -1; 11] * w[-2 2; 21] *
+        rho_twosite[11 21; 12 22] *
+        w'[12; 1 -11] * w'[22; -12 2]
+    )
     utan_prec = precondition_tangent(utan, rho_u)
     wtan_prec = precondition_tangent(wtan, rho_w)
     return BinaryLayer(utan_prec, wtan_prec)
@@ -208,8 +212,10 @@ end
 
 function space_invar_intralayer(layer::BinaryLayer)
     u, w = layer
-    matching_bonds = ((space(u, 3)', space(w, 2)),
-                      (space(u, 4)', space(w, 1)))
+    matching_bonds = (
+        (space(u, 3)', space(w, 2)),
+        (space(u, 4)', space(w, 1))
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     # Check that the dimensions are such that isometricity can hold.
     allmatch &= all((u, w)) do v
@@ -222,55 +228,60 @@ end
 function space_invar_interlayer(layer::BinaryLayer, next_layer::BinaryLayer)
     u, w = layer.disentangler, layer.isometry
     unext, wnext = next_layer.disentangler, next_layer.isometry
-    matching_bonds = ((space(w, 3)', space(unext, 1)),
-                      (space(w, 3)', space(unext, 2)))
+    matching_bonds = (
+        (space(w, 3)', space(unext, 1)),
+        (space(w, 3)', space(unext, 2))
+    )
     allmatch = all(pair -> ==(pair...), matching_bonds)
     return allmatch
 end
 
 # # # Ascending and descending superoperators
-const BinaryOperator{S} = AbstractTensorMap{S,3,3}
-const ChargedBinaryOperator{S} = AbstractTensorMap{S,3,4}
-const DoubleChargedBinaryOperator{S} = AbstractTensorMap{S,3,5}
+const BinaryOperator{S} = AbstractTensorMap{S, 3, 3}
+const ChargedBinaryOperator{S} = AbstractTensorMap{S, 3, 4}
+const DoubleChargedBinaryOperator{S} = AbstractTensorMap{S, 3, 5}
 
-function ascend(op::Union{BinaryOperator,
-                          ChargedBinaryOperator,
-                          DoubleChargedBinaryOperator},
-                layer::BinaryLayer)
+function ascend(
+    op::Union{BinaryOperator, ChargedBinaryOperator, DoubleChargedBinaryOperator},
+    layer::BinaryLayer
+)
     l = ascend_left(op, layer)
     r = ascend_right(op, layer)
     scaled_op = (l+r)/2
     return scaled_op
 end
 
-ascend(op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer) =
-    ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
+function ascend(
+    op::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer
+)
+    return ascend(expand_support(op, causal_cone_width(BinaryLayer)), layer)
+end
 
 # TODO Think about how to best remove the code duplication of having the separate methods
 # for ordinary, charged, and double charged operators.
 function ascend_left(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
-            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
-            u'[7 13; 3 4] * u'[11 17; 14 12] *
-            op[3 4 14; 1 2 10 -1000] *
-            u[1 2; 6 9] * u[10 12; 8 16] *
-            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
-           )
+        scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
+        w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
+        u'[7 13; 3 4] * u'[11 17; 14 12] *
+        op[3 4 14; 1 2 10 -1000] *
+        u[1 2; 6 9] * u[10 12; 8 16] *
+        w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
+    )
     return scaled_op
 end
 
 function ascend_right(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
-            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
-            u'[17 11; 12 14] * u'[13 7; 3 4] *
-            op[14 3 4; 10 1 2 -1000] *
-            u[12 10; 16 8] * u[1 2; 9 6] *
-            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
-           )
+        scaled_op[-100 -200 -300; -400 -500 -600 -1000] :=
+        w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
+        u'[17 11; 12 14] * u'[13 7; 3 4] *
+        op[14 3 4; 10 1 2 -1000] *
+        u[12 10; 16 8] * u[1 2; 9 6] *
+        w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
+    )
     return scaled_op
 end
 
@@ -278,45 +289,45 @@ end
 function ascend_left(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600] :=
-            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
-            u'[7 13; 3 4] * u'[11 17; 14 12] *
-            op[3 4 14; 1 2 10] *
-            u[1 2; 6 9] * u[10 12; 8 16] *
-            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
-           )
+        scaled_op[-100 -200 -300; -400 -500 -600] :=
+        w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
+        u'[7 13; 3 4] * u'[11 17; 14 12] *
+        op[3 4 14; 1 2 10] *
+        u[1 2; 6 9] * u[10 12; 8 16] *
+        w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
+    )
     return scaled_op
 end
 
 function ascend_right(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_op[-100 -200 -300; -400 -500 -600] :=
-            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
-            u'[17 11; 12 14] * u'[13 7; 3 4] *
-            op[14 3 4; 10 1 2] *
-            u[12 10; 16 8] * u[1 2; 9 6] *
-            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
-           )
+        scaled_op[-100 -200 -300; -400 -500 -600] :=
+        w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
+        u'[17 11; 12 14] * u'[13 7; 3 4] *
+        op[14 3 4; 10 1 2] *
+        u[12 10; 16 8] * u[1 2; 9 6] *
+        w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
+    )
     return scaled_op
 end
 
 function ascend_left(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
-            op[-1 -2 -8; 1 2 -5 -6 -7] *
-            u[1 2; -3 -4]
-           )
+        temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
+        op[-1 -2 -8; 1 2 -5 -6 -7] *
+        u[1 2; -3 -4]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 6, 7, 4, 5, 8))
     @tensor(
-            temp3[-100 -200 -300; -400 -1000 -2000 -500 -600] :=
-            w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
-            u'[7 13; 3 4] * u'[11 17; 14 12] *
-            temp2[3 4; 6 -1000 -2000 9 10 14] *
-            u[10 12; 8 16] *
-            w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
-           )
+        temp3[-100 -200 -300; -400 -1000 -2000 -500 -600] :=
+        w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
+        u'[7 13; 3 4] * u'[11 17; 14 12] *
+        temp2[3 4; 6 -1000 -2000 9 10 14] *
+        u[10 12; 8 16] *
+        w[5 6; -400] * w[9 8; -500] * w[16 15; -600]
+    )
     scaled_op = braid(temp3, (11, 12, 13, 14, 1, 100, 15, 16), (1, 2, 3), (4, 7, 8, 5, 6))
     return scaled_op
 end
@@ -324,19 +335,19 @@ end
 function ascend_right(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
-            op[-3 -1 -2; -4 1 2 -7 -8] *
-            u[1 2; -5 -6]
-           )
+        temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
+        op[-3 -1 -2; -4 1 2 -7 -8] *
+        u[1 2; -5 -6]
+    )
     temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 4, 5, 7, 8, 6))
     @tensor(
-            temp3[-100 -200 -300; -400 -500 -1000 -2000 -600] :=
-            w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
-            u'[17 11; 12 14] * u'[13 7; 3 4] *
-            temp2[3 4; 14 10 9 -1000 -2000 6] *
-            u[12 10; 16 8] *
-            w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
-           )
+        temp3[-100 -200 -300; -400 -500 -1000 -2000 -600] :=
+        w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
+        u'[17 11; 12 14] * u'[13 7; 3 4] *
+        temp2[3 4; 14 10 9 -1000 -2000 6] *
+        u[12 10; 16 8] *
+        w[15 16; -400] * w[8 9; -500] * w[6 5; -600]
+    )
     scaled_op = braid(temp3, (11, 12, 13, 14, 15, 1, 100, 16), (1, 2, 3), (4, 5, 8, 6, 7))
     return scaled_op
 end
@@ -344,26 +355,26 @@ end
 function descend_left(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_rho[-100 -200 -300; -400 -500 -600] :=
-            u[-100 -200; 14 15] * u[-300 11; 3 8] *
-            w[1 14; 13] * w[15 3; 7] * w[8 4; 6] *
-            rho[13 7 6; 12 9 5] *
-            w'[12; 1 16] * w'[9; 17 2] * w'[5; 10 4] *
-            u'[16 17; -400 -500] * u'[2 10; -600 11]
-           )
+        scaled_rho[-100 -200 -300; -400 -500 -600] :=
+        u[-100 -200; 14 15] * u[-300 11; 3 8] *
+        w[1 14; 13] * w[15 3; 7] * w[8 4; 6] *
+        rho[13 7 6; 12 9 5] *
+        w'[12; 1 16] * w'[9; 17 2] * w'[5; 10 4] *
+        u'[16 17; -400 -500] * u'[2 10; -600 11]
+    )
     return scaled_rho
 end
 
 function descend_right(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
-            scaled_rho[-100 -200 -300; -400 -500 -600] :=
-            u[11 -100; 8 3] * u[-200 -300; 15 14] *
-            w[4 8; 6] * w[3 15; 7] * w[14 1; 13] *
-            rho[6 7 13; 5 9 12] *
-            w'[5; 4 10] * w'[9; 2 17] * w'[12; 16 1] *
-            u'[10 2; 11 -400] * u'[17 16; -500 -600]
-           )
+        scaled_rho[-100 -200 -300; -400 -500 -600] :=
+        u[11 -100; 8 3] * u[-200 -300; 15 14] *
+        w[4 8; 6] * w[3 15; 7] * w[14 1; 13] *
+        rho[6 7 13; 5 9 12] *
+        w'[5; 4 10] * w'[9; 2 17] * w'[12; 16 1] *
+        u'[10 2; 11 -400] * u'[17 16; -500 -600]
+    )
     return scaled_rho
 end
 
@@ -387,10 +398,14 @@ function environment(op, layer::BinaryLayer, rho; vary_disentanglers = true)
     return BinaryLayer(env_u, env_w)
 end
 
-function minimize_expectation_ev(layer::BinaryLayer, env::BinaryLayer;
-                                 vary_disentanglers = true)
-    u = (vary_disentanglers ? projectisometric(env.disentangler; alg = Polar())
-         : layer.disentangler)
+function minimize_expectation_ev(
+    layer::BinaryLayer, env::BinaryLayer; vary_disentanglers = true
+)
+    u = if vary_disentanglers
+        projectisometric(env.disentangler; alg = Polar())
+    else
+        layer.disentangler
+    end
     w = projectisometric(env.isometry; alg = Polar())
     return BinaryLayer(u, w)
 end
@@ -398,51 +413,52 @@ end
 function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
     u, w = layer
     @tensor(
-            env1[-1 -2; -3 -4] :=
-            rho[17 18 10; 15 14 9] *
-            w'[15; 5 6] * w'[14; 16 -3] * w'[9; -4 8] *
-            u'[6 16; 1 2] *
-            h[1 2 -1; 3 4 13] *
-            u[3 4; 7 12] * u[13 -2; 11 19] *
-            w[5 7; 17] * w[12 11; 18] * w[19 8; 10]
-           )
+        env1[-1 -2; -3 -4] :=
+        rho[17 18 10; 15 14 9] *
+        w'[15; 5 6] * w'[14; 16 -3] * w'[9; -4 8] *
+        u'[6 16; 1 2] *
+        h[1 2 -1; 3 4 13] *
+        u[3 4; 7 12] * u[13 -2; 11 19] *
+        w[5 7; 17] * w[12 11; 18] * w[19 8; 10]
+    )
 
     @tensor(
-            env2[-1 -2; -3 -4] :=
-            rho[4 15 6; 3 10 5] *
-            w'[3; 1 11] * w'[10; 9 -3] * w'[5; -4 2] *
-            u'[11 9; 12 19] *
-            h[19 -1 -2; 18 7 8] *
-            u[12 18; 13 14] * u[7 8; 16 17] *
-            w[1 13; 4] * w[14 16; 15] * w[17 2; 6]
-           )
+        env2[-1 -2; -3 -4] :=
+        rho[4 15 6; 3 10 5] *
+        w'[3; 1 11] * w'[10; 9 -3] * w'[5; -4 2] *
+        u'[11 9; 12 19] *
+        h[19 -1 -2; 18 7 8] *
+        u[12 18; 13 14] * u[7 8; 16 17] *
+        w[1 13; 4] * w[14 16; 15] * w[17 2; 6]
+    )
 
     @tensor(
-            env3[-1 -2; -3 -4] :=
-            rho[6 15 4; 5 10 3] *
-            w'[5; 2 -3] * w'[10; -4 9] * w'[3; 11 1] *
-            u'[9 11; 19 12] *
-            h[-1 -2 19; 8 7 18] *
-            u[8 7; 17 16] * u[18 12; 14 13] *
-            w[2 17; 6] * w[16 14; 15] * w[13 1; 4]
-           )
+        env3[-1 -2; -3 -4] :=
+        rho[6 15 4; 5 10 3] *
+        w'[5; 2 -3] * w'[10; -4 9] * w'[3; 11 1] *
+        u'[9 11; 19 12] *
+        h[-1 -2 19; 8 7 18] *
+        u[8 7; 17 16] * u[18 12; 14 13] *
+        w[2 17; 6] * w[16 14; 15] * w[13 1; 4]
+    )
 
     @tensor(
-            env4[-1 -2; -3 -4] :=
-            rho[10 18 17; 9 14 15] *
-            w'[9; 8 -3] * w'[14; -4 16] * w'[15; 6 5] *
-            u'[16 6; 2 1] *
-            h[-2 2 1; 13 4 3] *
-            u[-1 13; 19 11] * u[4 3; 12 7] *
-            w[8 19; 10] * w[11 12; 18] * w[7 5; 17]
-           )
+        env4[-1 -2; -3 -4] :=
+        rho[10 18 17; 9 14 15] *
+        w'[9; 8 -3] * w'[14; -4 16] * w'[15; 6 5] *
+        u'[16 6; 2 1] *
+        h[-2 2 1; 13 4 3] *
+        u[-1 13; 19 11] * u[4 3; 12 7] *
+        w[8 19; 10] * w[11 12; 18] * w[7 5; 17]
+    )
 
     env = (env1 + env2 + env3 + env4)/2
     return env
 end
 
-function environment_disentangler(h::Union{SquareTensorMap{1}, SquareTensorMap{2}},
-                                    layer::BinaryLayer, rho)
+function environment_disentangler(
+    h::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer, rho
+)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_disentangler(h, layer, rho)
 end
@@ -450,71 +466,72 @@ end
 function environment_isometry(h::BinaryOperator, layer, rho)
     u, w = layer
     @tensor(
-            env1[-1 -2; -3] :=
-            rho[16 15 19; 18 17 -3] *
-            w'[18; 5 6] * w'[17; 9 8] *
-            u'[6 9; 2 1] * u'[8 -1; 10 11] *
-            h[2 1 10; 4 3 12] *
-            u[4 3; 7 14] * u[12 11; 13 20] *
-            w[5 7; 16] * w[14 13; 15] * w[20 -2; 19]
-           )
+        env1[-1 -2; -3] :=
+        rho[16 15 19; 18 17 -3] *
+        w'[18; 5 6] * w'[17; 9 8] *
+        u'[6 9; 2 1] * u'[8 -1; 10 11] *
+        h[2 1 10; 4 3 12] *
+        u[4 3; 7 14] * u[12 11; 13 20] *
+        w[5 7; 16] * w[14 13; 15] * w[20 -2; 19]
+    )
 
     @tensor(
-            env2[-1 -2; -3] :=
-            rho[18 17 19; 16 15 -3] *
-            w'[16; 12 13] * w'[15; 5 6] *
-            u'[13 5; 9 7] * u'[6 -1; 2 1] *
-            h[7 2 1; 8 4 3] *
-            u[9 8; 14 11] * u[4 3; 10 20] *
-            w[12 14; 18] * w[11 10; 17] * w[20 -2; 19]
-           )
+        env2[-1 -2; -3] :=
+        rho[18 17 19; 16 15 -3] *
+        w'[16; 12 13] * w'[15; 5 6] *
+        u'[13 5; 9 7] * u'[6 -1; 2 1] *
+        h[7 2 1; 8 4 3] *
+        u[9 8; 14 11] * u[4 3; 10 20] *
+        w[12 14; 18] * w[11 10; 17] * w[20 -2; 19]
+    )
 
     @tensor(
-            env3[-1 -2; -3] :=
-            rho[19 20 15; 18 -3 14] *
-            w'[18; 5 6] * w'[14; 17 13] *
-            u'[6 -1; 2 1] * u'[-2 17; 12 11] *
-            h[2 1 12; 4 3 9] *
-            u[4 3; 7 10] * u[9 11; 8 16] *
-            w[5 7; 19] * w[10 8; 20] * w[16 13; 15]
-           )
+        env3[-1 -2; -3] :=
+        rho[19 20 15; 18 -3 14] *
+        w'[18; 5 6] * w'[14; 17 13] *
+        u'[6 -1; 2 1] * u'[-2 17; 12 11] *
+        h[2 1 12; 4 3 9] *
+        u[4 3; 7 10] * u[9 11; 8 16] *
+        w[5 7; 19] * w[10 8; 20] * w[16 13; 15]
+    )
 
     @tensor(
-            env4[-1 -2; -3] :=
-            rho[15 20 19; 14 -3 18] *
-            w'[14; 13 17] * w'[18; 6 5] *
-            u'[17 -1; 11 12] * u'[-2 6; 1 2] *
-            h[12 1 2; 9 3 4] *
-            u[11 9; 16 8] * u[3 4; 10 7] *
-            w[13 16; 15] * w[8 10; 20] * w[7 5; 19]
-           )
+        env4[-1 -2; -3] :=
+        rho[15 20 19; 14 -3 18] *
+        w'[14; 13 17] * w'[18; 6 5] *
+        u'[17 -1; 11 12] * u'[-2 6; 1 2] *
+        h[12 1 2; 9 3 4] *
+        u[11 9; 16 8] * u[3 4; 10 7] *
+        w[13 16; 15] * w[8 10; 20] * w[7 5; 19]
+    )
 
     @tensor(
-            env5[-1 -2; -3] :=
-            rho[19 17 18; -3 15 16] *
-            w'[15; 6 5] * w'[16; 13 12] *
-            u'[-2 6; 1 2] * u'[5 13; 7 9] *
-            h[1 2 7; 3 4 8] *
-            u[3 4; 20 10] * u[8 9; 11 14] *
-            w[-1 20; 19] * w[10 11; 17] * w[14 12; 18]
-           )
+        env5[-1 -2; -3] :=
+        rho[19 17 18; -3 15 16] *
+        w'[15; 6 5] * w'[16; 13 12] *
+        u'[-2 6; 1 2] * u'[5 13; 7 9] *
+        h[1 2 7; 3 4 8] *
+        u[3 4; 20 10] * u[8 9; 11 14] *
+        w[-1 20; 19] * w[10 11; 17] * w[14 12; 18]
+    )
 
     @tensor(
-            env6[-1 -2; -3] :=
-            rho[19 15 16; -3 17 18] *
-            w'[17; 8 9] * w'[18; 6 5] *
-            u'[-2 8; 11 10] * u'[9 6; 1 2] *
-            h[10 1 2; 12 3 4] *
-            u[11 12; 20 13] * u[3 4; 14 7] *
-            w[-1 20; 19] * w[13 14; 15] * w[7 5; 16]
-           )
+        env6[-1 -2; -3] :=
+        rho[19 15 16; -3 17 18] *
+        w'[17; 8 9] * w'[18; 6 5] *
+        u'[-2 8; 11 10] * u'[9 6; 1 2] *
+        h[10 1 2; 12 3 4] *
+        u[11 12; 20 13] * u[3 4; 14 7] *
+        w[-1 20; 19] * w[13 14; 15] * w[7 5; 16]
+    )
 
     env = (env1 + env2 + env3 + env4 + env5 + env6)/2
     return env
 end
 
-function environment_isometry(h::Union{SquareTensorMap{1}, SquareTensorMap{2}},
-                                layer::BinaryLayer, rho)
+function environment_isometry(
+    h::Union{SquareTensorMap{1}, SquareTensorMap{2}}, layer::BinaryLayer, rho
+)
     h = expand_support(h, causal_cone_width(BinaryLayer))
     return environment_isometry(h, layer, rho)
 end

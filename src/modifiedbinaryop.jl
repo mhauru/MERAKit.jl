@@ -80,10 +80,18 @@ end
 # Pass element-wise arithmetic down onto the AbstractTensorMaps. Promote AbstractTensorMaps
 # to ModifiedBinaryOps if necessary.
 for op in (:+, :-, :/, :*)
-    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::ModifiedBinaryOp)
-           = ModifiedBinaryOp(($(op)(xi, yi) for (xi, yi) in zip(x, y))...)))
-    eval(:(Base.$(op)(x::AbstractTensorMap, y::ModifiedBinaryOp) = $(op)(ModifiedBinaryOp(x), y)))
-    eval(:(Base.$(op)(x::ModifiedBinaryOp, y::AbstractTensorMap) = $(op)(x, ModifiedBinaryOp(y))))
+    eval(:(
+        Base.$(op)(x::ModifiedBinaryOp, y::ModifiedBinaryOp)
+        = ModifiedBinaryOp(($(op)(xi, yi) for (xi, yi) in zip(x, y))...)
+    ))
+    eval( :(
+        Base.$(op)(x::AbstractTensorMap, y::ModifiedBinaryOp)
+        = $(op)(ModifiedBinaryOp(x), y)
+    ))
+    eval(:(
+        Base.$(op)(x::ModifiedBinaryOp, y::AbstractTensorMap)
+        = $(op)(x, ModifiedBinaryOp(y))
+    ))
 end
 
 Base.:*(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid * a, op.gap * a)

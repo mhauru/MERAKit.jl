@@ -42,9 +42,11 @@ function main()
     # disentanglers, making the disentanglers isometric instead of unitary). This would
     # probably be better for accuracy/speed, but using the same `V_virtual` everywhere works
     # well too, so for simplicity we stick to that.
-    V_virtual_steps = (Z2Space(0 => 2, 1 => 2),
-                       Z2Space(0 => 3, 1 => 3),
-                       Z2Space(0 => 4, 1 => 4))
+    V_virtual_steps = (
+        Z2Space(0 => 2, 1 => 2),
+        Z2Space(0 => 3, 1 => 3),
+        Z2Space(0 => 4, 1 => 4),
+    )
 
     # Specify the optimisation method. We use here Riemannian LBFGS as described in
     # https://arxiv.org/abs/2007.03638
@@ -101,10 +103,12 @@ function main()
         end
         # Many more optimisation parameters can be specified, see the documentation on
         # `minimize_expectation`.
-        pars = (gradient_delta = gradient_delta,
-                maxiter = maxiter_steps[i],
-                method = method,
-                verbosity = verbosity)
+        pars = (
+            gradient_delta = gradient_delta,
+            maxiter = maxiter_steps[i],
+            method = method,
+            verbosity = verbosity
+        )
         m = minimize_expectation(m, h, pars; finalize! = finalize!)
     end
 

@@ -51,9 +51,13 @@ mutable struct MERACache{N, LT <: Layer, OT}
         environments = Dict{Any, Vector{Union{LT}}}()
         previous_fixedpoint_densitymatrix = nothing
         previous_operatorsum = nothing
-        new{N, LT, OT}(densitymatrices, operators, environments,
-                       previous_fixedpoint_densitymatrix,
-                       previous_operatorsum)
+        new{N, LT, OT}(
+            densitymatrices,
+            operators,
+            environments,
+            previous_fixedpoint_densitymatrix,
+            previous_operatorsum
+        )
     end
 end
 
@@ -62,9 +66,9 @@ function MERACache{N, LT}() where {N, LT}
     return MERACache{N, LT, OT}()
 end
 
-operatortype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = OT
-layertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = LT
-baselayertype(::Type{MERACache{N,LT,OT}}) where {N, LT, OT} = baselayertype(LT)
+operatortype(::Type{MERACache{N, LT, OT}}) where {N, LT, OT} = OT
+layertype(::Type{MERACache{N, LT, OT}}) where {N, LT, OT} = LT
+baselayertype(::Type{MERACache{N, LT, OT}}) where {N, LT, OT} = baselayertype(LT)
 causal_cone_width(C::Type{<:MERACache}) = causal_cone_width(layertype(C))
 
 function Base.copy!(dst::MERACache, src::MERACache)

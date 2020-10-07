@@ -131,6 +131,7 @@ e.g. I ⊗ op and op ⊗ I, are averaged over.
 See also: [`support`](@ref)
 """
 @inline expand_support(op::SquareTensorMap, n::Int) = _expand_support(op, Val(n))
+
 @noinline function _expand_support(op::SquareTensorMap{N}, ::Val{n}) where {N, n}
     if n <= N
         return op
@@ -223,8 +224,9 @@ function pseudoserialize(t::T) where T <: TensorMap
     return repr(T), domstr, codomstr, eltyp, data
 end
 
-function depseudoserialize(::Type{T}, domstr, codomstr, eltyp, data
-                          ) where T <: AbstractTensorMap
+function depseudoserialize(
+    ::Type{T}, domstr, codomstr, eltyp, data
+) where {T <: AbstractTensorMap}
     dom = eval(Meta.parse(domstr))
     codom = eval(Meta.parse(codomstr))
     t = TensorMap(zeros, eltyp, codom ← dom)
@@ -321,8 +323,8 @@ See also: [`gershgorin_discs`](@ref)
 function gershgorin_bounds(t::SquareTensorMap)
     v = real(first(last(first(blocks(t))))) # get first element from first block
     lb, ub = v, v
-    largest_bound((lb1,ub1), (lb2,ub2)) = (min(lb1,lb2), max(ub1,ub2))
-    for (c,b) in blocks(t)
+    largest_bound((lb1, ub1), (lb2, ub2)) = (min(lb1, lb2), max(ub1, ub2))
+    for (c, b) in blocks(t)
         lb, ub = largest_bound((lb, ub), gershgorin_bounds(b))
     end
     return lb, ub
@@ -380,8 +382,9 @@ that inverse. The regularised inverse is S -> 1/sqrt(S^2 + delta^2).
 
 See also: [`precondition_regconst`](@ref)
 """
-function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap,
-                              delta = precondition_regconst(X))
+function precondition_tangent(
+    X::Stiefel.StiefelTangent, rho::AbstractTensorMap, delta = precondition_regconst(X)
+)
     W, A, Z = X.W, X.A, X.Z
     E, U = eigh(rho)
     Einv = reginv_E(E, delta)
@@ -391,8 +394,9 @@ function precondition_tangent(X::Stiefel.StiefelTangent, rho::AbstractTensorMap,
     return Stiefel.StiefelTangent(W, A_prec, Z_prec)
 end
 
-function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensorMap,
-                              delta = precondition_regconst(X))
+function precondition_tangent(
+    X::Grassmann.GrassmannTangent, rho::AbstractTensorMap, delta = precondition_regconst(X)
+)
     W, Z = X.W, X.Z
     E, U = eigh(rho)
     Einv = reginv_E(E, delta)
@@ -401,8 +405,9 @@ function precondition_tangent(X::Grassmann.GrassmannTangent, rho::AbstractTensor
     return Grassmann.GrassmannTangent(W, Z_prec)
 end
 
-function precondition_tangent(X::Unitary.UnitaryTangent, rho::AbstractTensorMap,
-                              delta = precondition_regconst(X))
+function precondition_tangent(
+    X::Unitary.UnitaryTangent, rho::AbstractTensorMap, delta = precondition_regconst(X)
+)
     W, A = X.W, X.A
     E, U = eigh(rho)
     A_prec = projectantihermitian!(symmetric_sylvester(E, U, 2*A, delta))
@@ -441,8 +446,9 @@ Solve the Sylvester equation `A*X + X*A = C`, where we know that `A = A'` and th
 matrix inversion of `1 ⊗ A + A ⊗ 1`, and that inverse is regularised as
 `X -> 1/sqrt(X^2 + delta^2)`.
 """
-function symmetric_sylvester(E::AbstractTensorMap, U::AbstractTensorMap,
-                             C::AbstractTensorMap, delta)
+function symmetric_sylvester(
+    E::AbstractTensorMap, U::AbstractTensorMap, C::AbstractTensorMap, delta
+)
     cod = domain(C)
     dom = codomain(C)
     sylAB(c) = symmetric_sylvester(diag(block(E, c)), block(U, c), block(C, c), delta)

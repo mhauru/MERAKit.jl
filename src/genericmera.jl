@@ -33,8 +33,9 @@ struct GenericMERA{N, LT <: Layer, OT}
     layers::NTuple{N, LT}
     cache::MERACache{N, LT, OT}
 
-    function GenericMERA{N, LT, OT}(layers::NTuple{N}, cache::MERACache{N, LT, OT}
-                                   ) where {N, LT, OT}
+    function GenericMERA{N, LT, OT}(
+        layers::NTuple{N}, cache::MERACache{N, LT, OT}
+    ) where {N, LT, OT}
         # Note that this prevents the creation of types like GenericMERA{3, SimpleLayer}:
         # The second type parameter must be exactly the element type of layers, specified at
         # as a concrete type. This is intentional, to avoid accidentally creating
@@ -156,8 +157,9 @@ end
 Replace the layer at `depth` in `m` with `layer`. If `check_invar = true`, check that the
 indices match afterwards.
 """
-function replace_layer(m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar = true
-                      ) where {N, LT}
+function replace_layer(
+    m::GenericMERA{N, LT}, newlayer::LT, depth; check_invar = true
+) where {N, LT}
     index = min(num_translayers(m)+1, depth)
     new_layers = Base.setindex(m.layers, newlayer, index)
     new_cache = replace_layer(m.cache, depth)
@@ -252,8 +254,9 @@ for each layer.
 
 See also: [`randomlayer`](@ref)
 """
-function random_MERA(::Type{T}, ::Type{ET}, Vouts, Vints = Vouts; kwargs...
-                    ) where {T <: GenericMERA, ET}
+function random_MERA(::Type{T}, ::Type{ET}, Vouts, Vints = Vouts; kwargs...) where {
+    T <: GenericMERA, ET
+}
     L = layertype(T)
     Vins = tuple(Vouts[2:end]..., Vouts[end])
     layers = ntuple(length(Vouts)) do i
@@ -602,8 +605,9 @@ To approximate the converging series, we use an iterative Krylov solver. The opt
 solver should be in `pars.scaleinvariant_krylovoptions`, they will be passed
 to `KrylovKit.linsolve`.
 """
-function scale_invariant_operator_sum(op, m::GenericMERA{N, LT, OT}, pars::NamedTuple = (;)
-                                     ) where {N, LT, OT}
+function scale_invariant_operator_sum(
+    op, m::GenericMERA{N, LT, OT}, pars::NamedTuple = (;)
+) where {N, LT, OT}
     nt = num_translayers(m)
     # fp is the dominant eigenvector of the ascending superoperator. We are not interested
     # in contributions to the sum along fp, since they will just be fp * infty, and fp is
@@ -781,26 +785,27 @@ end
 
 # # # Optimization
 
-const default_pars = (method = :lbfgs,
-                      retraction = :exp,
-                      transport = :exp,
-                      metric = :euclidean,
-                      precondition = true,
-                      vary_disentanglers = true,
-                      gradient_delta = 1e-12,
-                      isometries_only_iters = 0,
-                      maxiter = 2000,
-                      ev_layer_iters = 1,
-                      ls_epsilon = 1e-6,
-                      lbfgs_m = 8,
-                      cg_flavor = :HagerZhang,
-                      verbosity = 2,
-                      scaleinvariant_krylovoptions = (
-                                                      tol = 1e-13,
-                                                      verbosity = 0,
-                                                      maxiter = 20,
-                                                     ),
-                     )
+const default_pars = (
+    method = :lbfgs,
+    retraction = :exp,
+    transport = :exp,
+    metric = :euclidean,
+    precondition = true,
+    vary_disentanglers = true,
+    gradient_delta = 1e-12,
+    isometries_only_iters = 0,
+    maxiter = 2000,
+    ev_layer_iters = 1,
+    ls_epsilon = 1e-6,
+    lbfgs_m = 8,
+    cg_flavor = :HagerZhang,
+    verbosity = 2,
+    scaleinvariant_krylovoptions = (
+        tol = 1e-13,
+        verbosity = 0,
+        maxiter = 20,
+    ),
+)
 
 """
     minimize_expectation(m::GenericMERA, h, pars = (;); finalize! = OptimKit._finalize!)
@@ -854,8 +859,9 @@ current iteration number. It should return the possibly modified `m`, `f`, and `
 Evenbly-Vidal algorithm does not use gradients.
 
 """
-function minimize_expectation(m::GenericMERA, h, pars = (;);
-                              finalize! = OptimKit._finalize!)
+function minimize_expectation(
+    m::GenericMERA, h, pars = (;); finalize! = OptimKit._finalize!
+)
     pars = merge(default_pars, pars)
     # If pars[:isometries_only_iters] is set, but the optimization on the whole is supposed
     # to vary_disentanglers too, then first run a pre-optimization without touching the
@@ -906,8 +912,9 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
             for j in 1:pars[:ev_layer_iters]
                 env = environment(h, m, i, pars)
                 l = getlayer(m, i)
-                new_l = minimize_expectation_ev(l, env;
-                                                vary_disentanglers = pars[:vary_disentanglers])
+                new_l = minimize_expectation_ev(
+                    l, env; vary_disentanglers = pars[:vary_disentanglers]
+                )
                 m = replace_layer(m, new_l, i)
             end
             # We use the latest env and the corresponding layer to compute the norm of the
@@ -925,17 +932,23 @@ function minimize_expectation_ev(m::GenericMERA, h, pars; finalize! = OptimKit._
         # finalize! expects.
         m = finalize!(m, expectation, nothing, counter)[1]
         if pars[:verbosity] >= 2
-            @info(@sprintf("E-V: iter %4d: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
-                           counter, expectation, gradnorm, rhos_maxchange))
+            @info(@sprintf(
+                "E-V: iter %4d: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                counter, expectation, gradnorm, rhos_maxchange
+            ))
         end
     end
     if pars[:verbosity] > 0
         if gradnorm <= pars[:gradient_delta]
-            @info(@sprintf("E-V: converged after %d iterations: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
-                           counter, expectation, gradnorm, rhos_maxchange))
+            @info(@sprintf(
+                "E-V: converged after %d iterations: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                counter, expectation, gradnorm, rhos_maxchange
+            ))
         else
-            @warn(@sprintf("E-V: not converged to requested tol: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
-                           expectation, gradnorm, rhos_maxchange))
+            @warn(@sprintf(
+                "E-V: not converged to requested tol: f = %.12f, ‖∇f‖ = %.4e, max‖Δρ‖ = %.4e",
+                expectation, gradnorm, rhos_maxchange
+            ))
         end
     end
     return m
@@ -988,11 +1001,14 @@ This means the sum of the inner products of the individual tensors.
 
 See the documentation for `TensorKitManifolds` for more details.
 """
-function TensorKitManifolds.inner(m::GenericMERA, m1::GenericMERA, m2::GenericMERA;
-                                  metric = :euclidean)
+function TensorKitManifolds.inner(
+    m::GenericMERA, m1::GenericMERA, m2::GenericMERA; metric = :euclidean
+)
     n = max(num_translayers(m1), num_translayers(m2)) + 1
-    res = sum([inner(getlayer(m, i), getlayer(m1, i), getlayer(m2, i); metric = metric)
-               for i in 1:n])
+    res = sum([
+        inner(getlayer(m, i), getlayer(m1, i), getlayer(m2, i); metric = metric)
+        for i in 1:n
+    ])
     return res
 end
 
@@ -1035,11 +1051,11 @@ For details on how the preconditioning is done, see https://arxiv.org/abs/2007.0
 function precondition_tangent(m::GenericMERA, tan::GenericMERA, pars::NamedTuple)
     nt = num_translayers(m)
     tanlayers_prec = ntuple(Val(nt+1)) do i
-                          l = getlayer(m, i)
-                          tanl = getlayer(tan, i)
-                          rho = densitymatrix(m, i+1, pars)
-                          precondition_tangent(l, tanl, rho)
-                      end
+        l = getlayer(m, i)
+        tanl = getlayer(tan, i)
+        rho = densitymatrix(m, i+1, pars)
+        precondition_tangent(l, tanl, rho)
+    end
     tan_prec = GenericMERA(tanlayers_prec)
     return tan_prec
 end
@@ -1058,8 +1074,9 @@ See the documentation for `TensorKitManifolds` for more details.
 
 See also: [`transport!`](@ref)
 """
-function TensorKitManifolds.retract(m::GenericMERA{N}, mtan::GenericMERA{N}, alpha::Real;
-                                    kwargs...) where N
+function TensorKitManifolds.retract(
+    m::GenericMERA{N}, mtan::GenericMERA{N}, alpha::Real; kwargs...
+) where N
     layers_and_layers_tan = retract.(m.layers, mtan.layers, alpha; kwargs...)
     layers = first.(layers_and_layers_tan)
     layers_tan = last.(layers_and_layers_tan)
@@ -1082,15 +1099,16 @@ See the documentation for `TensorKitManifolds` for more details.
 
 See also: [`retract`](@ref)
 """
-function TensorKitManifolds.transport!(mvec::GenericMERA, m::GenericMERA,
-                                       mtan::GenericMERA, alpha::Real,
-                                       mend::GenericMERA; kwargs...)
+function TensorKitManifolds.transport!(
+    mvec::GenericMERA, m::GenericMERA, mtan::GenericMERA, alpha::Real, mend::GenericMERA;
+    kwargs...
+)
     layers = transport!.(mvec.layers, m.layers, mtan.layers, alpha, mend.layers; kwargs...)
     return GenericMERA(layers)
 end
 
 """
-    minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
+minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
 
 Return a MERA optimized with one of the gradient methods to minimize the expectation value
 of operator `h`, starting with `m` as the initial guess. See [`minimize_expectation`](@ref)
@@ -1116,10 +1134,12 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
         precondition = OptimKit._precondition
     end
 
-    algkwargs = (maxiter = pars[:maxiter],
-                 linesearch = linesearch,
-                 verbosity = pars[:verbosity],
-                 gradtol = pars[:gradient_delta])
+    algkwargs = (
+        maxiter = pars[:maxiter],
+        linesearch = linesearch,
+        verbosity = pars[:verbosity],
+        gradtol = pars[:gradient_delta]
+    )
     local alg
     if pars[:method] == :cg || pars[:method] == :conjugategradient
         if pars[:cg_flavor] == :HagerZhang
@@ -1145,9 +1165,17 @@ function minimize_expectation_grad(m, h, pars; finalize! = OptimKit._finalize!)
         msg = "Unknown optimization method $(pars[:method])."
         throw(ArgumentError(msg))
     end
-    res = optimize(fg, m, alg; scale! = scale, add! = add, retract = rtrct,
-                   inner = innr, transport! = trnsprt!, isometrictransport = true,
-                   precondition = precondition, finalize! = finalize!)
+    res = optimize(
+        fg, m, alg;
+        scale! = scale,
+        add! = add,
+        retract = rtrct,
+        inner = innr,
+        transport! = trnsprt!,
+        isometrictransport = true,
+        precondition = precondition,
+        finalize! = finalize!
+    )
     m, expectation, normgrad, normgradhistory = res
     if pars[:verbosity] > 0
         @info("Gradient optimization done. Expectation = $(expectation).")
