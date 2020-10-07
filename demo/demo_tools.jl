@@ -57,6 +57,16 @@ function block_op(op::MERA.SquareTensorMap{1}, num_sites)
     return op
 end
 
+function goldenchain_hamiltonian(JI, Jτ; block_size = 1)
+    V = GradedSpace[FibonacciAnyon](:I => 0, :τ => 1)
+    H = TensorMap(zeros, Float64, V*V ← V*V)
+    H.data[FibonacciAnyon(:I)] .= JI
+    H.data[FibonacciAnyon(:τ)] .= Jτ
+    H = block_op(H, block_size)
+    H = H / block_size
+    return H
+end
+
 """
     XXZ_hamiltonian(J_xy, J_z; symmetry=:none, block_size=1)
 
@@ -95,9 +105,9 @@ function XXZ_hamiltonian(J_xy, J_z; symmetry=:none, block_size=1)
 end
 
 """
-    ising_hamiltonian(h=1.0; symmetry=:none, block_size=1)
+    ising_hamiltonian(J=-1.0, h=1.0; symmetry=:none, block_size=1)
 
-Return the local Hamiltonian term for the Ising model: -XX - h*Z
+Return the local Hamiltonian term for the Ising model: J*XX + h*Z
 
 `symmetry` should be `:none`, `:group`, or `:anyons` and determmines whether the Hamiltonian
 should be an explicitly Z2 symmetric or anyonic `TensorMap`, or a dense one. `block_size`
@@ -105,7 +115,7 @@ determines how many sites to block together, and should be a power of 2. If site
 blocked, then the Hamiltonian is divided by a constant to make the energy per site be the
 same as for the original.
 """
-function ising_hamiltonian(h=1.0; symmetry=:none, block_size=1)
+function ising_hamiltonian(J=-1.0, h=1.0; symmetry=:none, block_size=1)
     if symmetry == :Z2
         V = ℂ[ℤ₂](0=>1, 1=>1)
         # Pauli Z
@@ -119,12 +129,20 @@ function ising_hamiltonian(h=1.0; symmetry=:none, block_size=1)
         XX = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
         XX.data[ℤ₂(0)] .= [0.0 1.0; 1.0 0.0]
         XX.data[ℤ₂(1)] .= [0.0 1.0; 1.0 0.0]
-        H = -(XX + h/2 * (ZI+IZ))
+        H = J*XX + h/2 * (ZI+IZ)
     elseif symmetry == :anyons
         V = RepresentationSpace{IsingAnyon}(:I => 0, :ψ => 0, :σ => 1)
         H = TensorMap(zeros, Float64, V ⊗ V ← V ⊗ V)
-        H.data[IsingAnyon(:I)] .= 1.0
-        H.data[IsingAnyon(:ψ)] .= -1.0
+        if J == 1.0 && h == 1.0
+            H.data[IsingAnyon(:I)] .= 2.0
+            H.data[IsingAnyon(:ψ)] .= -2.0
+        elseif J == -1.0 && h == 1.0
+            H.data[IsingAnyon(:I)] .= -2.0
+            H.data[IsingAnyon(:ψ)] .= 2.0
+        else
+            msg = "Can't create an anyon symmetric Ising Hamiltonian that isn't critical."
+            throw(ArgumentError(msg))
+        end
     elseif symmetry == :none
         V = ℂ^2
         # Pauli matrices
@@ -136,7 +154,7 @@ function ising_hamiltonian(h=1.0; symmetry=:none, block_size=1)
         XX = X ⊗ X
         ZI = Z ⊗ eye
         IZ = eye ⊗ Z
-        H = -(XX + h/2 * (ZI+IZ))
+        H = J*XX + h/2 * (ZI+IZ)
     else
         error("Unknown symmetry: $symmetry")
     end
