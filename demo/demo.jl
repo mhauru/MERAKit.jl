@@ -20,7 +20,7 @@ function main()
     # tensors, and block two sites together, so that the local state space dimension is 4.
     # The blocking simply obviates the need for a trivial, unitary layer at the bottom of
     # the MERA.
-    h = DemoTools.ising_hamiltonian(1; symmetry = :Z2, block_size = 2)
+    h = DemoTools.ising_hamiltonian(; symmetry = :Z2, block_size = 2)
     exact_energy = -4/pi
     V_physical = space(h, 1)
 
@@ -96,6 +96,7 @@ function main()
             @info("Expanding to bond dimension $(dim(V_virtual)).")
             for j in 2:layers
                 m = expand_bonddim(m, j-1, V_virtual)
+                m = expand_internal_bonddim(m, j, V_virtual)
             end
         end
         # Many more optimisation parameters can be specified, see the documentation on
@@ -110,6 +111,7 @@ function main()
     # Write the resulting MERA to disc. It can then be read using
     # `DemoTools.load_mera(path)`.
     DemoTools.store_mera(path, m)
+    return m
 end
 
 # Run the actual script. The whole thing is in a function mainly to avoid polluting the
