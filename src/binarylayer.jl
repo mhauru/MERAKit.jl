@@ -180,24 +180,12 @@ end
 function precondition_tangent(layer::BinaryLayer, tan::BinaryLayer, rho)
     u, w = layer
     utan, wtan = tan
-    # TODO This is just a silly hack to work around the fact that I haven't yet made trace!
-    # work with anyonic tensors. trace! calls permute of double fusion trees, which isn't
-    # well-defined for anyons.
-    V = space(rho, 1)
-    eye = isomorphism(Matrix{eltype(rho)}, V', V')
-    @tensor rho_wl[-1; -11] := eye[2; 12] * eye[1; 11] * rho[-1 2 1; -11 12 11]
-    @tensor rho_wm[-1; -11] := eye[2; 12] * rho[1 -1 2; 11 -11 12] * eye[1; 11]
-    @tensor rho_wr[-1; -11] := rho[1 2 -1; 11 12 -11] * eye[1; 11] * eye[2; 12]
-    #@tensor rho_wl[-1; -11] := rho[-1 1 2; -11 1 2]
-    #@tensor rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
-    #@tensor rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
+    @planar rho_wl[-1; -11] := rho[-1 1 2; -11 1 2]
+    @planar rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
+    @planar rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
     rho_w = (rho_wl + rho_wm + rho_wr) / 3.0
-    @tensor rho_twosite_l[-1 -2; -11 -12] := eye[1; 2] * rho[-1 -2 1; -11 -12 2]
-    @tensor rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 2 -11 -12] * eye[1; 2]
-    #@tensor rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
-    #@tensor rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 1 -11 -12]
     rho_twosite = (rho_twosite_l + rho_twosite_r) / 2.0
-    @tensor(
+    @planar(
         rho_u[-1 -2; -11 -12] :=
         w[1 -1; 11] * w[-2 2; 21] *
         rho_twosite[11 21; 12 22] *
@@ -258,7 +246,8 @@ function ascend(
 end
 
 # TODO Think about how to best remove the code duplication of having the separate methods
-# for ordinary, charged, and double charged operators.
+# for ordinary, charged, and double charged operators. Note also that there's a mix of using
+# @tensor and @planar.
 function ascend_left(op::ChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
     @tensor(
@@ -288,7 +277,7 @@ end
 # TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
 function ascend_left(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         scaled_op[-100 -200 -300; -400 -500 -600] :=
         w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
         u'[7 13; 3 4] * u'[11 17; 14 12] *
@@ -301,7 +290,7 @@ end
 
 function ascend_right(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         scaled_op[-100 -200 -300; -400 -500 -600] :=
         w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
         u'[17 11; 12 14] * u'[13 7; 3 4] *
@@ -314,13 +303,13 @@ end
 
 function ascend_left(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
         op[-1 -2 -8; 1 2 -5 -6 -7] *
         u[1 2; -3 -4]
     )
     temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 6, 7, 4, 5, 8))
-    @tensor(
+    @planar(
         temp3[-100 -200 -300; -400 -1000 -2000 -500 -600] :=
         w'[-100; 5 7] * w'[-200; 13 11] * w'[-300; 17 15] *
         u'[7 13; 3 4] * u'[11 17; 14 12] *
@@ -334,13 +323,13 @@ end
 
 function ascend_right(op::DoubleChargedBinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         temp1[-1 -2; -3 -4 -5 -6 -7 -8] :=
         op[-3 -1 -2; -4 1 2 -7 -8] *
         u[1 2; -5 -6]
     )
     temp2 = braid(temp1, (11, 12, 13, 14, 15, 16, 1, 100), (1, 2), (3, 4, 5, 7, 8, 6))
-    @tensor(
+    @planar(
         temp3[-100 -200 -300; -400 -500 -1000 -2000 -600] :=
         w'[-100; 15 17] * w'[-200; 11 13] * w'[-300; 7 5] *
         u'[17 11; 12 14] * u'[13 7; 3 4] *
@@ -354,7 +343,7 @@ end
 
 function descend_left(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         scaled_rho[-100 -200 -300; -400 -500 -600] :=
         u[-100 -200; 14 15] * u[-300 11; 3 8] *
         w[1 14; 13] * w[15 3; 7] * w[8 4; 6] *
@@ -367,7 +356,7 @@ end
 
 function descend_right(rho::BinaryOperator, layer::BinaryLayer)
     u, w = layer
-    @tensor(
+    @planar(
         scaled_rho[-100 -200 -300; -400 -500 -600] :=
         u[11 -100; 8 3] * u[-200 -300; 15 14] *
         w[4 8; 6] * w[3 15; 7] * w[14 1; 13] *
@@ -412,7 +401,7 @@ end
 
 function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
     u, w = layer
-    @tensor(
+    @planar(
         env1[-1 -2; -3 -4] :=
         rho[17 18 10; 15 14 9] *
         w'[15; 5 6] * w'[14; 16 -3] * w'[9; -4 8] *
@@ -422,7 +411,7 @@ function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
         w[5 7; 17] * w[12 11; 18] * w[19 8; 10]
     )
 
-    @tensor(
+    @planar(
         env2[-1 -2; -3 -4] :=
         rho[4 15 6; 3 10 5] *
         w'[3; 1 11] * w'[10; 9 -3] * w'[5; -4 2] *
@@ -432,7 +421,7 @@ function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
         w[1 13; 4] * w[14 16; 15] * w[17 2; 6]
     )
 
-    @tensor(
+    @planar(
         env3[-1 -2; -3 -4] :=
         rho[6 15 4; 5 10 3] *
         w'[5; 2 -3] * w'[10; -4 9] * w'[3; 11 1] *
@@ -442,7 +431,7 @@ function environment_disentangler(h::BinaryOperator, layer::BinaryLayer, rho)
         w[2 17; 6] * w[16 14; 15] * w[13 1; 4]
     )
 
-    @tensor(
+    @planar(
         env4[-1 -2; -3 -4] :=
         rho[10 18 17; 9 14 15] *
         w'[9; 8 -3] * w'[14; -4 16] * w'[15; 6 5] *
@@ -465,7 +454,7 @@ end
 
 function environment_isometry(h::BinaryOperator, layer, rho)
     u, w = layer
-    @tensor(
+    @planar(
         env1[-1 -2; -3] :=
         rho[16 15 19; 18 17 -3] *
         w'[18; 5 6] * w'[17; 9 8] *
@@ -475,7 +464,7 @@ function environment_isometry(h::BinaryOperator, layer, rho)
         w[5 7; 16] * w[14 13; 15] * w[20 -2; 19]
     )
 
-    @tensor(
+    @planar(
         env2[-1 -2; -3] :=
         rho[18 17 19; 16 15 -3] *
         w'[16; 12 13] * w'[15; 5 6] *
@@ -485,7 +474,7 @@ function environment_isometry(h::BinaryOperator, layer, rho)
         w[12 14; 18] * w[11 10; 17] * w[20 -2; 19]
     )
 
-    @tensor(
+    @planar(
         env3[-1 -2; -3] :=
         rho[19 20 15; 18 -3 14] *
         w'[18; 5 6] * w'[14; 17 13] *
@@ -495,7 +484,7 @@ function environment_isometry(h::BinaryOperator, layer, rho)
         w[5 7; 19] * w[10 8; 20] * w[16 13; 15]
     )
 
-    @tensor(
+    @planar(
         env4[-1 -2; -3] :=
         rho[15 20 19; 14 -3 18] *
         w'[14; 13 17] * w'[18; 6 5] *
@@ -505,7 +494,7 @@ function environment_isometry(h::BinaryOperator, layer, rho)
         w[13 16; 15] * w[8 10; 20] * w[7 5; 19]
     )
 
-    @tensor(
+    @planar(
         env5[-1 -2; -3] :=
         rho[19 17 18; -3 15 16] *
         w'[15; 6 5] * w'[16; 13 12] *
@@ -515,7 +504,7 @@ function environment_isometry(h::BinaryOperator, layer, rho)
         w[-1 20; 19] * w[10 11; 17] * w[14 12; 18]
     )
 
-    @tensor(
+    @planar(
         env6[-1 -2; -3] :=
         rho[19 15 16; -3 17 18] *
         w'[17; 8 9] * w'[18; 6 5] *
