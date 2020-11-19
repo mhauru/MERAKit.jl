@@ -276,7 +276,6 @@ function ascend_right(op::ChargedBinaryOperator, layer::BinaryLayer)
     return scaled_op
 end
 
-# TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
 function ascend_left(op::BinaryOperator, layer::BinaryLayer)
     u, w = layer
     @planar(

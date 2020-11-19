@@ -167,7 +167,8 @@ function randomlayer(
     # We make the initial guess be reflection symmetric, since that's often true of the
     # desired MERA too (at least if random_disentangler is false, but we do it every time
     # any way).
-    # TODO For anyons, should there be a twist on the top leg too?
+    # TODO For anyons, should there be a twist on the top leg too, and does the braid make
+    # sense?
     wr = braid(wl, (1, 2, 3), (2, 1), (3,); copy = true)
     u = initialize_disentangler(T, Vout, Vint, random_disentangler)
     return ModifiedBinaryLayer(u, wl, wr)
@@ -295,6 +296,7 @@ end
 
 # TODO Think about how to best remove the code duplication of having the separate methods
 # for ordinary, charged, and double charged operators.
+# Operators without charge legs.
 function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     T <: SquareTensorMap{2}
 }
@@ -361,6 +363,7 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) whe
     return scaled_op
 end
 
+# Operators with one charge leg.
 function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     S1, T <: AbstractTensorMap{S1, 2, 3}
 }
@@ -427,6 +430,7 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) whe
     return scaled_op
 end
 
+# Operators with two charge legs.
 function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     S1, T <: AbstractTensorMap{S1, 2, 4}
 }

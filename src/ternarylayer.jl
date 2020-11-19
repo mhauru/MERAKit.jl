@@ -305,7 +305,6 @@ function ascend_mid(op::ChargedTernaryOperator, layer::TernaryLayer)
     return scaled_op
 end
 
-# TODO Figure out how to deal with the extra charge legs in the case of anyonic tensors.
 function ascend_left(op::TernaryOperator, layer::TernaryLayer)
     u, w = layer
     # Cost: 2X^8 + 2X^7 + 2X^6
