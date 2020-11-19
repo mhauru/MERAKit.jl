@@ -184,6 +184,8 @@ function precondition_tangent(layer::BinaryLayer, tan::BinaryLayer, rho)
     @planar rho_wm[-1; -11] := rho[1 -1 2; 1 -11 2]
     @planar rho_wr[-1; -11] := rho[1 2 -1; 1 2 -11]
     rho_w = (rho_wl + rho_wm + rho_wr) / 3.0
+    @planar rho_twosite_l[-1 -2; -11 -12] := rho[-1 -2 1; -11 -12 1]
+    @planar rho_twosite_r[-1 -2; -11 -12] := rho[1 -1 -2; 1 -11 -12]
     rho_twosite = (rho_twosite_l + rho_twosite_r) / 2.0
     @planar(
         rho_u[-1 -2; -11 -12] :=
