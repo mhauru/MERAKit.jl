@@ -6,16 +6,16 @@ using MERA
 using Logging
 using Random
 
-function particle_number_operator(::Type{GradedSpace[FibonacciAnyon]})
-    V = GradedSpace[FibonacciAnyon](FibonacciAnyon(:I) => 1, FibonacciAnyon(:τ) => 1)
+function particle_number_operator(::Type{Vect[FibonacciAnyon]})
+    V = Vect[FibonacciAnyon](FibonacciAnyon(:I) => 1, FibonacciAnyon(:τ) => 1)
     z = TensorMap(zeros, Float64, V ← V)
     z.data[FibonacciAnyon(:I)] .= 0.0
     z.data[FibonacciAnyon(:τ)] .= 1.0
     return z
 end
 
-function particle_number_operator(::Type{GradedSpace[IsingAnyon]})
-    V = GradedSpace[IsingAnyon](
+function particle_number_operator(::Type{Vect[IsingAnyon]})
+    V = Vect[IsingAnyon](
         IsingAnyon(:I) => 1,
         IsingAnyon(:σ) => 1,
         IsingAnyon(:ψ) => 1
@@ -43,20 +43,21 @@ function particle_number_operator(::Type{ComplexSpace})
     return z
 end
 
-function random_space(::Type{GradedSpace[FibonacciAnyon]}, dlow=2, dhigh=6)
+function random_space(::Type{Vect[FibonacciAnyon]}, dlow=2, dhigh=6)
     dtotal = rand(dlow:dhigh)
     d0 = rand(1:dtotal-1)
     d1 = dtotal - d0
-    V = GradedSpace[FibonacciAnyon](FibonacciAnyon(:I) => d0, FibonacciAnyon(:τ) => d1)
+    V = Vect[FibonacciAnyon](FibonacciAnyon(:I) => d0, FibonacciAnyon(:τ) => d1)
     return V
 end
 
-function random_space(::Type{GradedSpace[IsingAnyon]}, dlow=3, dhigh=6)
+function random_space(::Type{Vect[IsingAnyon]}, dlow=3, dhigh=6)
+    @assert dlow > 2
     dtotal = rand(dlow:dhigh)
     d0 = rand(1:dtotal-2)
     d1 = rand(1:(dtotal-d0-1))
     d2 = dtotal - d0 - d1
-    V = GradedSpace[IsingAnyon](
+    V = Vect[IsingAnyon](
         IsingAnyon(:I) => d0,
         IsingAnyon(:σ) => d1,
         IsingAnyon(:ψ) => d2
@@ -530,7 +531,7 @@ function test_optimization(::Type{M}, ::Type{S}, method, precondition = false) w
     pars = (
         method = method,
         gradient_delta = 1e-6,
-        maxiter = 500,
+        maxiter = 1000,
         isometries_only_iters = 30,
         precondition = precondition,
         verbosity = 0,
@@ -644,9 +645,9 @@ function test_with_all_types(testfunc, meratypes, spacetypes, args...)
     end
 end
 
-Random.seed!(1)  # For reproducing the same tests again and again.
+Random.seed!(2)  # For reproducing the same tests again and again.
 meratypes = (ModifiedBinaryMERA, BinaryMERA, TernaryMERA)
-spacetypes = (ComplexSpace, Z2Space, GradedSpace[FibonacciAnyon], GradedSpace[IsingAnyon])
+spacetypes = (ComplexSpace, Z2Space, Vect[FibonacciAnyon])
 
 # Run the tests on different MERAs and vector spaces.
 # Basics
