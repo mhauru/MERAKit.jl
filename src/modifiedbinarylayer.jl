@@ -220,9 +220,9 @@ function precondition_tangent(layer::ModifiedBinaryLayer, tan::ModifiedBinaryLay
     rho_wr = (rho_wr_mid + rho_wr_gap) / 2.0
     @planar(
         rho_u[-1 -2; -11 -12] :=
-        wl[1 -1; 11] * wr[-2 2; 21] *
+        wl'[12; 1 -11] * wr'[22; -12 2] *
         rho.mid[11 21; 12 22] *
-        wl'[12; 1 -11] * wr'[22; -12 2]
+        wl[1 -1; 11] * wr[-2 2; 21]
     )
     utan_prec = precondition_tangent(utan, rho_u)
     wltan_prec = precondition_tangent(wltan, rho_wl)
@@ -303,11 +303,11 @@ function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         scaled_op[-100 -200; -300 -400] :=
-        wl'[-100; 3 2] * wr'[-200; 9 1] *
-        u'[2 9; 4 5] *
-        op_gap[3 4; 7 6] *
+        wl[7 8; -300] * wr[10 1; -400] *
         u[6 5; 8 10] *
-        wl[7 8; -300] * wr[10 1; -400]
+        op_gap[3 4; 7 6] *
+        u'[2 9; 4 5] *
+        wl'[-100; 3 2] * wr'[-200; 9 1]
     )
     return scaled_op
 end
@@ -320,11 +320,11 @@ function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         scaled_op[-100 -200; -300 -400] :=
-        wl'[-100; 1 9] * wr'[-200; 2 3] *
-        u'[9 2; 5 4] *
-        op_gap[4 3; 6 7] *
+        wl[1 10; -300] * wr[8 7; -400] *
         u[5 6; 10 8] *
-        wl[1 10; -300] * wr[8 7; -400]
+        op_gap[4 3; 6 7] *
+        u'[9 2; 5 4] *
+        wl'[-100; 1 9] * wr'[-200; 2 3]
     )
     return scaled_op
 end
@@ -337,11 +337,11 @@ function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     # Cost: 4X^6 + 2X^5
     @planar(
         scaled_op[-100 -200; -300 -400] :=
-        wl'[-100; 12 24] * wr'[-200; 22 11] *
-        u'[24 22; 1 2] *
-        op_mid[1 2; 3 4] *
+        wl[12 23; -300] * wr[21 11; -400] *
         u[3 4; 23 21] *
-        wl[12 23; -300] * wr[21 11; -400]
+        op_mid[1 2; 3 4] *
+        u'[24 22; 1 2] *
+        wl'[-100; 12 24] * wr'[-200; 22 11]
     )
     return scaled_op
 end
@@ -354,9 +354,9 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) whe
     # Cost: 2X^6 + 2X^5
     @planar(
         scaled_op[-100 -200; -300 -400] :=
-        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        wr[12 23; -300] * wl[21 11; -400] *
         op_mid[24 22; 23 21] *
-        wr[12 23; -300] * wl[21 11; -400]
+        wr'[-100; 12 24] * wl'[-200; 22 11]
     )
     return scaled_op
 end
@@ -369,11 +369,11 @@ function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
         scaled_op[-100 -200; -300 -400 -1000] :=
-        wl'[-100; 3 2] * wr'[-200; 9 1] *
-        u'[2 9; 4 5] *
-        op_gap[3 4; 7 6 -1000] *
+        wl[7 8; -300] * wr[10 1; -400] *
         u[6 5; 8 10] *
-        wl[7 8; -300] * wr[10 1; -400]
+        op_gap[3 4; 7 6 -1000] *
+        u'[2 9; 4 5] *
+        wl'[-100; 3 2] * wr'[-200; 9 1]
     )
     return scaled_op
 end
@@ -386,11 +386,11 @@ function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where
     # Cost: 2X^7 + 3X^6 + 1X^5
     @tensor(
         scaled_op[-100 -200; -300 -400 -1000] :=
-        wl'[-100; 1 9] * wr'[-200; 2 3] *
-        u'[9 2; 5 4] *
-        op_gap[4 3; 6 7 -1000] *
+        wl[1 10; -300] * wr[8 7; -400] *
         u[5 6; 10 8] *
-        wl[1 10; -300] * wr[8 7; -400]
+        op_gap[4 3; 6 7 -1000] *
+        u'[9 2; 5 4] *
+        wl'[-100; 1 9] * wr'[-200; 2 3]
     )
     return scaled_op
 end
@@ -403,11 +403,11 @@ function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     # Cost: 4X^6 + 2X^5
     @tensor(
         scaled_op[-100 -200; -300 -400 -1000] :=
-        wl'[-100; 12 24] * wr'[-200; 22 11] *
-        u'[24 22; 1 2] *
-        op_mid[1 2; 3 4 -1000] *
+        wl[12 23; -300] * wr[21 11; -400] *
         u[3 4; 23 21] *
-        wl[12 23; -300] * wr[21 11; -400]
+        op_mid[1 2; 3 4 -1000] *
+        u'[24 22; 1 2] *
+        wl'[-100; 12 24] * wr'[-200; 22 11]
     )
     return scaled_op
 end
@@ -420,9 +420,9 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) whe
     # Cost: 2X^6 + 2X^5
     @tensor(
         scaled_op[-100 -200; -300 -400 -1000] :=
-        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        wr[12 23; -300] * wl[21 11; -400] *
         op_mid[24 22; 23 21 -1000] *
-        wr[12 23; -300] * wl[21 11; -400]
+        wr'[-100; 12 24] * wl'[-200; 22 11]
     )
     return scaled_op
 end
@@ -435,17 +435,17 @@ function ascend_left(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         temp1[-1 -2 -3; -11 -12 -13 -14] :=
-        wl'[-2; 3 2] *
+        op_gap[3 4; -1 -11 -12 -13] *
         u'[2 -3; 4 -14] *
-        op_gap[3 4; -1 -11 -12 -13]
+        wl'[-2; 3 2]
     )
     temp2 = braid(temp1, (11, 12, 13, 14, 1, 100, 15), (1, 2, 5, 6, 3), (4, 7))
     @planar(
         temp3[-100 -1000 -2000 -200; -300 -400] :=
-        wr'[-200; 9 1] *
-        temp2[7 -100 -1000 -2000 9; 6 5] *
+        wl[7 8; -300] * wr[10 1; -400] *
         u[6 5; 8 10] *
-        wl[7 8; -300] * wr[10 1; -400]
+        temp2[7 -100 -1000 -2000 9; 6 5] *
+        wr'[-200; 9 1]
     )
     scaled_op = braid(temp3, (11, 1, 100, 12, 13, 14), (1, 4), (5, 6, 2, 3))
     return scaled_op
@@ -460,11 +460,11 @@ function ascend_right(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where
     # This happens to not need any braiding.
     @planar(
         scaled_op[-100 -200; -300 -400 -1000 -2000] :=
-        wl'[-100; 1 9] * wr'[-200; 2 3] *
-        u'[9 2; 5 4] *
-        op_gap[4 3; 6 7 -1000 -2000] *
+        wl[1 10; -300] * wr[8 7; -400] *
         u[5 6; 10 8] *
-        wl[1 10; -300] * wr[8 7; -400]
+        op_gap[4 3; 6 7 -1000 -2000] *
+        u'[9 2; 5 4] *
+        wl'[-100; 1 9] * wr'[-200; 2 3]
     )
     return scaled_op
 end
@@ -477,16 +477,16 @@ function ascend_mid(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) where {
     # Cost: 4X^6 + 2X^5
     @planar(
         temp1[-1 -2; -3 -4 -5 -6] :=
-        u'[-1 -2; 1 2] *
+        u[3 4; -3 -4] *
         op_mid[1 2; 3 4 -5 -6] *
-        u[3 4; -3 -4]
+        u'[-1 -2; 1 2]
     )
     temp2 = braid(temp1, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
     @planar(
         temp3[-100 -200; -300 -1000 -2000 -400] :=
-        wl'[-100; 12 24] * wr'[-200; 22 11] *
+        wl[12 23; -300] * wr[21 11; -400] *
         temp2[24 22; 23 -1000 -2000 21] *
-        wl[12 23; -300] * wr[21 11; -400]
+        wl'[-100; 12 24] * wr'[-200; 22 11]
     )
     scaled_op = braid(temp3, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
     return scaled_op
@@ -501,9 +501,9 @@ function ascend_between(op::ModifiedBinaryOp{T}, layer::ModifiedBinaryLayer) whe
     temp1 = braid(op_mid, (11, 12, 13, 14, 1, 100), (1, 2), (3, 5, 6, 4))
     @planar(
         temp2[-100 -200; -300 -1000 -2000 -400] :=
-        wr'[-100; 12 24] * wl'[-200; 22 11] *
+        wr[12 23; -300] * wl[21 11; -400] *
         temp1[24 22; 23 -1000 -2000 21] *
-        wr[12 23; -300] * wl[21 11; -400]
+        wr'[-100; 12 24] * wl'[-200; 22 11]
     )
     scaled_op = braid(temp2, (11, 12, 13, 1, 100, 14), (1, 2), (3, 6, 4, 5))
     return scaled_op
@@ -515,11 +515,11 @@ function descend_left(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         scaled_rho[-100 -200; -300 -400] :=
-        u[-200 7; 10 8] *
-        wl[-100 10; 9] * wr[8 1; 3] *
-        rho_mid[9 3; 4 2] *
+        u'[5 6; -400 7] *
         wl'[4; -300 5] * wr'[2; 6 1] *
-        u'[5 6; -400 7]
+        rho_mid[9 3; 4 2] *
+        wl[-100 10; 9] * wr[8 1; 3] *
+        u[-200 7; 10 8]
     )
     return scaled_rho
 end
@@ -530,11 +530,11 @@ function descend_right(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         scaled_rho[-100 -200; -300 -400] :=
-        u[7 -100; 8 10] *
-        wl[1 8; 3] * wr[10 -200; 9] *
-        rho_mid[3 9; 2 4] *
+        u'[6 5; 7 -300] *
         wl'[2; 1 6] * wr'[4; 5 -400] *
-        u'[6 5; 7 -300]
+        rho_mid[3 9; 2 4] *
+        wl[1 8; 3] * wr[10 -200; 9] *
+        u[7 -100; 8 10]
     )
     return scaled_rho
 end
@@ -545,11 +545,11 @@ function descend_mid(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 4X^6 + 2X^5
     @planar(
         scaled_rho[-100 -200; -300 -400] :=
-        u[-100 -200; 7 8] *
-        wl[4 7; 6] * wr[8 1; 3] *
-        rho_mid[6 3; 5 2] *
+        u'[9 10; -300 -400] *
         wl'[5; 4 9] * wr'[2; 10 1] *
-        u'[9 10; -300 -400]
+        rho_mid[6 3; 5 2] *
+        wl[4 7; 6] * wr[8 1; 3] *
+        u[-100 -200; 7 8]
     )
     return scaled_rho
 end
@@ -560,9 +560,9 @@ function descend_between(rho::ModifiedBinaryOp, layer::ModifiedBinaryLayer)
     # Cost: 2X^6 + 2X^5
     @planar(
         scaled_rho[-100 -200; -300 -400] :=
-        wr[4 -100; 6] * wl[-200 1; 3] *
+        wr'[5; 4 -300] * wl'[2; -400 1] *
         rho_gap[6 3; 5 2] *
-        wr'[5; 4 -300] * wl'[2; -400 1]
+        wr[4 -100; 6] * wl[-200 1; 3]
     )
     return scaled_rho
 end
@@ -621,30 +621,30 @@ function environment_disentangler(
     @planar(
         envl[-100 -200; -300 -400] :=
         rho_mid[4 2; 10 3] *
-        wl'[10; 9 -300] * wr'[3; -400 1] *
-        h_gap[9 -100; 7 8] *
+        wl[7 5; 4] * wr[6 1; 2] *
         u[8 -200; 5 6] *
-        wl[7 5; 4] * wr[6 1; 2]
+        h_gap[9 -100; 7 8] *
+        wl'[10; 9 -300] * wr'[3; -400 1]
     )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         envr[-100 -200; -300 -400] :=
         rho_mid[2 4; 3 10] *
-        wl'[3; 1 -300] * wr'[10; -400 9] *
-        h_gap[-200 9; 8 7] *
+        wl[1 6; 2] * wr[5 7; 4] *
         u[-100 8; 6 5] *
-        wl[1 6; 2] * wr[5 7; 4]
+        h_gap[-200 9; 8 7] *
+        wl'[3; 1 -300] * wr'[10; -400 9]
     )
 
     # Cost: 4X^6 + 2X^5
     @planar(
         envm[-100 -200; -300 -400] :=
         rho_mid[6 4; 5 3] *
-        wl'[5; 1 -300] * wr'[3; -400 2] *
-        h_mid[-100 -200; 9 10] *
+        wl[1 7; 6] * wr[8 2; 4] *
         u[9 10; 7 8] *
-        wl[1 7; 6] * wr[8 2; 4]
+        h_mid[-100 -200; 9 10] *
+        wl'[5; 1 -300] * wr'[3; -400 2]
     )
 
     env = (envl + envr + envm) / 4.0
@@ -669,42 +669,42 @@ function environment_isometry_left(h::ModifiedBinaryOp, layer, rho::ModifiedBina
     @planar(
         envl[-100 -200; -300] :=
         rho_mid[4 3; -300 2] *
-        wr'[2; 11 1] *
-        u'[-200 11; 9 10] *
-        h_gap[-100 9; 7 8] *
+        wl[7 5; 4] * wr[6 1; 3] *
         u[8 10; 5 6] *
-        wl[7 5; 4] * wr[6 1; 3]
+        h_gap[-100 9; 7 8] *
+        u'[-200 11; 9 10] *
+        wr'[2; 11 1]
     )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         envr[-100 -200; -300] :=
         rho_mid[10 8; -300 9] *
-        wr'[9; 7 6] *
-        u'[-200 7; 5 4] *
-        h_gap[4 6; 3 2] *
+        wl[-100 11; 10] * wr[1 2; 8] *
         u[5 3; 11 1] *
-        wl[-100 11; 10] * wr[1 2; 8]
+        h_gap[4 6; 3 2] *
+        u'[-200 7; 5 4] *
+        wr'[9; 7 6]
     )
 
     # Cost: 4X^6 + 2X^5
     @planar(
         envm[-100 -200; -300] :=
         rho_mid[10 9; -300 8] *
-        wr'[8; 6 5] *
-        u'[-200 6; 1 2] *
-        h_mid[1 2; 3 4] *
+        wl[-100 11; 10] * wr[7 5; 9] *
         u[3 4; 11 7] *
-        wl[-100 11; 10] * wr[7 5; 9]
+        h_mid[1 2; 3 4] *
+        u'[-200 6; 1 2] *
+        wr'[8; 6 5]
     )
 
     # Cost: 2X^6 + 2X^5
     @planar(
         envb[-100 -200; -300] :=
         rho_gap[5 7; 4 -300] *
-        wr'[4; 1 2] *
+        wr[1 3; 5] * wl[6 -200; 7] *
         h_mid[2 -100; 3 6] *
-        wr[1 3; 5] * wl[6 -200; 7]
+        wr'[4; 1 2]
     )
 
     env = (envl + envr + envm + envb) / 4.0
@@ -733,42 +733,42 @@ function environment_isometry_right(h::ModifiedBinaryOp, layer, rho::ModifiedBin
     @planar(
         envl[-100 -200; -300] :=
         rho_mid[8 10; 9 -300] *
-        wl'[9; 6 7] *
-        u'[7 -100; 4 5] *
-        h_gap[6 4; 2 3] *
+        wl[2 1; 8] * wr[11 -200; 10] *
         u[3 5; 1 11] *
-        wl[2 1; 8] * wr[11 -200; 10]
+        h_gap[6 4; 2 3] *
+        u'[7 -100; 4 5] *
+        wl'[9; 6 7]
     )
 
     # Cost: 2X^7 + 3X^6 + 1X^5
     @planar(
         envr[-100 -200; -300] :=
         rho_mid[3 4; 2 -300] *
-        wl'[2; 1 11] *
-        u'[11 -100; 10 9] *
-        h_gap[9 -200; 8 7] *
+        wl[1 6; 3] * wr[5 7; 4] *
         u[10 8; 6 5] *
-        wl[1 6; 3] * wr[5 7; 4]
+        h_gap[9 -200; 8 7] *
+        u'[11 -100; 10 9] *
+        wl'[2; 1 11]
     )
 
     # Cost: 4X^6 + 2X^5
     @planar(
         envm[-100 -200; -300] :=
         rho_mid[9 10; 8 -300] *
-        wl'[8; 5 6] *
-        u'[6 -100; 2 1] *
-        h_mid[2 1; 4 3] *
+        wl[5 7; 9] * wr[11 -200; 10] *
         u[4 3; 7 11] *
-        wl[5 7; 9] * wr[11 -200; 10]
+        h_mid[2 1; 4 3] *
+        u'[6 -100; 2 1] *
+        wl'[8; 5 6]
     )
 
     # Cost: 2X^6 + 2X^5
     @planar(
         envb[-100 -200; -300] :=
         rho_gap[7 5; -300 4] *
-        wl'[4; 2 1] *
+        wr[-100 6; 7] * wl[3 1; 5] *
         h_mid[-200 2; 6 3] *
-        wr[-100 6; 7] * wl[3 1; 5]
+        wl'[4; 2 1]
     )
 
     env = (envl + envr + envm + envb) / 4.0
