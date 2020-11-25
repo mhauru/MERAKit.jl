@@ -2,7 +2,7 @@ using Test
 using TensorKit
 using TensorKitManifolds
 using LinearAlgebra
-using MERA
+using MERAKit
 using Logging
 using Random
 
@@ -140,7 +140,7 @@ function test_modifiedbinaryop(::Type{S}) where {S}
         copy,
         adjoint,
         one,
-        (x) -> MERA.expand_support(x, 2),
+        (x) -> MERAKit.expand_support(x, 2),
         (x) -> a * x,
         (x) -> x * a,
         (x) -> x / a,
@@ -234,22 +234,22 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     randomop1 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop1 = randomop1 + randomop1'
     randomop1 = convert(
-        MERA.operatortype(m), MERA.expand_support(randomop1, causal_cone_width(M))
+        MERAKit.operatortype(m), MERAKit.expand_support(randomop1, causal_cone_width(M))
     )
     randomop2 = TensorMap(randn, ComplexF64, V1 ← V1)
     randomop2 = randomop2 + randomop2'
     randomop2 = convert(
-        MERA.operatortype(m), MERA.expand_support(randomop2, causal_cone_width(M))
+        MERAKit.operatortype(m), MERAKit.expand_support(randomop2, causal_cone_width(M))
     )
     randomrho1 = TensorMap(randn, ComplexF64, Vend ← Vend)
     randomrho1 = randomrho1 + randomrho1'
     randomrho1 = convert(
-        MERA.operatortype(m), MERA.expand_support(randomrho1, causal_cone_width(M))
+        MERAKit.operatortype(m), MERAKit.expand_support(randomrho1, causal_cone_width(M))
     )
     randomrho2 = TensorMap(randn, ComplexF64, V2 ← V2)
     randomrho2 = randomrho2 + randomrho2'
     randomrho2 = convert(
-        MERA.operatortype(m), MERA.expand_support(randomrho2, causal_cone_width(M))
+        MERAKit.operatortype(m), MERAKit.expand_support(randomrho2, causal_cone_width(M))
     )
 
     nt = @inferred num_translayers(m)
@@ -262,30 +262,30 @@ function test_type_stability(::Type{M}, ::Type{S}) where {M, S}
     @inferred projectisometric(m)
     @inferred outputspace(m, Inf)
     @inferred inputspace(m, Inf)
-    @inferred MERA.environment(randomop1, l1, randomrho2)
+    @inferred MERAKit.environment(randomop1, l1, randomrho2)
 
-    @inferred MERA.ascend(randomop1, m)
+    @inferred MERAKit.ascend(randomop1, m)
     @inferred ascended_operator(randomop1, m, 1)
-    @inferred MERA.descend(randomrho1, m)
-    @inferred MERA.thermal_densitymatrix(m, Inf)
-    @inferred MERA.fixedpoint_densitymatrix(m)
-    @inferred MERA.scale_invariant_operator_sum(randomop1, m, (;))
+    @inferred MERAKit.descend(randomrho1, m)
+    @inferred MERAKit.thermal_densitymatrix(m, Inf)
+    @inferred MERAKit.fixedpoint_densitymatrix(m)
+    @inferred MERAKit.scale_invariant_operator_sum(randomop1, m, (;))
     @inferred densitymatrix(m, 1)
 
     # TODO Finish this part, and add @inferred checks for more functions, optimally all
     # functions that can reasonably be expected to be type stable.
     pars = (metric = :euclidean, precondition = false)
-    pars = merge(MERA.default_pars, pars)
+    pars = merge(MERAKit.default_pars, pars)
     mtan1 = gradient(randomop1, m, pars)
     mtan2 = gradient(randomop2, m, pars)
     ltan1 = getlayer(mtan1, 1)
     ltan2 = getlayer(mtan2, 1)
     @inferred (x -> tuple(x...))(ltan1)
-    @inferred MERA.tensorwise_scale(ltan1, 0.1)
-    @inferred MERA.tensorwise_sum(ltan1, ltan2)
+    @inferred MERAKit.tensorwise_scale(ltan1, 0.1)
+    @inferred MERAKit.tensorwise_sum(ltan1, ltan2)
     @inferred inner(l1, ltan1, ltan2)
-    @inferred MERA.tensorwise_scale(mtan1, 0.1)
-    @inferred MERA.tensorwise_sum(mtan1, mtan2)
+    @inferred MERAKit.tensorwise_scale(mtan1, 0.1)
+    @inferred MERAKit.tensorwise_sum(mtan1, mtan2)
     @inferred inner(m, mtan1, mtan2)
 end
 
@@ -308,8 +308,8 @@ function test_ascend_and_descend(::Type{M}, ::Type{S}) where {M, S}
         lower_space = ⊗(fill(Vout, width)...)
         randomop1 = TensorMap(randn, ComplexF64, upper_space ← upper_space)
         randomop2 = TensorMap(randn, ComplexF64, lower_space ← lower_space)
-        down1 = MERA.descend(randomop1, m, i, i+1)
-        up2 = MERA.ascend(randomop2, m, i+1, i)
+        down1 = MERAKit.descend(randomop1, m, i, i+1)
+        up2 = MERAKit.ascend(randomop2, m, i+1, i)
         e1 = dot(down1, randomop2)
         e2 = dot(randomop1, up2)
         @test e1 ≈ e2
@@ -575,7 +575,7 @@ function test_gradient_and_retraction(::Type{M}, ::Type{S}, alg, metric) where {
     eye = id(V)
 
     pars = (metric = metric, precondition = false)
-    pars = merge(MERA.default_pars, pars)
+    pars = merge(MERAKit.default_pars, pars)
 
     fg(x) = (expect(ham, x), gradient(ham, x, pars))
     scale!(vec, beta) = tensorwise_scale(vec, beta)
@@ -622,7 +622,7 @@ function test_transport(::Type{M}, ::Type{S}, alg, metric) where {M, S}
     hams = [ham + ham' for ham in hams]
 
     pars = (metric = metric, precondition = false)
-    pars = merge(MERA.default_pars, pars)
+    pars = merge(MERAKit.default_pars, pars)
 
     g1, g2, g3 = [gradient(ham, m, pars) for ham in hams]
     angle_pre = inner(m, g2, g3; metric=metric)

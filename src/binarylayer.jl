@@ -1,5 +1,5 @@
 # BinaryLayer and BinaryMERA types, and methods thereof.
-# To be `included` in MERA.jl.
+# To be `included` in MERAKit.jl.
 
 """
     BinaryLayer{ST, ET, Tan} <: SimpleLayer

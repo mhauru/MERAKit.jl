@@ -1,4 +1,4 @@
-module MERA
+module MERAKit
 
 using TensorKit
 using TensorKitManifolds

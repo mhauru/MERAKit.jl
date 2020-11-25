@@ -1,5 +1,5 @@
 using Documenter
-using MERA
+using MERAKit
 
-makedocs(sitename = "MERA.jl", modules = [MERA])
-deploydocs(repo = "github.com/mhauru/MERA.jl.git")
+makedocs(sitename = "MERAKit.jl", modules = [MERAKit])
+deploydocs(repo = "github.com/mhauru/MERAKit.jl.git")

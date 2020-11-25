@@ -1,6 +1,6 @@
-# MERA.jl reference
+# MERAKit.jl reference
 
-MERA.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. For usage instructions, see the [GitHub page](https://github.com/mhauru/MERA.jl). Below you can find the reference documentation, listing all the types and functions.
+MERAKit.jl provides Julia implementations of some basic [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms. For usage instructions, see the [GitHub page](https://github.com/mhauru/MERAKit.jl). Below you can find the reference documentation, listing all the types and functions.
 
 ## MERA types
 ```@docs

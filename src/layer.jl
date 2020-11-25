@@ -1,5 +1,5 @@
 # The Layer abstract type and empty function definitions, to be expanded by subtypes.
-# To be included in MERA.jl
+# To be included in MERAKit.jl
 
 """
 Abstract supertype of all layer types, e.g. `BinaryLayer` and `TernaryLayer`.

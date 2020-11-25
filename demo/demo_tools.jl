@@ -4,7 +4,7 @@ module DemoTools
 using LinearAlgebra
 using TensorKit
 using JLD2
-using MERA
+using MERAKit
 
 """
     block_op(op, num_sites)
@@ -14,7 +14,7 @@ together to form a new operator for which each site corresponds to `num_sites` s
 original operator, and which sums up to the same global operator. `num_sites` should be a
 power of 2.
 """
-function block_op(op::MERA.SquareTensorMap{2}, num_sites)
+function block_op(op::MERAKit.SquareTensorMap{2}, num_sites)
     while num_sites > 1
         VL = space(op, 1)
         VR = space(op, 2)
@@ -37,7 +37,7 @@ function block_op(op::MERA.SquareTensorMap{2}, num_sites)
     return op
 end
 
-function block_op(op::MERA.SquareTensorMap{1}, num_sites)
+function block_op(op::MERAKit.SquareTensorMap{1}, num_sites)
     while num_sites > 1
         V = space(op, 1)
         eye = id(V)
@@ -192,7 +192,7 @@ Store the MERA `m` on disk at `path`.
 
 The storage format is a JLD2 file of `pseudoserialize(m)`.  We use pseudoserialization to
 both work around limitations of JLD(2) and improve compatibility between different versions
-of MERA.jl
+of MERAKit.jl
 
 See also: [`load_mera`](@ref)
 """
@@ -208,7 +208,7 @@ Load the MERA at stored at `path`.
 
 The storage format is a JLD2 file of `pseudoserialize(m)`.  We use pseudoserialization to
 both work around limitations of JLD(2) and improve compatibility between different versions
-of MERA.jl
+of MERAKit.jl
 
 See also: [`store_mera`](@ref)
 """

@@ -1,4 +1,4 @@
-# To be included in MERA.jl.
+# To be included in MERAKit.jl.
 
 """
     ModifiedBinaryOp{T}

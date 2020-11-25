@@ -1,5 +1,5 @@
 # Utilities for creating and modifying vector spaces and TensorMaps.
-# To be `included` in MERA.jl.
+# To be `included` in MERAKit.jl.
 
 """
 An `AbstractTensorMap` from N indices to N indices.

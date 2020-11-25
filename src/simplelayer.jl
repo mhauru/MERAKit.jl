@@ -1,5 +1,5 @@
 # The SimpleLayer abstract type and methods for it.
-# To be `included` in MERA.jl.
+# To be `included` in MERAKit.jl.
 
 """
     SimpleLayer <: Layer

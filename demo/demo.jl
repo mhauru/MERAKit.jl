@@ -1,9 +1,9 @@
-# This script demonstrates how to use MERA.jl to find an approximation to the ground state
-# of the critical Ising model.
+# This script demonstrates how to use MERAKit.jl to find an approximation to the ground
+# state of the critical Ising model.
 using Random
 using LinearAlgebra
 using TensorKit
-using MERA
+using MERAKit
 # DemoTools holds some utility functions needed by this script, for creating Hamiltonians
 # and storing and reading MERAs to/from disk. It exports nothing, so all calls need to be
 # qualified as DemoTools.whatever.
@@ -70,7 +70,7 @@ function main()
     # argument of `minimize_expectation`, which can be a function that is run at the end of
     # every iteration. `finalize!` could be used to do plenty of things, including modifying
     # the current MERA `m` during the optimisation, but we simply use it to print things out
-    # every `checkpoint_frequency` iterations. See the documentation of MERA.jl for more
+    # every `checkpoint_frequency` iterations. See the documentation of MERAKit.jl for more
     # details on `finalize!`.
     checkpoint_frequency = 100
     function finalize!(m, energy, g, repnum)

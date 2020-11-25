@@ -2,7 +2,7 @@
 # implementations (binary, ternary, ...) are built. Methods and functions that can be
 # implemented on this level of abstraction, without having to know the details of the
 # specific MERA type.
-# To be included in MERA.jl.
+# To be included in MERAKit.jl.
 
 """
     GenericMERA{N, LT <: Layer, OT}
@@ -359,7 +359,6 @@ remove_symmetry(m::GenericMERA) = GenericMERA(map(remove_symmetry, m.layers))
 # # # Pseudo(de)serialization
 # "Pseudo(de)serialization" refers to breaking the MERA down into types in Julia Base, and
 # constructing it back. This can be used for storing MERAs on disk.
-# TODO Once JLD or JLD2 works properly we should be able to get rid of this.
 #
 # Note that pseudoserialization discards the cache, forcing recomputation.
 

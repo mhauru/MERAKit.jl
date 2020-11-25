@@ -1,5 +1,5 @@
 # TernaryLayer and TernaryMERA types, and methods thereof.
-# To be `included` in MERA.jl.
+# To be `included` in MERAKit.jl.
 
 """
     TernaryLayer{ST, ET, Tan} <: SimpleLayer

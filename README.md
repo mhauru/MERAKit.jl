@@ -1,21 +1,19 @@
-# MERA.jl
+# MERAKit.jl
 [![][docs-img]][docs-url] [![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
 
-MERA.jl provides Julia implementations of [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms.
+MERAKit.jl provides Julia implementations of [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms.
 At the moment it only implements infinite, translation invariant MERA.
 It has implementations of ternary, binary, and modified binary MERA, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions.
 Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient-based optimization methods](https://arxiv.org/abs/2007.03638).
-MERA.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
-
-MERA.jl remains in active development as of September 2020.
+MERAKit.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
 
 ## Installation
 ```
-]add https://github.com/mhauru/MERA.jl
+]add https://github.com/mhauru/MERAKit.jl
 ```
 or if you also want the demo scripts discussed below,
 ```
-git clone https://github.com/mhauru/MERA.jl
+git clone https://github.com/mhauru/MERAKit.jl
 ```
 
 ## Usage
@@ -34,7 +32,7 @@ If you have any questions, requests, or issues, feel free to open a GitHub issue
 The actual library is obviously in `src`.
 The type system is based on an abstract type `GenericMERA{N, LT} where LT <: Layer`, and its concrete subtypes such as `TernaryMERA{N} = GenericMERA{N, TernaryLayer}` and `BinaryMERA{N} = GenericMERA{N, BinaryLayer}`.
 Here's a rough summary of the contents of each file in `src`:
-* `MERA.jl`: Exports, imports, and inclusion of the other files.
+* `MERAKit.jl`: Exports, imports, and inclusion of the other files.
 * `layer.jl`: Define the abstract type `Layer`, and empty functions for it that subtypes should implement.
 * `genericmera.jl`: The `GenericMERA` type and all functions that are common to all types of MERAs.
 * `meracache.jl`: A cache for things like ascended operators and environments, used by `GenericMERA`.
@@ -46,8 +44,8 @@ Here's a rough summary of the contents of each file in `src`:
 See also `test/runtests.jl` for the test suite.
 
 [docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-url]: https://mhauru.github.io/MERA.jl/dev/
-[travis-img]: https://travis-ci.org/mhauru/MERA.jl.svg?branch=master
-[travis-url]: https://travis-ci.org/mhauru/MERA.jl
-[codecov-img]: https://codecov.io/gh/mhauru/MERA.jl/branch/master/graph/badge.svg
-[codecov-url]: https://codecov.io/gh/mhauru/MERA.jl
+[docs-url]: https://mhauru.github.io/MERAKit.jl/dev/
+[travis-img]: https://travis-ci.org/mhauru/MERAKit.jl.svg?branch=master
+[travis-url]: https://travis-ci.org/mhauru/MERAKit.jl
+[codecov-img]: https://codecov.io/gh/mhauru/MERAKit.jl/branch/master/graph/badge.svg
+[codecov-url]: https://codecov.io/gh/mhauru/MERAKit.jl
