@@ -5,7 +5,7 @@ MERAKit.jl provides Julia implementations of [Multiscale Entaglement Renormaliza
 At the moment it only implements infinite, translation invariant MERA.
 It has implementations of ternary, binary, and modified binary MERA, with functions for doing energy minimization, evaluating local expectation values, and computing scaling dimensions.
 Energy can be minimised using either the classic [alternating energy minimization algorithm](https://arxiv.org/abs/0707.1454), that in the code is called the Evenbly-Vidal algorithm, or using [gradient-based optimization methods](https://arxiv.org/abs/2007.03638).
-MERAKit.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal symmetries, both Abelian and non-Abelian.
+MERAKit.jl makes extensive use of [TensorKit](https://github.com/Jutho/TensorKit.jl), and uses it to support global internal group symmetries, both Abelian and non-Abelian, as well as anyonic MERAs.
 
 ## Installation
 ```
