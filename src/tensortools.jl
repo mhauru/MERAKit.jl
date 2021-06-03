@@ -303,7 +303,7 @@ function pad_with_zeros_to(t::AbstractTensorMap, spacedict::Dict)
         a = t[f1, f2]
         anew = tnew[f1, f2]
         axes = Base.OneTo.(min.(size(a), size(anew)))
-        copyto!(view(anew, axes...), view(a, axes...))
+        copy!(view(anew, axes...), view(a, axes...))
     end
     return tnew
 end
