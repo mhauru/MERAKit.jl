@@ -4,8 +4,6 @@ authors = ["Markus Hauru <markus@mhauru.org>", "Jutho Haegeman <jutho.haegeman@u
 version = "0.1.0"
 
 [deps]
-ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
-JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -18,8 +16,6 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 TupleTools = "9d95972d-f1c8-5527-a6e0-b4b365fa01f6"
 
 [compat]
-ArgParse = "^1.1.0"
-JLD2 = "^0.1.14"
 KrylovKit = "^0.5.2"
 NamedTupleTools = "^0.13.6"
 OptimKit = "0.1 - 1"

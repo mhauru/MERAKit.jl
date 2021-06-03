@@ -98,9 +98,9 @@ Base.:*(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid * a, op.gap *
 Base.:*(a::Number, op::ModifiedBinaryOp) = op*a
 Base.:/(op::ModifiedBinaryOp, a::Number) = ModifiedBinaryOp(op.mid / a, op.gap / a)
 
-function Base.copyto!(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
-    copyto!(op1.mid, op2.mid)
-    copyto!(op1.gap, op2.gap)
+function Base.copy!(op1::ModifiedBinaryOp, op2::ModifiedBinaryOp)
+    copy!(op1.mid, op2.mid)
+    copy!(op1.gap, op2.gap)
     return op1
 end
 
