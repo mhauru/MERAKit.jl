@@ -28,7 +28,7 @@ function particle_number_operator(::Type{Vect[IsingAnyon]})
 end
 
 function particle_number_operator(::Type{Z2Space})
-    V = Z2Space(ℤ₂(0) => 1, ℤ₂(1) => 1)
+    V = Z2Space(0 => 1, 1 => 1)
     z = TensorMap(zeros, Float64, V ← V)
     z.data[ℤ₂(0)] .= 0.0
     z.data[ℤ₂(0)] .= 1.0
@@ -213,8 +213,8 @@ function test_modifiedbinaryop(::Type{S}) where {S}
     res_m = tr(m1)
     @test res_t == res_m
 
-    res_t = ModifiedBinaryOp(copyto!(mid1, mid2), copyto!(gap1, gap2))
-    res_m = copyto!(m1, m2)
+    res_t = ModifiedBinaryOp(copy!(mid1, mid2), copy!(gap1, gap2))
+    res_m = copy!(m1, m2)
     @test res_t == res_m
 end
 
