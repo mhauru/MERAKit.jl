@@ -1,5 +1,5 @@
 # MERAKit.jl
-[![][docs-img]][docs-url] [![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
+[![][docs-img]][docs-url] [![CI](https://github.com/mhauru/MERAKit.jl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mhauru/MERAKit.jl/actions/workflows/ci.yml) [![][codecov-img]][codecov-url]
 
 MERAKit.jl provides Julia implementations of [Multiscale Entaglement Renormalization Ansatz](https://arxiv.org/abs/quant-ph/0610099) algorithms.
 At the moment it only implements infinite, translation invariant MERA.
